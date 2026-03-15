@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  /* 모바일 뷰포트에서만 스크롤바 숨김, 데스크톱에서는 가로 스크롤 가능 */
+  .scrollbar-hide-mobile {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide-mobile::-webkit-scrollbar {
+    display: none;
+  }
+  @media (min-width: 769px) {
+    .scrollbar-hide-mobile {
+      -ms-overflow-style: auto;
+      scrollbar-width: auto;
+    }
+    .scrollbar-hide-mobile::-webkit-scrollbar {
+      display: block;
+    }
+  }
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}

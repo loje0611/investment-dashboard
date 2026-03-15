@@ -1,0 +1,89 @@
+import type { SheetDataRow } from '../types/api';
+import type { PensionRow } from '../data/dashboardDummy';
+
+function toNumber(value: string | number | boolean | null | undefined): number {
+  if (value == null) return 0;
+  if (typeof value === 'number' && !Number.isNaN(value)) return value;
+  if (typeof value === 'string') {
+    const n = parseFloat(value.replace(/,/g, '').trim());
+    return Number.isNaN(n) ? 0 : n;
+  }
+  return 0;
+}
+
+function parseRate(value: string | number | boolean | null | undefined): number {
+  if (value == null) return 0;
+  if (typeof value === 'number' && !Number.isNaN(value)) return value;
+  const s = String(value).replace(/,/g, '').trim();
+  const isNegative = s.includes('▼');
+  const num = parseFloat(s.replace(/[▲▼%\s]/g, ''));
+  if (Number.isNaN(num)) return 0;
+  return isNegative ? -Math.abs(num) : num;
+}
+
+function toString(value: string | number | boolean | null | undefined): string {
+  if (value == null) return '';
+  return String(value).trim();
+}
+
+/** 시트 6~11번째 컬럼(수익률 오른쪽 6개) 값을 배열로 */
+function parseSixValues(row: SheetDataRow, fallback: number): number[] {
+  const keys = Object.keys(row);
+  if (keys.length < 11) return [0, 0, 0, 0, 0, fallback];
+  const sixKeys = keys.slice(5, 11);
+  const values = sixKeys.map((k) => parseRate(row[k]));
+  const hasData = values.some((v) => v !== 0);
+  if (!hasData) return [0, 0, 0, 0, 0, fallback];
+  while (values.length < 6) values.push(values[values.length - 1] ?? 0);
+  return values.slice(0, 6);
+}
+
+/**
+ * 연금 시트 행 배열을 연금 현황 탭용 PensionRow[]로 변환합니다.
+ * 컬럼 구조: 상품명, 투자시점(등), 투자원금, 평가금액, 수익률, 이후 6개 월별 수익률.
+ */
+export function pensionToRows(rows: SheetDataRow[]): PensionRow[] {
+  return rows.map((row, i) => {
+    const name =
+      toString(row.상품명) ||
+      toString(row.종목명) ||
+      toString(row.이름) ||
+      '-';
+    const principal =
+      toNumber(row.투자원금) || toNumber(row.원금) || toNumber(row.매입금액) || 0;
+    const valuation =
+      toNumber(row.평가금액) ||
+      toNumber(row.평가금) ||
+      toNumber(row.현재평가) ||
+      toNumber(row.평가) ||
+      0;
+    const returnRate =
+      principal > 0 && valuation !== 0
+        ? ((valuation - principal) / principal) * 100
+        : parseRate(row.수익률) || parseRate(row['전체 수익률']) || 0;
+
+    const sixValues = parseSixValues(row, returnRate / 100);
+    const isDecimal = sixValues.every((x) => Math.abs(x) <= 2);
+    const factor = isDecimal ? 100 : 1;
+    const monthlyDeltas =
+      sixValues.length >= 2
+        ? [
+            ...sixValues
+              .slice(0, -1)
+              .map((v, j) =>
+                Number(((v - sixValues[j + 1]) * factor).toFixed(2))
+              ),
+            0,
+          ].slice(0, 6)
+        : [0, 0, 0, 0, 0, 0];
+
+    return {
+      id: `pension-${i}`,
+      name,
+      principal,
+      valuation,
+      returnRate,
+      monthlyDeltas,
+    };
+  });
+}
