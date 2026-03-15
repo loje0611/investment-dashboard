@@ -11,7 +11,6 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts'
-import { TrendingUp, TrendingDown } from 'lucide-react'
 import type { PieSegment, TrendPoint } from '../../data/dashboardDummy'
 
 interface GlobalOverviewProps {
@@ -23,10 +22,6 @@ function formatYAxis(value: number): string {
   if (value >= 100_000_000) return `${(value / 100_000_000).toFixed(0)}억`
   if (value >= 10_000) return `${(value / 10_000).toFixed(0)}만`
   return String(value)
-}
-
-function formatWon(value: number): string {
-  return value.toLocaleString('ko-KR')
 }
 
 function CustomTooltip({ active, payload, label }: any) {
@@ -81,7 +76,7 @@ export function GlobalOverview({ pieData, trendData }: GlobalOverviewProps) {
                   dataKey="value"
                   nameKey="name"
                   stroke="none"
-                  labelLine={{ stroke: '#94a3b8', strokeWidth: 1, length1: 15, length2: 10 }}
+                  labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
                   label={({ cx, cy, midAngle, outerRadius, name, value }) => {
                     const RADIAN = Math.PI / 180;
                     // 반지름보다 훨씬 바깥(양옆)으로 밀어냄

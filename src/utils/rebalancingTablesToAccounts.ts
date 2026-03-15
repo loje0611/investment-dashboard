@@ -1,7 +1,7 @@
 import type { RebalancingTableRow } from '../types/api';
 import type { RebalancingAccount, RebalancingHolding } from '../data/dashboardDummy';
 
-function toNumber(value: string | number | boolean | null | undefined): number {
+function toNumber(value: unknown): number {
   if (value == null) return 0;
   if (typeof value === 'number' && !Number.isNaN(value)) return value;
   if (typeof value === 'string') {
@@ -11,7 +11,7 @@ function toNumber(value: string | number | boolean | null | undefined): number {
   return 0;
 }
 
-function toString(value: string | number | boolean | null | undefined): string {
+function toString(value: unknown): string {
   if (value == null) return '';
   return String(value).trim();
 }

@@ -60,7 +60,6 @@ function SummaryCardSlide({ item }: { item: SummaryCardItem }) {
   const isProfit = (item.rate ?? 0) >= 0
   const rateColor = isProfit ? 'text-rose-500' : 'text-sky-500'
   const symbol = isProfit ? '▲' : '▼'
-  const rateLabel = item.riskText == null ? '' : ''
 
   return (
     <div className="h-full min-w-0 flex-shrink-0 rounded-xl border border-slate-100 bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.05)]">

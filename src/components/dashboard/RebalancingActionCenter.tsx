@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import type { RebalancingAccount, RebalancingHolding } from '../../data/dashboardDummy'
+import type { RebalancingAccount } from '../../data/dashboardDummy'
 
 interface RebalancingActionCenterProps {
   accounts: RebalancingAccount[]

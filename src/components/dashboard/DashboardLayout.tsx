@@ -73,7 +73,7 @@ function formatRedemptionDateDisplay(dateStr: string): string {
 }
 
 export function DashboardLayout() {
-  const { els, etf, pension, portfolio, rebalancing, isLoading, isLoadingAssets, isLoadingRebalancing, fetchData } = useStore()
+  const { els, etf, pension, portfolio, rebalancing, isLoadingAssets, isLoadingRebalancing, fetchData } = useStore()
   const elsProducts = useElsProductsWithMappings()
   const [mainTab, setMainTab] = useState<MainTabId>('home')
 
