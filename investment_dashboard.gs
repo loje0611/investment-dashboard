@@ -106,7 +106,7 @@ function getDashboardData(dataType) {
       pension = [];
     }
     try {
-      els = readSheetAsObjects(ss, 'ELS(투자중)', 1);
+      els = readSheetAsObjectsFirstNonEmpty(ss, ['ELS(투자중)', 'ELS (투자중)', '투자중ELS'], 1);
     } catch (e) {
       els = [];
     }
@@ -116,7 +116,11 @@ function getDashboardData(dataType) {
       elsSheetTotals = null;
     }
     try {
-      elsCompleted = readSheetAsObjects(ss, 'ELS(완료)', 1);
+      elsCompleted = readSheetAsObjectsFirstNonEmpty(
+        ss,
+        ['ELS(완료)', 'ELS (완료)', 'ELS완료'],
+        1
+      );
     } catch (e) {
       elsCompleted = [];
     }
@@ -149,8 +153,36 @@ function getDashboardData(dataType) {
  * 탭 이름은 정확히 'ELS' 여야 합니다.
  * @returns {{ principal: number, valuation: number }|null}
  */
+/**
+ * 후보 시트명 중 첫 번째로 존재하는 시트를 headerRowIndex 행을 헤더로 읽습니다.
+ * @returns {Object[]}
+ */
+function readSheetAsObjectsFirstNonEmpty(ss, sheetNames, headerRowIndex) {
+  if (!sheetNames || !sheetNames.length) return [];
+  var hi = headerRowIndex == null ? 0 : Number(headerRowIndex) || 0;
+  for (var i = 0; i < sheetNames.length; i++) {
+    var name = sheetNames[i];
+    try {
+      var sheet = ss.getSheetByName(name);
+      if (!sheet) continue;
+      var rows = readSheetAsObjects(ss, name, hi);
+      if (rows && rows.length > 0) return rows;
+    } catch (e) {}
+  }
+  for (var j = 0; j < sheetNames.length; j++) {
+    try {
+      var sh = ss.getSheetByName(sheetNames[j]);
+      if (sh) return readSheetAsObjects(ss, sheetNames[j], hi);
+    } catch (e2) {}
+  }
+  return [];
+}
+
 function readElsSheetTotalsB4C4(ss) {
-  var sh = ss.getSheetByName('ELS');
+  var sh =
+    ss.getSheetByName('ELS') ||
+    ss.getSheetByName('els') ||
+    ss.getSheetByName('Els');
   if (!sh) return null;
   var vals = sh.getRange(4, 2, 4, 3).getValues();
   if (!vals || !vals[0]) return null;
@@ -347,7 +379,17 @@ function readTotalAssetsSheet(ss) {
       var hit = false;
       for (var c = 0; c < row.length; c++) {
         var cell = row[c] != null ? String(row[c]).trim() : '';
-        if (cell === '평가일' || cell === '일자' || cell.indexOf('평가일') >= 0 || cell.indexOf('일자') >= 0) {
+        if (
+          cell === '평가일' ||
+          cell === '일자' ||
+          cell === '날짜' ||
+          cell.indexOf('평가일') >= 0 ||
+          cell.indexOf('일자') >= 0 ||
+          cell.indexOf('날짜') >= 0 ||
+          cell.indexOf('기준일') >= 0 ||
+          cell.indexOf('연월') >= 0 ||
+          cell.indexOf('년월') >= 0
+        ) {
           hit = true;
           break;
         }

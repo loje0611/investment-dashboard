@@ -25,10 +25,42 @@ function normalizeKey(k: string): string {
     .trim()
 }
 
-const DATE_KEYS = ['평가일', '일자', '날짜', 'date'] as const
-const PRINCIPAL_KEYS = ['원금 총액', '원금총액', '투자원금합계', '원금'] as const
-/** 총자산은 일부 시트에서 '평가금 총액'과 다른 의미일 수 있어 뒤에서만 시도 */
-const VALUATION_KEYS = ['평가금 총액', '평가금총액', '평가합계'] as const
+const DATE_KEYS = [
+  '평가일',
+  '일자',
+  '날짜',
+  '기준일',
+  '평가기준일',
+  '평가 기준일',
+  '연월',
+  '년월',
+  'date',
+] as const
+const PRINCIPAL_KEYS = [
+  '원금 총액',
+  '원금총액',
+  '원금 합계',
+  '원금합계',
+  '투자원금합계',
+  '총 투자원금',
+  '총투자원금',
+  '투자원금',
+  '원금',
+] as const
+/** 총자산 이력 시트: 평가금 총액·평가금액 등 다양한 헤더 */
+const VALUATION_KEYS = [
+  '평가금 총액',
+  '평가금총액',
+  '평가 합계',
+  '평가합계',
+  '총 평가금',
+  '총평가금',
+  '총 평가금액',
+  '총평가금액',
+  '평가금액',
+  '평가액',
+  '평가금',
+] as const
 const MOM_PRINCIPAL_KEYS = ['원금 증감액', '원금증감액'] as const
 const MOM_VALUATION_KEYS = ['평가 증감액', '평가증감액'] as const
 
@@ -69,6 +101,14 @@ function parseDateValue(v: unknown): Date | null {
     const dt = new Date(fullY, Number(m[2]) - 1, Number(m[3]))
     return Number.isNaN(dt.getTime()) ? null : dt
   }
+  // 시트 표시 형식: 26.3.15 / 26.03.15
+  m = s.match(/^(\d{2})\.(\d{1,2})\.(\d{1,2})$/)
+  if (m) {
+    const y = Number(m[1])
+    const fullY = y >= 70 ? 1900 + y : 2000 + y
+    const dt = new Date(fullY, Number(m[2]) - 1, Number(m[3]))
+    return Number.isNaN(dt.getTime()) ? null : dt
+  }
   return null
 }
 
@@ -103,7 +143,15 @@ function getDateFromRow(row: TotalAssetRow): Date | null {
   }
   const fuzzy = findCellByHeaderPattern(
     row,
-    (h) => h === '평가일' || h === '일자' || h.endsWith('평가일') || /^날짜/i.test(h)
+    (h) =>
+      h === '평가일' ||
+      h === '일자' ||
+      h === '날짜' ||
+      h === '기준일' ||
+      h.endsWith('평가일') ||
+      /^날짜/i.test(h) ||
+      /기준일/.test(h) ||
+      /^연월|^년월/.test(h)
   )
   const fromFuzzy = parseDateValue(fuzzy)
   if (fromFuzzy) return fromFuzzy
@@ -124,9 +172,11 @@ function getPrincipalFromRow(row: TotalAssetRow): number | null {
   const v = findCellByHeaderPattern(
     row,
     (h) =>
+      !isDirtyPrincipalHeader(h) &&
       !isDirtyValuationHeader(h) &&
       ((h.includes('원금') && (h.includes('총액') || h.includes('합계'))) ||
-        (h.includes('원금') && h.includes('총')))
+        (h.includes('원금') && h.includes('총')) ||
+        (h.includes('투자원금') && (h.includes('합') || h.includes('계'))))
   )
   return coerceNumber(v)
 }
@@ -144,6 +194,17 @@ function isDirtyValuationHeader(h: string): boolean {
   )
 }
 
+function isDirtyPrincipalHeader(h: string): boolean {
+  return (
+    h.includes('증감') ||
+    h.includes('증가') ||
+    h.includes('증액') ||
+    h.includes('전월') ||
+    h.includes('차액') ||
+    h.includes('대비')
+  )
+}
+
 function getValuationFromRow(row: TotalAssetRow): number | null {
   for (const k of VALUATION_KEYS) {
     const raw = getByNormalizedKeys(row, [k])
@@ -154,8 +215,11 @@ function getValuationFromRow(row: TotalAssetRow): number | null {
     row,
     (h) =>
       !isDirtyValuationHeader(h) &&
+      !h.includes('원금') &&
       ((h.includes('평가금') && (h.includes('총액') || h.includes('합계'))) ||
-        (h.includes('평가') && h.includes('총액') && !h.includes('원금')))
+        (h.includes('평가') && h.includes('총액')) ||
+        (h.includes('평가') && (h.includes('금액') || h.endsWith('평가액'))) ||
+        h === '평가금액')
   )
   const fromFuzzy = coerceNumber(v)
   if (fromFuzzy != null) return fromFuzzy

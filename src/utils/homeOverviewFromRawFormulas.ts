@@ -49,12 +49,17 @@ function sumPrincipalValuation(
       coerceNumber(row['투자원금']) ??
       coerceNumber(row['원금']) ??
       coerceNumber(row['매입금액']) ??
+      coerceNumber(row['납입원금']) ??
+      coerceNumber(row['매수금액']) ??
       0
     const v =
       coerceNumber(row['평가금액']) ??
       coerceNumber(row['평가금']) ??
       coerceNumber(row['현재평가']) ??
       coerceNumber(row['평가']) ??
+      coerceNumber(row['잔고평가금액']) ??
+      coerceNumber(row['평가잔액']) ??
+      coerceNumber(row['평가금합계']) ??
       0
     principal += p
     valuation += v
@@ -107,6 +112,10 @@ function sumElsCompletedProfit(rows: ElsCompletedRow[]): number {
       coerceNumber(row['수익']) ??
       coerceNumber(row['실현수익']) ??
       coerceNumber(row['누적수익']) ??
+      coerceNumber(row['실현손익']) ??
+      coerceNumber(row['손익']) ??
+      coerceNumber(row['세후수익']) ??
+      coerceNumber(row['이익']) ??
       0
     s += profit
   }
@@ -127,6 +136,8 @@ function elsCompletedWeightedPrincipalDays(rows: ElsCompletedRow[]): number {
       coerceNumber(row['투자기간']) ??
       coerceNumber(row['보유기간']) ??
       coerceNumber(row['경과일']) ??
+      coerceNumber(row['경과일수']) ??
+      coerceNumber(row['일수']) ??
       0
     sp += p * days
   }

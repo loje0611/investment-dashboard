@@ -297,7 +297,8 @@ export function GlobalOverview({
             ) : (
               <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900">
                 총자산 <strong>{totalAssetsRowCount}행</strong>을 받았지만 날짜·원금·평가금을 읽지
-                못했습니다. 헤더(평가일, 원금 총액, 평가금 총액)를 확인해 주세요.
+                못했습니다. 시트 헤더에 날짜(예: 평가일·일자·날짜·기준일)와 원금·평가금 합계 열이 있는지
+                확인해 주세요.
               </p>
             )}
           </div>
