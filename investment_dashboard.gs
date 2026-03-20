@@ -428,7 +428,12 @@ function readSheetAsObjects(ss, sheetName, headerRowIndex) {
     if (values.length < hi + 2) return [];
 
     const headers = values[hi].map(function (h) {
-      return h != null ? String(h).trim() : '';
+      if (h == null) return '';
+      return String(h)
+        .replace(/\u3000/g, ' ')
+        .replace(/\t/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
     });
     const rows = [];
 

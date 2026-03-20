@@ -28,17 +28,21 @@ export function isGasErrorResponse(
   );
 }
 
-/** 총자산 시트 한 행 ('총자산' 탭 헤더와 동일한 키) */
+/**
+ * 총자산 시트 한 행
+ * 헤더: 평가일, 원금 총액, 연금 평가금, ELS 평가금, ETF 평가금, 현금 평가금, 평가금 총액, 수익률, 원금 증감액, 평가 증감액
+ */
 export interface TotalAssetRow extends SheetDataRow {
-  /** 평가 기준일 (예: 2026-03-15) */
   평가일?: string;
-  /** 원금 합계 */
   '원금 총액'?: number | string;
-  /** 평가금 합계 */
+  '연금 평가금'?: number | string;
+  'ELS 평가금'?: number | string;
+  'ETF 평가금'?: number | string;
+  '현금 평가금'?: number | string;
+  /** 합계(추이 차트에 사용) */
   '평가금 총액'?: number | string;
-  /** 전월 대비 원금 차이 (시트 수식) */
+  수익률?: number | string;
   '원금 증감액'?: number | string;
-  /** 전월 대비 평가금 차이 (시트 수식) */
   '평가 증감액'?: number | string;
   일자?: string;
   총자산?: number;

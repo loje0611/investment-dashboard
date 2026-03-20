@@ -17,14 +17,22 @@ export interface PrincipalValuationTrend {
   latestLabel: string | null
 }
 
-/** 전각 공백·연속 공백 정리 (시트 헤더 "원금　총액" 등 대응) */
+/**
+ * 전각·탭·연속 공백 정리 (시트 헤더가 탭으로 붙어 있거나 "원금　총액" 형태일 때 대응)
+ */
 function normalizeKey(k: string): string {
   return k
     .replace(/\u3000/g, ' ')
+    .replace(/\t/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
 
+/**
+ * 「총자산」시트 표준 헤더(1행):
+ * 평가일 | 원금 총액 | 연금 평가금 | ELS 평가금 | ETF 평가금 | 현금 평가금 | 평가금 총액 | 수익률 | 원금 증감액 | 평가 증감액
+ * 차트·추이는 평가일·원금 총액·평가금 총액 열만 사용합니다.
+ */
 const DATE_KEYS = [
   '평가일',
   '일자',
@@ -37,6 +45,7 @@ const DATE_KEYS = [
   'date',
 ] as const
 const PRINCIPAL_KEYS = [
+  /** 총자산 시트 본문 열 */
   '원금 총액',
   '원금총액',
   '원금 합계',
@@ -47,8 +56,9 @@ const PRINCIPAL_KEYS = [
   '투자원금',
   '원금',
 ] as const
-/** 총자산 이력 시트: 평가금 총액·평가금액 등 다양한 헤더 */
+/** 총자산·기타 이력: 합계 열 우선(연금/ELS/ETF/현금 평가금 열은 사용하지 않음) */
 const VALUATION_KEYS = [
+  /** 총자산 시트 본문 합계 열 */
   '평가금 총액',
   '평가금총액',
   '평가 합계',
