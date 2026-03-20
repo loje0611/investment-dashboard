@@ -5,56 +5,16 @@ import { portfolioToEtfRows } from '../../utils/portfolioToEtf'
 import { pensionToRows } from '../../utils/pensionToRows'
 import { portfolioToRebalancingAccounts } from '../../utils/portfolioToRebalancing'
 import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAccounts'
+import { totalAssetsToPrincipalValuationTrend } from '../../utils/totalAssetsToPrincipalValuation'
+import { buildHomeOverviewFromRawFormulas } from '../../utils/homeOverviewFromRawFormulas'
+import { getCurrentLevelFromRow, parseBarrierPercent } from '../../utils/elsRiskCounts'
 import type { ElsCardItem, EtfRow, PensionRow } from '../../data/dashboardDummy'
 import { SummaryCardsCarousel } from './SummaryCardsCarousel'
 import { GlobalOverview } from './GlobalOverview'
 import { AssetDetailsTabs } from './AssetDetailsTabs'
 import { RebalancingActionCenter } from './RebalancingActionCenter'
 import { BottomNav, type MainTabId } from './BottomNav'
-import {
-  SUMMARY_CARDS,
-  PIE_DATA,
-  TREND_DATA,
-  ELS_LIST,
-  ETF_TABLE,
-  PENSION_TABLE,
-} from '../../data/dashboardDummy'
-
-function parseBarrierPercent(
-  value: string | number | boolean | null | undefined
-): number {
-  if (value == null) return 0
-  if (typeof value === 'number' && !Number.isNaN(value)) {
-    return value > 0 && value < 1.5 ? value * 100 : value
-  }
-  const s = String(value).replace(/%/g, '').trim()
-  const n = parseFloat(s)
-  if (Number.isNaN(n)) return 0
-  return n > 0 && n < 1.5 ? n * 100 : n
-}
-
-function getCurrentLevelFromRow(
-  row: Record<string, unknown>,
-  fallback: number
-): number {
-  const worstPerf = row['Worst Perf.'] ?? row['Worst Perf']
-  if (worstPerf != null && worstPerf !== '') {
-    const s = String(worstPerf).replace(/%/g, '').trim()
-    const n = parseFloat(s)
-    if (!Number.isNaN(n)) return n
-  }
-  const currentLevel = row.현재수준 ?? row['현재 수준']
-  if (currentLevel != null) {
-    const n = typeof currentLevel === 'number' ? currentLevel : parseFloat(String(currentLevel))
-    if (!Number.isNaN(n)) return Math.max(0, Math.min(100, n))
-  }
-  const curr = row.현재가 != null ? Number(row.현재가) : NaN
-  const base = row.기준가 != null ? Number(row.기준가) : NaN
-  if (!Number.isNaN(curr) && !Number.isNaN(base) && base !== 0) {
-    return Math.max(0, Math.min(100, (curr / base) * 100))
-  }
-  return fallback
-}
+import { AmountHideToggle } from './AmountHideToggle'
 
 function getNextRedemptionDate(row: Record<string, unknown>): string {
   const next = row['다음 평가일']
@@ -72,8 +32,37 @@ function formatRedemptionDateDisplay(dateStr: string): string {
   return s
 }
 
+function HomeLoadingScreen() {
+  return (
+    <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 py-16 text-slate-500">
+      <div
+        className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600"
+        aria-hidden
+      />
+      <p className="text-sm font-medium">로딩 중...</p>
+    </div>
+  )
+}
+
 export function DashboardLayout() {
-  const { els, etf, pension, portfolio, rebalancing, isLoadingAssets, isLoadingRebalancing, fetchData } = useStore()
+  const {
+    els,
+    etf,
+    pension,
+    portfolio,
+    rebalancing,
+    totalAssets,
+    elsCompleted,
+    elsSheetTotals,
+    cashOther,
+    isLoading,
+    isLoadingAssets,
+    isLoadingRebalancing,
+    error,
+    fetchData,
+    clearError,
+    hideAmounts,
+  } = useStore()
   const elsProducts = useElsProductsWithMappings()
   const [mainTab, setMainTab] = useState<MainTabId>('home')
 
@@ -82,10 +71,10 @@ export function DashboardLayout() {
   }, [fetchData])
 
   const elsListForTab = useMemo((): ElsCardItem[] => {
-    if (!els.length) return ELS_LIST
-    const fromApi = els.map((row, i) => {
+    if (!els.length) return []
+    return els.map((row, i) => {
       const product = elsProducts[i]
-      const worst = product ? getWorstPerformer(product) : null
+      const worst = product != null ? getWorstPerformer(product) : null
       const levelFromWorst = worst != null ? 100 + worst.percentage : 0
       const currentLevel = getCurrentLevelFromRow(row, levelFromWorst)
       const kiBarrier = parseBarrierPercent(row.낙인배리어 ?? row.KI) || 70
@@ -101,25 +90,28 @@ export function DashboardLayout() {
         redemptionBarrier,
       }
     })
-    const hasMeaningfulData = fromApi.some(
-      (item) => item.productName !== '-' || item.nextRedemptionDate !== '-' || item.currentLevel !== 0
-    )
-    return hasMeaningfulData ? fromApi : ELS_LIST
   }, [els, elsProducts])
 
   const etfTableForTab = useMemo((): EtfRow[] => {
-    if (!etf.length) return ETF_TABLE
-    const fromApi = portfolioToEtfRows(etf)
-    const hasMeaningful = fromApi.some((r) => r.name !== '-' || r.principal > 0 || r.valuation > 0)
-    return hasMeaningful ? fromApi : ETF_TABLE
+    if (!etf.length) return []
+    return portfolioToEtfRows(etf)
   }, [etf])
 
   const pensionTableForTab = useMemo((): PensionRow[] => {
-    if (!pension.length) return PENSION_TABLE
-    const fromApi = pensionToRows(pension)
-    const hasMeaningful = fromApi.some((r) => r.name !== '-' || r.principal > 0 || r.valuation > 0)
-    return hasMeaningful ? fromApi : PENSION_TABLE
+    if (!pension.length) return []
+    return pensionToRows(pension)
   }, [pension])
+
+  const principalValuationTrend = useMemo(
+    () => totalAssetsToPrincipalValuationTrend(totalAssets),
+    [totalAssets]
+  )
+
+  const homeOverview = useMemo(
+    () =>
+      buildHomeOverviewFromRawFormulas(pension, etf, els, elsCompleted, cashOther, elsSheetTotals),
+    [pension, etf, els, elsCompleted, cashOther, elsSheetTotals]
+  )
 
   const rebalancingAccounts = useMemo(() => {
     if (rebalancing && rebalancing.length > 0) {
@@ -132,11 +124,8 @@ export function DashboardLayout() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* 모바일 프레임: 최대 480px 중앙 정렬, PC에서도 폰처럼 보이게 */}
       <div className="relative mx-auto min-h-screen max-w-[480px] bg-slate-50 pb-20 shadow-[0_0_0_1px_rgba(0,0,0,0.06)]">
-        {/* 메인 콘텐츠: 탭별로 전환, 스크롤 없이 화면 단위 전환 */}
         <div className="relative min-h-[calc(100vh-3.5rem)]">
-          {/* 홈(대시보드) */}
           <div
             className="absolute inset-0 overflow-y-auto overflow-x-hidden scrollbar-hide transition-opacity duration-300 ease-out"
             style={{
@@ -146,20 +135,58 @@ export function DashboardLayout() {
             }}
           >
             <div className="flex flex-col pb-6">
-              <h1 className="shrink-0 px-4 pt-6 pb-3 text-xl font-bold text-slate-900">종합 자산</h1>
+              <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
+                <h1 className="text-xl font-bold text-slate-900">종합 자산</h1>
+                <AmountHideToggle />
+              </div>
               <div className="px-4">
-              <div className="mb-6">
-                <SummaryCardsCarousel items={SUMMARY_CARDS} />
-              </div>
-              <div className="space-y-6">
-                <h2 className="text-sm font-semibold text-slate-700">전체 현황</h2>
-                <GlobalOverview pieData={PIE_DATA} trendData={TREND_DATA} />
-              </div>
+                {isLoading ? (
+                  <HomeLoadingScreen />
+                ) : error ? (
+                  <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-6 text-sm text-rose-900">
+                    <p className="font-medium">데이터를 불러오지 못했습니다</p>
+                    <p className="mt-2 whitespace-pre-wrap text-rose-800/90">{error}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearError()
+                        fetchData()
+                      }}
+                      className="mt-4 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
+                    >
+                      다시 시도
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-6">
+                      {homeOverview.summaryCards.length > 0 ? (
+                        <SummaryCardsCarousel
+                          items={homeOverview.summaryCards}
+                          hideAmounts={hideAmounts}
+                        />
+                      ) : (
+                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-500">
+                          총자산 시트에서 표시할 수 있는 최신 행이 없습니다. 평가일·원금·평가금 열을
+                          확인해 주세요.
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-6">
+                      <h2 className="text-sm font-semibold text-slate-700">전체 현황</h2>
+                      <GlobalOverview
+                        pieData={homeOverview.pieData}
+                        principalValuationTrend={principalValuationTrend}
+                        totalAssetsRowCount={totalAssets.length}
+                        hideAmounts={hideAmounts}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
-          {/* 자산 상세: 타이틀·탭 고정, 상품 목록만 스크롤·가로 스크롤바 항상 노출 */}
           <div
             className="absolute inset-0 flex flex-col overflow-hidden transition-opacity duration-300 ease-out"
             style={{
@@ -168,18 +195,21 @@ export function DashboardLayout() {
               zIndex: mainTab === 'assets' ? 1 : 0,
             }}
           >
-            <h1 className="shrink-0 px-4 pt-6 pb-3 text-xl font-bold text-slate-900">자산 상세</h1>
+            <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
+              <h1 className="text-xl font-bold text-slate-900">자산 상세</h1>
+              <AmountHideToggle />
+            </div>
             <div className="flex min-h-0 flex-1 flex-col px-4 pb-4">
               <AssetDetailsTabs
                 elsList={elsListForTab}
                 etfTable={etfTableForTab}
                 pensionTable={pensionTableForTab}
-                isLoading={isLoadingAssets}
+                isLoading={isLoading || isLoadingAssets}
+                hideAmounts={hideAmounts}
               />
             </div>
           </div>
 
-          {/* 리밸런싱: 타이틀·필터 고정, 테이블만 스크롤·가로 스크롤바 항상 노출 */}
           <div
             className="absolute inset-0 flex flex-col overflow-hidden transition-opacity duration-300 ease-out"
             style={{
@@ -190,8 +220,9 @@ export function DashboardLayout() {
           >
             <RebalancingActionCenter
               accounts={rebalancingAccounts}
-              isLoading={isLoadingRebalancing}
+              isLoading={isLoading || isLoadingRebalancing}
               compact
+              hideAmounts={hideAmounts}
             />
           </div>
         </div>

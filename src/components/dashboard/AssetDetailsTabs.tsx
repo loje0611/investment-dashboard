@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Bar, BarChart, Cell, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
 import { ElsRiskProgressBar } from '../ElsRiskProgressBar'
 import type { ElsCardItem, EtfRow, PensionRow } from '../../data/dashboardDummy'
+import { formatWonDigits } from '../../utils/maskSensitiveAmount'
 
 type TabId = 'els' | 'etf' | 'pension'
 
@@ -11,10 +12,7 @@ interface AssetDetailsTabsProps {
   pensionTable: PensionRow[]
   /** 상세 현황 데이터 로딩 중일 때 true */
   isLoading?: boolean
-}
-
-function formatWon(value: number): string {
-  return value.toLocaleString('ko-KR')
+  hideAmounts: boolean
 }
 
 const BAR_SPARKLINE_WIDTH = 80
@@ -59,6 +57,7 @@ export function AssetDetailsTabs({
   etfTable,
   pensionTable,
   isLoading = false,
+  hideAmounts,
 }: AssetDetailsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('els')
 
@@ -148,8 +147,12 @@ export function AssetDetailsTabs({
                         </td>
                         <td className="py-2 pr-2 tabular-nums text-center text-slate-700">
                           <div className="flex flex-col gap-0.5 text-xs">
-                            <span className="whitespace-nowrap">₩{formatWon(row.principal)}</span>
-                            <span className="whitespace-nowrap">₩{formatWon(row.valuation)}</span>
+                            <span className="whitespace-nowrap">
+                              ₩{formatWonDigits(hideAmounts, row.principal)}
+                            </span>
+                            <span className="whitespace-nowrap">
+                              ₩{formatWonDigits(hideAmounts, row.valuation)}
+                            </span>
                           </div>
                         </td>
                         <td
@@ -194,8 +197,12 @@ export function AssetDetailsTabs({
                         </td>
                         <td className="py-2 pr-2 tabular-nums text-center text-slate-700">
                           <div className="flex flex-col gap-0.5 text-xs">
-                            <span className="whitespace-nowrap">₩{formatWon(row.principal)}</span>
-                            <span className="whitespace-nowrap">₩{formatWon(row.valuation)}</span>
+                            <span className="whitespace-nowrap">
+                              ₩{formatWonDigits(hideAmounts, row.principal)}
+                            </span>
+                            <span className="whitespace-nowrap">
+                              ₩{formatWonDigits(hideAmounts, row.valuation)}
+                            </span>
                           </div>
                         </td>
                         <td

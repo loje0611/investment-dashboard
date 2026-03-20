@@ -1,16 +1,14 @@
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import type { SummaryCardItem } from '../../data/dashboardDummy'
+import { formatWonDigits } from '../../utils/maskSensitiveAmount'
 
 interface SummaryCardsCarouselProps {
   items: SummaryCardItem[]
-}
-
-function formatWon(value: number): string {
-  return value.toLocaleString('ko-KR')
+  hideAmounts: boolean
 }
 
 /** 히어로 카드: 총 자산 평가 — 그라데이션 배경 */
-function HeroCard({ item }: { item: SummaryCardItem }) {
+function HeroCard({ item, hideAmounts }: { item: SummaryCardItem; hideAmounts: boolean }) {
   const isProfit = (item.rate ?? 0) >= 0
   const rateColor = isProfit ? 'text-emerald-300' : 'text-rose-300'
   const symbol = isProfit ? '▲' : '▼'
@@ -24,7 +22,7 @@ function HeroCard({ item }: { item: SummaryCardItem }) {
 
       <p className="mb-1 text-sm font-medium text-white/70">{item.title}</p>
       <p className="text-3xl font-extrabold tracking-tight tabular-nums">
-        ₩{item.amount != null ? formatWon(item.amount) : '-'}
+        {item.amount != null ? `₩${formatWonDigits(hideAmounts, item.amount)}` : '-'}
       </p>
       {item.rate != null && (
         <div className={`mt-2 flex items-center gap-1.5 text-sm font-semibold tabular-nums ${rateColor}`}>
@@ -38,7 +36,13 @@ function HeroCard({ item }: { item: SummaryCardItem }) {
 }
 
 /** 일반 카드 슬라이드 */
-function SummaryCardSlide({ item }: { item: SummaryCardItem }) {
+function SummaryCardSlide({
+  item,
+  hideAmounts,
+}: {
+  item: SummaryCardItem
+  hideAmounts: boolean
+}) {
   if (item.riskText != null) {
     return (
       <div className="h-full min-w-0 flex-shrink-0 rounded-xl border border-slate-100 bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
@@ -65,7 +69,7 @@ function SummaryCardSlide({ item }: { item: SummaryCardItem }) {
     <div className="h-full min-w-0 flex-shrink-0 rounded-xl border border-slate-100 bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
       <p className="mb-1 text-xs font-medium text-slate-400">{item.title}</p>
       <p className="text-base font-bold tabular-nums text-slate-900">
-        ₩{item.amount != null ? formatWon(item.amount) : '-'}
+        {item.amount != null ? `₩${formatWonDigits(hideAmounts, item.amount)}` : '-'}
       </p>
       {item.rate != null && (
         <p className={`mt-1 text-xs font-semibold tabular-nums ${rateColor}`}>
@@ -77,7 +81,7 @@ function SummaryCardSlide({ item }: { item: SummaryCardItem }) {
 }
 
 /** 모바일용 요약 카드: 히어로 + 나머지 캐러셀 */
-export function SummaryCardsCarousel({ items }: SummaryCardsCarouselProps) {
+export function SummaryCardsCarousel({ items, hideAmounts }: SummaryCardsCarouselProps) {
   if (!items.length) return null
 
   const heroItem = items[0]
@@ -86,7 +90,7 @@ export function SummaryCardsCarousel({ items }: SummaryCardsCarouselProps) {
   return (
     <div className="space-y-3">
       {/* 히어로: 총 자산 평가 */}
-      <HeroCard item={heroItem} />
+      <HeroCard item={heroItem} hideAmounts={hideAmounts} />
 
       {/* 나머지 카드: 가로 스와이프 캐러셀 */}
       {restItems.length > 0 && (
@@ -104,7 +108,7 @@ export function SummaryCardsCarousel({ items }: SummaryCardsCarouselProps) {
                 className="flex-shrink-0 snap-start"
                 style={{ width: '44%', minWidth: '44%' }}
               >
-                <SummaryCardSlide item={item} />
+                <SummaryCardSlide item={item} hideAmounts={hideAmounts} />
               </div>
             ))}
           </div>

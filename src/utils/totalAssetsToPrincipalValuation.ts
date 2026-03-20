@@ -1,0 +1,273 @@
+import type { TotalAssetRow } from '../types/api'
+
+export interface PrincipalValuationPoint {
+  /** X축 라벨 (yy.mm) */
+  label: string
+  원금총액: number
+  평가금총액: number
+}
+
+export interface PrincipalValuationTrend {
+  points: PrincipalValuationPoint[]
+  /** 최신 평가일 행 기준 전월 대비 원금 변화 (시트 컬럼 우선, 없으면 이전 행과 차이) */
+  momPrincipal: number | null
+  /** 최신 평가일 행 기준 전월 대비 평가금 변화 */
+  momValuation: number | null
+  /** 최신 데이터 라벨 (표시용) */
+  latestLabel: string | null
+}
+
+/** 전각 공백·연속 공백 정리 (시트 헤더 "원금　총액" 등 대응) */
+function normalizeKey(k: string): string {
+  return k
+    .replace(/\u3000/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const DATE_KEYS = ['평가일', '일자', '날짜', 'date'] as const
+const PRINCIPAL_KEYS = ['원금 총액', '원금총액', '투자원금합계', '원금'] as const
+/** 총자산은 일부 시트에서 '평가금 총액'과 다른 의미일 수 있어 뒤에서만 시도 */
+const VALUATION_KEYS = ['평가금 총액', '평가금총액', '평가합계'] as const
+const MOM_PRINCIPAL_KEYS = ['원금 증감액', '원금증감액'] as const
+const MOM_VALUATION_KEYS = ['평가 증감액', '평가증감액'] as const
+
+function coerceNumber(v: unknown): number | null {
+  if (v == null || v === '') return null
+  if (typeof v === 'boolean') return null
+  if (typeof v === 'number' && !Number.isNaN(v)) return v
+  const s = String(v).replace(/,/g, '').replace(/원/g, '').replace(/\s/g, '').trim()
+  const n = parseFloat(s)
+  return Number.isNaN(n) ? null : n
+}
+
+/** Google Sheets / Excel 일련번호 (대략 1990~2040년) */
+function serialToDate(serial: number): Date | null {
+  if (serial < 20000 || serial > 65000) return null
+  const ms = (serial - 25569) * 86400 * 1000
+  const d = new Date(ms)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+function parseDateValue(v: unknown): Date | null {
+  if (v == null || v === '') return null
+  if (typeof v === 'number' && !Number.isNaN(v)) {
+    const fromSerial = serialToDate(v)
+    if (fromSerial) return fromSerial
+    return null
+  }
+  const s = String(v).trim().split('T')[0]
+  let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (m) {
+    const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+    return Number.isNaN(dt.getTime()) ? null : dt
+  }
+  m = s.match(/^(\d{2})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (m) {
+    const y = Number(m[1])
+    const fullY = y >= 70 ? 1900 + y : 2000 + y
+    const dt = new Date(fullY, Number(m[2]) - 1, Number(m[3]))
+    return Number.isNaN(dt.getTime()) ? null : dt
+  }
+  return null
+}
+
+function getByNormalizedKeys(row: TotalAssetRow, candidates: readonly string[]): unknown {
+  const map = new Map<string, string>()
+  for (const raw of Object.keys(row)) {
+    map.set(normalizeKey(raw), raw)
+  }
+  for (const c of candidates) {
+    const raw = map.get(normalizeKey(c))
+    if (raw != null) return row[raw]
+  }
+  return undefined
+}
+
+/** 헤더 문자열 패턴으로 열 값 찾기 */
+function findCellByHeaderPattern(
+  row: TotalAssetRow,
+  predicate: (normalizedHeader: string) => boolean
+): unknown {
+  for (const raw of Object.keys(row)) {
+    if (predicate(normalizeKey(raw))) return row[raw]
+  }
+  return undefined
+}
+
+function getDateFromRow(row: TotalAssetRow): Date | null {
+  for (const k of DATE_KEYS) {
+    const v = getByNormalizedKeys(row, [k])
+    const d = parseDateValue(v)
+    if (d) return d
+  }
+  const fuzzy = findCellByHeaderPattern(
+    row,
+    (h) => h === '평가일' || h === '일자' || h.endsWith('평가일') || /^날짜/i.test(h)
+  )
+  const fromFuzzy = parseDateValue(fuzzy)
+  if (fromFuzzy) return fromFuzzy
+
+  // 헤더 매칭 실패 시: GAS가 넣은 키 순서(열 순)대로 첫 날짜 형태 값 사용
+  for (const k of Object.keys(row)) {
+    const d = parseDateValue(row[k])
+    if (d) return d
+  }
+  return null
+}
+
+function getPrincipalFromRow(row: TotalAssetRow): number | null {
+  for (const k of PRINCIPAL_KEYS) {
+    const n = coerceNumber(getByNormalizedKeys(row, [k]))
+    if (n != null) return n
+  }
+  const v = findCellByHeaderPattern(
+    row,
+    (h) =>
+      !isDirtyValuationHeader(h) &&
+      ((h.includes('원금') && (h.includes('총액') || h.includes('합계'))) ||
+        (h.includes('원금') && h.includes('총')))
+  )
+  return coerceNumber(v)
+}
+
+function isDirtyValuationHeader(h: string): boolean {
+  return (
+    h.includes('증감') ||
+    h.includes('증가') ||
+    h.includes('증액') ||
+    h.includes('전월') ||
+    h.includes('전기') ||
+    h.includes('차액') ||
+    h.includes('수익률') ||
+    h.includes('대비')
+  )
+}
+
+function getValuationFromRow(row: TotalAssetRow): number | null {
+  for (const k of VALUATION_KEYS) {
+    const raw = getByNormalizedKeys(row, [k])
+    const n = coerceNumber(raw)
+    if (n != null) return n
+  }
+  const v = findCellByHeaderPattern(
+    row,
+    (h) =>
+      !isDirtyValuationHeader(h) &&
+      ((h.includes('평가금') && (h.includes('총액') || h.includes('합계'))) ||
+        (h.includes('평가') && h.includes('총액') && !h.includes('원금')))
+  )
+  const fromFuzzy = coerceNumber(v)
+  if (fromFuzzy != null) return fromFuzzy
+  return coerceNumber(
+    findCellByHeaderPattern(
+      row,
+      (h) => !isDirtyValuationHeader(h) && (h === '총자산' || h.endsWith('총자산'))
+    )
+  )
+}
+
+function getMomFromRow(row: TotalAssetRow): { principal: number | null; valuation: number | null } {
+  let principal: number | null = null
+  for (const k of MOM_PRINCIPAL_KEYS) {
+    const n = coerceNumber(getByNormalizedKeys(row, [k]))
+    if (n != null) {
+      principal = n
+      break
+    }
+  }
+  if (principal == null) {
+    const v = findCellByHeaderPattern(
+      row,
+      (h) => h.includes('원금') && (h.includes('증감') || h.includes('증가'))
+    )
+    principal = coerceNumber(v)
+  }
+
+  let valuation: number | null = null
+  for (const k of MOM_VALUATION_KEYS) {
+    const n = coerceNumber(getByNormalizedKeys(row, [k]))
+    if (n != null) {
+      valuation = n
+      break
+    }
+  }
+  if (valuation == null) {
+    const v = findCellByHeaderPattern(
+      row,
+      (h) =>
+        (h.includes('평가') && (h.includes('증감') || h.includes('증가'))) ||
+        (h.includes('평가금') && h.includes('차'))
+    )
+    valuation = coerceNumber(v)
+  }
+  return { principal, valuation }
+}
+
+function formatChartLabel(d: Date): string {
+  const y = String(d.getFullYear()).slice(-2)
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  return `${y}.${m}`
+}
+
+export interface ParsedTotalAssetHistoryRow {
+  date: Date
+  principal: number
+  valuation: number
+  row: TotalAssetRow
+}
+
+/** 날짜·원금·평가금을 읽을 수 있는 행만 모아 과거→최신 정렬 */
+export function parseTotalAssetHistoryRows(rows: TotalAssetRow[]): ParsedTotalAssetHistoryRow[] {
+  const parsed: ParsedTotalAssetHistoryRow[] = []
+  for (const row of rows) {
+    const date = getDateFromRow(row)
+    const principal = getPrincipalFromRow(row)
+    const valuation = getValuationFromRow(row)
+    if (!date || principal == null || valuation == null) continue
+    parsed.push({ date, principal, valuation, row })
+  }
+  parsed.sort((a, b) => a.date.getTime() - b.date.getTime())
+  return parsed
+}
+
+/**
+ * 총자산 시트 행 배열에서 원금·평가금 시계열과 최신 전월 대비 증감을 만듭니다.
+ * 날짜 기준 오름차순(과거→최신)으로 정렬합니다.
+ */
+export function totalAssetsToPrincipalValuationTrend(
+  rows: TotalAssetRow[]
+): PrincipalValuationTrend | null {
+  if (!rows.length) return null
+
+  const parsed = parseTotalAssetHistoryRows(rows)
+
+  if (!parsed.length) return null
+
+  const points: PrincipalValuationPoint[] = parsed.map((p) => ({
+    label: formatChartLabel(p.date),
+    원금총액: p.principal,
+    평가금총액: p.valuation,
+  }))
+
+  const latest = parsed[parsed.length - 1]
+  const prev = parsed.length >= 2 ? parsed[parsed.length - 2] : null
+
+  const sheetMom = getMomFromRow(latest.row)
+  let momPrincipal = sheetMom.principal
+  let momValuation = sheetMom.valuation
+
+  if (momPrincipal == null && prev != null) {
+    momPrincipal = latest.principal - prev.principal
+  }
+  if (momValuation == null && prev != null) {
+    momValuation = latest.valuation - prev.valuation
+  }
+
+  return {
+    points,
+    momPrincipal,
+    momValuation,
+    latestLabel: formatChartLabel(latest.date),
+  }
+}

@@ -13,12 +13,15 @@
  *   - rebalancing → "포트_API" (1행=헤더, 계좌명 기준 계좌별 그룹)
  *   - etf         → "ETF" (ETF 현황 탭 전용)
  *   - pension     → "연금" (연금 현황 탭 전용)
- *   - els         → "ELS(투자중)" 시트만 사용
+ *   - els            → "ELS(투자중)" (상세·리스크·탭 목록)
+ *   - elsSheetTotals → "ELS" 시트 고정 셀 B4(투자원금)·C4(평가금액) — 홈 카드「ELS 투자 평가」전용
+ *   - elsCompleted   → "ELS(완료)" (상환 완료: 수익·투자기간 등)
+ *   - cashOther      → "현금" (기타 평가금)
  *
- * 반환 형식: { totalAssets, portfolio, rebalancing, etf, pension, els }
+ * 반환 형식: { totalAssets, portfolio, rebalancing, etf, pension, els, elsSheetTotals, elsCompleted, cashOther }
  */
 // 배포 전 본인 스프레드시트 ID로 변경하세요. (URL의 /d/ 다음 부분)
-var SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID';
+var SPREADSHEET_ID = '1g1VBYupYjmkiF-85CXgjFvu4qzzSjtKTLGgXYNIhKQM';
 
 /**
  * 웹 앱으로 GET 요청 시 호출됩니다. JSON을 반환합니다.
@@ -66,10 +69,13 @@ function getDashboardData(dataType) {
   var etf = [];
   var pension = [];
   var els = [];
+  var elsSheetTotals = null;
+  var elsCompleted = [];
+  var cashOther = [];
 
   if (dataType === 'summary' || dataType === 'all') {
     try {
-      totalAssets = readSheetAsObjects(ss, '총자산');
+      totalAssets = readTotalAssetsSheet(ss);
     } catch (e) {
       totalAssets = [];
     }
@@ -96,7 +102,6 @@ function getDashboardData(dataType) {
     }
     try {
       pension = readSheetAsObjects(ss, '연금', 1);
-      if (pension && pension.length > 5) pension = pension.slice(0, 5);
     } catch (e) {
       pension = [];
     }
@@ -104,6 +109,25 @@ function getDashboardData(dataType) {
       els = readSheetAsObjects(ss, 'ELS(투자중)', 1);
     } catch (e) {
       els = [];
+    }
+    try {
+      elsSheetTotals = readElsSheetTotalsB4C4(ss);
+    } catch (e) {
+      elsSheetTotals = null;
+    }
+    try {
+      elsCompleted = readSheetAsObjects(ss, 'ELS(완료)', 1);
+    } catch (e) {
+      elsCompleted = [];
+    }
+    try {
+      cashOther = readSheetAsObjects(ss, '현금', 1);
+    } catch (e) {
+      try {
+        cashOther = readSheetAsObjects(ss, '현금', 0);
+      } catch (e2) {
+        cashOther = [];
+      }
     }
   }
 
@@ -113,8 +137,39 @@ function getDashboardData(dataType) {
     rebalancing: rebalancing || [],
     etf: etf || [],
     pension: pension || [],
-    els: els || []
+    els: els || [],
+    elsSheetTotals: elsSheetTotals,
+    elsCompleted: elsCompleted || [],
+    cashOther: cashOther || []
   };
+}
+
+/**
+ * 「ELS」시트 요약 행: B4=투자원금 합계, C4=평가금액 합계 (홈 카드·총자산 집계용).
+ * 탭 이름은 정확히 'ELS' 여야 합니다.
+ * @returns {{ principal: number, valuation: number }|null}
+ */
+function readElsSheetTotalsB4C4(ss) {
+  var sh = ss.getSheetByName('ELS');
+  if (!sh) return null;
+  var vals = sh.getRange(4, 2, 4, 3).getValues();
+  if (!vals || !vals[0]) return null;
+  var p = gasCoerceNumber_(vals[0][0]);
+  var v = gasCoerceNumber_(vals[0][1]);
+  if (p == null && v == null) return null;
+  return {
+    principal: p != null ? p : 0,
+    valuation: v != null ? v : 0
+  };
+}
+
+/** 시트/JSON 숫자 셀을 숫자로 변환 (쉼표·원 문자 제거) */
+function gasCoerceNumber_(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && !isNaN(v)) return v;
+  var s = String(v).replace(/,/g, '').replace(/원/g, '').replace(/\s/g, '').trim();
+  var n = parseFloat(s);
+  return isNaN(n) ? null : n;
 }
 
 /**
@@ -268,6 +323,38 @@ function readSheetAsMultipleTables(ss, sheetName) {
     }
 
     return tables;
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * '총자산' 시트: 1행이 표 제목만 있고 2행이 헤더인 경우가 많아, 상단 몇 행에서
+ * '평가일' / '일자'가 포함된 행을 헤더로 자동 선택합니다.
+ */
+function readTotalAssetsSheet(ss) {
+  try {
+    var sheet = ss.getSheetByName('총자산');
+    if (!sheet) return [];
+    var range = sheet.getDataRange();
+    if (!range) return [];
+    var values = range.getValues();
+    if (!values || values.length < 2) return [];
+
+    var maxScan = Math.min(6, values.length);
+    for (var r = 0; r < maxScan; r++) {
+      var row = values[r];
+      var hit = false;
+      for (var c = 0; c < row.length; c++) {
+        var cell = row[c] != null ? String(row[c]).trim() : '';
+        if (cell === '평가일' || cell === '일자' || cell.indexOf('평가일') >= 0 || cell.indexOf('일자') >= 0) {
+          hit = true;
+          break;
+        }
+      }
+      if (hit) return readSheetAsObjects(ss, '총자산', r);
+    }
+    return readSheetAsObjects(ss, '총자산', 0);
   } catch (e) {
     return [];
   }

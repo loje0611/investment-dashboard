@@ -28,8 +28,18 @@ export function isGasErrorResponse(
   );
 }
 
-/** 총자산 시트 한 행 (시트 컬럼에 맞게 확장 가능) */
+/** 총자산 시트 한 행 ('총자산' 탭 헤더와 동일한 키) */
 export interface TotalAssetRow extends SheetDataRow {
+  /** 평가 기준일 (예: 2026-03-15) */
+  평가일?: string;
+  /** 원금 합계 */
+  '원금 총액'?: number | string;
+  /** 평가금 합계 */
+  '평가금 총액'?: number | string;
+  /** 전월 대비 원금 차이 (시트 수식) */
+  '원금 증감액'?: number | string;
+  /** 전월 대비 평가금 차이 (시트 수식) */
+  '평가 증감액'?: number | string;
   일자?: string;
   총자산?: number;
   [key: string]: string | number | boolean | null | undefined;
@@ -84,6 +94,19 @@ export interface RebalancingTable {
   rows: RebalancingTableRow[];
 }
 
+/** ELS(완료) 시트 한 행 */
+export interface ElsCompletedRow extends SheetDataRow {
+  투자원금?: number | string;
+  수익?: number | string;
+  투자기간?: number | string;
+}
+
+/** 'ELS' 시트 B4·C4 요약 (투자원금·평가금액). 홈「ELS 투자 평가」전용 */
+export interface ElsSheetTotals {
+  principal: number;
+  valuation: number;
+}
+
 /** 대시보드용 GAS 응답 */
 export interface DashboardSheetResponse {
   totalAssets?: TotalAssetRow[];
@@ -92,4 +115,9 @@ export interface DashboardSheetResponse {
   etf?: EtfSheetRow[];
   pension?: PensionSheetRow[];
   els?: ElsRow[];
+  /** 'ELS' 탭 고정 셀 합계 (B4, C4). 없으면 ELS(투자중) 행 합산으로 대체 */
+  elsSheetTotals?: ElsSheetTotals | null;
+  elsCompleted?: ElsCompletedRow[];
+  /** 현금(기타) 시트 */
+  cashOther?: SheetDataRow[];
 }

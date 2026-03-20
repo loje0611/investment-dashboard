@@ -8,6 +8,9 @@ import type {
   PensionSheetRow,
   ElsRow,
   RebalancingTable,
+  SheetDataRow,
+  ElsCompletedRow,
+  ElsSheetTotals,
 } from '../types/api';
 import type { ElsProduct, AssetColumnMapping } from '../types/els';
 import {
@@ -31,6 +34,12 @@ export interface DashboardState {
   rebalancing: RebalancingTable[];
   /** ELS 데이터 */
   els: ElsRow[];
+  /** 'ELS' 시트 B4·C4 요약 (없으면 null) */
+  elsSheetTotals: ElsSheetTotals | null;
+  /** ELS(완료) 시트 */
+  elsCompleted: ElsCompletedRow[];
+  /** 현금(기타) 시트 */
+  cashOther: SheetDataRow[];
   /** 로딩 여부 (전체 또는 summary) */
   isLoading: boolean;
   /** 자산 상세(ELS/ETF/연금) 로딩 여부 */
@@ -39,10 +48,12 @@ export interface DashboardState {
   isLoadingRebalancing: boolean;
   /** 에러 메시지 (없으면 null) */
   error: string | null;
+  /** 홈 등에서 금액을 #으로 마스크 */
+  hideAmounts: boolean;
 }
 
 export interface DashboardActions {
-  /** 진입 시: summary 먼저 조회 후 홈 표시, 이어서 assets·rebalancing 병렬 조회 */
+  /** 진입 시: 웹앱에서 전체 데이터(summary·assets·rebalancing)를 한 번에 조회 */
   fetchData: (endpoint?: string) => Promise<void>;
   /** 자산 상세용(els, etf, pension)만 조회 (탭 전용 또는 보강) */
   fetchAssets: (endpoint?: string) => Promise<void>;
@@ -50,6 +61,7 @@ export interface DashboardActions {
   fetchRebalancing: (endpoint?: string) => Promise<void>;
   /** 에러 상태 초기화 */
   clearError: () => void;
+  setHideAmounts: (hide: boolean) => void;
 }
 
 const initialState: DashboardState = {
@@ -59,10 +71,14 @@ const initialState: DashboardState = {
   pension: [],
   rebalancing: [],
   els: [],
+  elsSheetTotals: null,
+  elsCompleted: [],
+  cashOther: [],
   isLoading: false,
   isLoadingAssets: false,
   isLoadingRebalancing: false,
   error: null,
+  hideAmounts: false,
 };
 
 export const useStore = create<DashboardState & DashboardActions>((set) => ({
@@ -71,35 +87,31 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
   fetchData: async (endpoint) => {
     set({ isLoading: true, error: null, isLoadingAssets: true, isLoadingRebalancing: true });
     try {
-      const summary = await fetchDashboardData(endpoint, 'summary');
+      const data = await fetchDashboardData(endpoint, 'all');
       set({
-        totalAssets: summary.totalAssets ?? [],
+        totalAssets: data.totalAssets ?? [],
+        portfolio: data.portfolio ?? [],
+        rebalancing: data.rebalancing ?? [],
+        etf: data.etf ?? [],
+        pension: data.pension ?? [],
+        els: data.els ?? [],
+        elsSheetTotals: data.elsSheetTotals ?? null,
+        elsCompleted: data.elsCompleted ?? [],
+        cashOther: data.cashOther ?? [],
         isLoading: false,
+        isLoadingAssets: false,
+        isLoadingRebalancing: false,
         error: null,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : '데이터를 불러오지 못했습니다.';
-      set({ isLoading: false, isLoadingAssets: false, isLoadingRebalancing: false, error: message });
-      return;
+      set({
+        isLoading: false,
+        isLoadingAssets: false,
+        isLoadingRebalancing: false,
+        error: message,
+      });
     }
-
-    Promise.all([
-      fetchDashboardData(endpoint, 'assets').then((data) => {
-        set({
-          etf: data.etf ?? [],
-          pension: data.pension ?? [],
-          els: data.els ?? [],
-          isLoadingAssets: false,
-        });
-      }).catch(() => set({ isLoadingAssets: false })),
-      fetchDashboardData(endpoint, 'rebalancing').then((data) => {
-        set({
-          portfolio: data.portfolio ?? [],
-          rebalancing: data.rebalancing ?? [],
-          isLoadingRebalancing: false,
-        });
-      }).catch(() => set({ isLoadingRebalancing: false })),
-    ]);
   },
 
   fetchAssets: async (endpoint) => {
@@ -110,6 +122,9 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
         etf: data.etf ?? [],
         pension: data.pension ?? [],
         els: data.els ?? [],
+        elsSheetTotals: data.elsSheetTotals ?? null,
+        elsCompleted: data.elsCompleted ?? [],
+        cashOther: data.cashOther ?? [],
         isLoadingAssets: false,
       });
     } catch (err) {
@@ -132,6 +147,8 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  setHideAmounts: (hide) => set({ hideAmounts: hide }),
 }));
 
 /**

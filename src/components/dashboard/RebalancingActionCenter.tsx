@@ -1,15 +1,14 @@
 import { useState, useMemo } from 'react'
 import type { RebalancingAccount } from '../../data/dashboardDummy'
+import { formatWonDigits } from '../../utils/maskSensitiveAmount'
+import { AmountHideToggle } from './AmountHideToggle'
 
 interface RebalancingActionCenterProps {
   accounts: RebalancingAccount[]
   isLoading?: boolean
   /** 모바일 전용: 여백·테두리 없이 화면에 꽉 차게 */
   compact?: boolean
-}
-
-function formatWon(value: number): string {
-  return value.toLocaleString('ko-KR')
+  hideAmounts: boolean
 }
 
 /**
@@ -55,7 +54,12 @@ function WeightBar({ current, target }: { current: number; target: number }) {
   )
 }
 
-export function RebalancingActionCenter({ accounts, isLoading = false, compact = false }: RebalancingActionCenterProps) {
+export function RebalancingActionCenter({
+  accounts,
+  isLoading = false,
+  compact = false,
+  hideAmounts,
+}: RebalancingActionCenterProps) {
   const [selectedId, setSelectedId] = useState(accounts[0]?.id ?? 'all')
   const [additionalInvestment, setAdditionalInvestment] = useState<string>('')
 
@@ -96,7 +100,10 @@ export function RebalancingActionCenter({ accounts, isLoading = false, compact =
   if (isLoading) {
     return (
       <section className={sectionClass}>
-        <h1 className="shrink-0 px-4 pt-6 pb-3 text-xl font-bold text-slate-900">리밸런싱</h1>
+        <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
+          <h1 className="text-xl font-bold text-slate-900">리밸런싱</h1>
+          <AmountHideToggle />
+        </div>
         <div className="flex flex-1 items-center justify-center gap-2 px-4 py-12 text-slate-500">
           <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
           <span>로딩 중...</span>
@@ -108,7 +115,10 @@ export function RebalancingActionCenter({ accounts, isLoading = false, compact =
   if (!accounts.length) {
     return (
       <section className={sectionClass}>
-        <h1 className="shrink-0 px-4 pt-6 pb-3 text-xl font-bold text-slate-900">리밸런싱</h1>
+        <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
+          <h1 className="text-xl font-bold text-slate-900">리밸런싱</h1>
+          <AmountHideToggle />
+        </div>
         <div className="flex flex-1 items-center justify-center px-4 py-12 text-center text-slate-500">데이터가 없습니다.</div>
       </section>
     )
@@ -116,7 +126,10 @@ export function RebalancingActionCenter({ accounts, isLoading = false, compact =
 
   return (
     <section className={sectionClass}>
-      <h1 className="shrink-0 px-4 pt-6 pb-3 text-xl font-bold text-slate-900">리밸런싱</h1>
+      <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
+        <h1 className="text-xl font-bold text-slate-900">리밸런싱</h1>
+        <AmountHideToggle />
+      </div>
 
       {/* 카드 영역: 자산 상세와 동일한 스타일, 계좌 선택 + 상품 목록 */}
       <div className="mx-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -155,22 +168,22 @@ export function RebalancingActionCenter({ accounts, isLoading = false, compact =
           <table className="w-full min-w-[720px] table-fixed text-left text-sm">
             <colgroup>
               <col style={{ width: '24%' }} />
+              <col style={{ width: 105 }} />
               <col style={{ width: 95 }} />
               <col style={{ width: 72 }} />
               <col style={{ width: 110 }} />
               <col style={{ width: 78 }} />
               <col style={{ width: 78 }} />
-              <col style={{ width: 105 }} />
             </colgroup>
             <thead>
               <tr className="sticky top-0 z-10 border-b border-slate-200 bg-white text-slate-500">
                 <th className="pb-2 pr-3 text-center font-medium">종목명</th>
+                <th className="pb-2 pr-3 text-center font-medium">액션</th>
                 <th className="pb-2 pr-3 text-center font-medium">현재가</th>
                 <th className="pb-2 pr-3 text-center font-medium">보유수량</th>
                 <th className="pb-2 pr-3 text-center font-medium">평가금액</th>
                 <th className="pb-2 pr-3 text-center font-medium">현재비중</th>
-                <th className="pb-2 pr-3 text-center font-medium">목표비중</th>
-                <th className="pb-2 text-center font-medium">액션</th>
+                <th className="pb-2 text-center font-medium">목표비중</th>
               </tr>
             </thead>
             <tbody>
@@ -180,20 +193,7 @@ export function RebalancingActionCenter({ accounts, isLoading = false, compact =
                     <span className="font-medium text-slate-900">{row.name}</span>
                     <WeightBar current={row.currentWeight} target={row.targetWeight} />
                   </td>
-                  <td className="whitespace-nowrap py-3 pr-3 tabular-nums text-slate-700">
-                    ₩{formatWon(row.currentPrice)}
-                  </td>
-                  <td className="whitespace-nowrap py-3 pr-3 tabular-nums text-slate-700">{row.quantity}주</td>
-                  <td className="whitespace-nowrap py-3 pr-3 tabular-nums text-slate-700">
-                    ₩{formatWon(row.currentValue)}
-                  </td>
-                  <td className="whitespace-nowrap py-3 pr-3 tabular-nums text-slate-700">
-                    {row.currentWeight.toFixed(1)}%
-                  </td>
-                  <td className="whitespace-nowrap py-3 pr-3 tabular-nums text-slate-700">
-                    {row.targetWeight.toFixed(1)}%
-                  </td>
-                  <td className="whitespace-nowrap py-3">
+                  <td className="whitespace-nowrap py-3 pr-3">
                     {row.rebalancingShares > 0 ? (
                       <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
                         [추가 매수] {row.rebalancingShares}주
@@ -208,14 +208,31 @@ export function RebalancingActionCenter({ accounts, isLoading = false, compact =
                       </span>
                     )}
                   </td>
+                  <td className="whitespace-nowrap py-3 pr-3 tabular-nums text-slate-700">
+                    ₩{formatWonDigits(hideAmounts, row.currentPrice)}
+                  </td>
+                  <td className="whitespace-nowrap py-3 pr-3 tabular-nums text-slate-700">{row.quantity}주</td>
+                  <td className="whitespace-nowrap py-3 pr-3 tabular-nums text-slate-700">
+                    ₩{formatWonDigits(hideAmounts, row.currentValue)}
+                  </td>
+                  <td className="whitespace-nowrap py-3 pr-3 tabular-nums text-slate-700">
+                    {row.currentWeight.toFixed(1)}%
+                  </td>
+                  <td className="whitespace-nowrap py-3 pr-3 tabular-nums text-slate-700">
+                    {row.targetWeight.toFixed(1)}%
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
           <p className="mt-3 text-xs text-slate-500">
-            계좌 총 평가금액: ₩{formatWon(totalValuation)}
+            계좌 총 평가금액: ₩{formatWonDigits(hideAmounts, totalValuation)}
             {additionalInvestmentNum > 0 && (
-              <> · 추가 투자금 반영: ₩{formatWon(totalValuation + additionalInvestmentNum)} 기준</>
+              <>
+                {' '}
+                · 추가 투자금 반영: ₩{formatWonDigits(hideAmounts, totalValuation + additionalInvestmentNum)}{' '}
+                기준
+              </>
             )}
             {' · '}
             리밸런싱 필요 주수 = (목표 금액 − 현재 보유 평가금액) ÷ 현재가, 목표 금액 = 목표 비중% × (계좌 평가금액 + 추가 투자금) (반올림)
