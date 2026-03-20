@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import type { RebalancingAccount } from '../../data/dashboardDummy'
 import { formatWonDigits } from '../../utils/maskSensitiveAmount'
 import { AmountHideToggle } from './AmountHideToggle'
+import { LogoutButton } from '../LogoutButton'
 
 interface RebalancingActionCenterProps {
   accounts: RebalancingAccount[]
@@ -102,7 +103,10 @@ export function RebalancingActionCenter({
       <section className={sectionClass}>
         <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
           <h1 className="text-xl font-bold text-slate-900">리밸런싱</h1>
-          <AmountHideToggle />
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <AmountHideToggle />
+            <LogoutButton />
+          </div>
         </div>
         <div className="flex flex-1 items-center justify-center gap-2 px-4 py-12 text-slate-500">
           <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
@@ -117,7 +121,10 @@ export function RebalancingActionCenter({
       <section className={sectionClass}>
         <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
           <h1 className="text-xl font-bold text-slate-900">리밸런싱</h1>
-          <AmountHideToggle />
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <AmountHideToggle />
+            <LogoutButton />
+          </div>
         </div>
         <div className="flex flex-1 items-center justify-center px-4 py-12 text-center text-slate-500">데이터가 없습니다.</div>
       </section>
@@ -128,7 +135,10 @@ export function RebalancingActionCenter({
     <section className={sectionClass}>
       <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
         <h1 className="text-xl font-bold text-slate-900">리밸런싱</h1>
-        <AmountHideToggle />
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <AmountHideToggle />
+          <LogoutButton />
+        </div>
       </div>
 
       {/* 카드 영역: 자산 상세와 동일한 스타일, 계좌 선택 + 상품 목록 */}

@@ -15,6 +15,7 @@ import { AssetDetailsTabs } from './AssetDetailsTabs'
 import { RebalancingActionCenter } from './RebalancingActionCenter'
 import { BottomNav, type MainTabId } from './BottomNav'
 import { AmountHideToggle } from './AmountHideToggle'
+import { LogoutButton } from '../LogoutButton'
 
 function getNextRedemptionDate(row: Record<string, unknown>): string {
   const next = row['다음 평가일']
@@ -137,7 +138,10 @@ export function DashboardLayout() {
             <div className="flex flex-col pb-6">
               <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
                 <h1 className="text-xl font-bold text-slate-900">종합 자산</h1>
-                <AmountHideToggle />
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  <AmountHideToggle />
+                  <LogoutButton />
+                </div>
               </div>
               <div className="px-4">
                 {isLoading ? (
@@ -197,7 +201,10 @@ export function DashboardLayout() {
           >
             <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
               <h1 className="text-xl font-bold text-slate-900">자산 상세</h1>
-              <AmountHideToggle />
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                <AmountHideToggle />
+                <LogoutButton />
+              </div>
             </div>
             <div className="flex min-h-0 flex-1 flex-col px-4 pb-4">
               <AssetDetailsTabs
