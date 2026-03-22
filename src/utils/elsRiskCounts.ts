@@ -4,13 +4,15 @@ function normH(k: string): string {
   return k.replace(/\u3000/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-function readInvestingStatus(row: Record<string, unknown>): string {
+/** ELS(투자중) 시트의 진행 상태 문구 (자산 상세 카드 표시용) */
+export function getElsInvestingStatusText(row: Record<string, unknown>): string {
   const direct = row['현재 상태'] ?? row['현재상태'] ?? row['상태']
-  if (direct != null && String(direct).trim() !== '') return String(direct)
+  if (direct != null && String(direct).trim() !== '') return String(direct).trim()
   for (const key of Object.keys(row)) {
     const h = normH(key)
     if (h.includes('상태') && (h.includes('현재') || h.includes('진행'))) {
-      return String(row[key] ?? '')
+      const v = row[key]
+      if (v != null && String(v).trim() !== '') return String(v).trim()
     }
   }
   return ''
@@ -58,7 +60,7 @@ export function countElsRiskFromInvestingSheet(elsRows: ElsRow[]): { danger: num
   let danger = 0
   let success = 0
   for (const row of elsRows) {
-    const status = readInvestingStatus(row)
+    const status = getElsInvestingStatusText(row)
     const d = readDDayCell(row)
     if (d == null || !(d < 30)) continue
     if (/낙인/.test(status)) danger++
@@ -80,25 +82,57 @@ export function parseBarrierPercent(
   return n > 0 && n < 1.5 ? n * 100 : n
 }
 
+/** 퍼센트·소수(0.92=92%) 형태의 '현재 수준' 등 */
+function parsePercentLikeLevel(v: unknown): number | null {
+  if (v == null || v === '') return null
+  if (typeof v === 'number' && !Number.isNaN(v)) {
+    let n = v
+    if (n > 0 && n <= 1.5) n *= 100
+    return n
+  }
+  const s = String(v).replace(/%/g, '').replace(/,/g, '').trim()
+  const n = parseFloat(s)
+  if (Number.isNaN(n)) return null
+  if (n > 0 && n <= 1.5) return n * 100
+  return n
+}
+
+/**
+ * Worst Perf. 열이 '기준 100 대비 등락률(%)'만 있는 경우(예: -8.2 → 91.8)와
+ * 이미 수준(92.5)으로 적힌 경우를 구분합니다.
+ */
+function interpretWorstPerfAsLevel(n: number): number {
+  if (n < 0) return 100 + n
+  if (n >= 0 && n <= 40) return 100 + n
+  return n
+}
+
+const LEVEL_MIN = 0
+const LEVEL_MAX = 110
+
 export function getCurrentLevelFromRow(
   row: Record<string, unknown>,
   fallback: number
 ): number {
+  const fromSheetLevel = parsePercentLikeLevel(row.현재수준 ?? row['현재 수준'])
+  if (fromSheetLevel != null) {
+    return Math.max(LEVEL_MIN, Math.min(LEVEL_MAX, fromSheetLevel))
+  }
+
   const worstPerf = row['Worst Perf.'] ?? row['Worst Perf']
   if (worstPerf != null && worstPerf !== '') {
-    const s = String(worstPerf).replace(/%/g, '').trim()
-    const n = parseFloat(s)
-    if (!Number.isNaN(n)) return n
+    const n = parseFloat(String(worstPerf).replace(/%/g, '').replace(/,/g, '').trim())
+    if (!Number.isNaN(n)) {
+      const level = interpretWorstPerfAsLevel(n)
+      return Math.max(LEVEL_MIN, Math.min(LEVEL_MAX, level))
+    }
   }
-  const currentLevel = row.현재수준 ?? row['현재 수준']
-  if (currentLevel != null) {
-    const n = typeof currentLevel === 'number' ? currentLevel : parseFloat(String(currentLevel))
-    if (!Number.isNaN(n)) return Math.max(0, Math.min(100, n))
-  }
+
   const curr = row.현재가 != null ? Number(row.현재가) : NaN
   const base = row.기준가 != null ? Number(row.기준가) : NaN
   if (!Number.isNaN(curr) && !Number.isNaN(base) && base !== 0) {
-    return Math.max(0, Math.min(100, (curr / base) * 100))
+    return Math.max(LEVEL_MIN, Math.min(LEVEL_MAX, (curr / base) * 100))
   }
-  return fallback
+
+  return Math.max(LEVEL_MIN, Math.min(LEVEL_MAX, fallback))
 }

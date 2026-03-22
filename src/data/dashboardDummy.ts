@@ -1,11 +1,9 @@
-/** 요약 카드 1개 (금액 + 수익률 또는 리스크 텍스트) */
+/** 요약 카드 1개 (금액 + 수익률) */
 export interface SummaryCardItem {
   id: string
   title: string
   amount?: number
   rate?: number
-  /** 리스크 카드일 때: { 위험: n, 상환: n } */
-  riskText?: { danger: number; success: number }
 }
 
 /** 자산 배분 파이용 */
@@ -63,7 +61,6 @@ export const SUMMARY_CARDS: SummaryCardItem[] = [
   { id: 'etf', title: 'ETF 평가', amount: 155_063_090, rate: 20.9 },
   { id: 'els', title: 'ELS 투자 평가', amount: 43_880_511, rate: 9.7 },
   { id: 'els-profit', title: 'ELS 누적 수익금', amount: 6_583_870, rate: 4.6 },
-  { id: 'risk', title: 'ELS 리스크 현황', riskText: { danger: 0, success: 4 } },
 ]
 
 export const PIE_DATA: PieSegment[] = [
@@ -79,12 +76,6 @@ export const TREND_DATA: TrendPoint[] = [
   { month: '26.01', pension: 34_000_000, els: 43_500_000, etf: 148_000_000 },
   { month: '26.02', pension: 34_500_000, els: 43_700_000, etf: 152_000_000 },
   { month: '26.03', pension: 35_214_403, els: 43_880_511, etf: 155_063_090 },
-]
-
-export const ELS_LIST: ElsCardItem[] = [
-  { id: '1', productName: 'ELS A KOSPI200', nextRedemptionDate: '2026-05-20', currentLevel: 52, kiBarrier: 50, redemptionBarrier: 80 },
-  { id: '2', productName: 'ELS B 금리', nextRedemptionDate: '2026-06-15', currentLevel: 92, kiBarrier: 70, redemptionBarrier: 90 },
-  { id: '3', productName: 'ELS C 해외지수', nextRedemptionDate: '2026-07-10', currentLevel: 75, kiBarrier: 60, redemptionBarrier: 85 },
 ]
 
 export const ETF_TABLE: EtfRow[] = [

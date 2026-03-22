@@ -1,6 +1,5 @@
 import type { SheetDataRow, ElsRow, ElsCompletedRow, ElsSheetTotals } from '../types/api'
 import type { SummaryCardItem, PieSegment } from '../data/dashboardDummy'
-import { countElsRiskFromInvestingSheet } from './elsRiskCounts'
 
 function normalizeKey(k: string): string {
   return k.replace(/\u3000/g, ' ').replace(/\s+/g, ' ').trim()
@@ -162,7 +161,6 @@ const PIE_COLORS: Record<string, string> = {
  * - 총 자산 평가 = 연금평가금(개인연금만) + ELS평가 + ETF평가 + 기타평가
  * - 연금 수익률 = (연금평가 − 연금원금) / 연금원금 (위와 동일 행 집합)
  * - ELS 누적 수익 = SUM(ELS(완료)[수익]), 수익률 분모 = SUMPRODUCT(원금,투자기간)/365
- * - ELS 리스크: 투자중 시트 COUNTIFS(현재상태, D-Day) 규칙
  */
 export function buildHomeOverviewFromRawFormulas(
   pensionRows: SheetDataRow[],
@@ -199,8 +197,6 @@ export function buildHomeOverviewFromRawFormulas(
     elsProfitRate = Math.abs(raw) < 1.5 ? raw * 100 : raw
   }
 
-  const risk = countElsRiskFromInvestingSheet(elsInvestingRows)
-
   const summaryCards: SummaryCardItem[] = [
     {
       id: 'total',
@@ -234,11 +230,6 @@ export function buildHomeOverviewFromRawFormulas(
         elsCompletedRows.length > 0 && elsProfitRate != null && Number.isFinite(elsProfitRate)
           ? round1(elsProfitRate)
           : undefined,
-    },
-    {
-      id: 'risk',
-      title: 'ELS 리스크 현황',
-      riskText: { danger: risk.danger, success: risk.success },
     },
   ]
 

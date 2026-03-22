@@ -43,24 +43,6 @@ function SummaryCardSlide({
   item: SummaryCardItem
   hideAmounts: boolean
 }) {
-  if (item.riskText != null) {
-    return (
-      <div className="h-full min-w-0 flex-shrink-0 rounded-xl border border-slate-100 bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
-        <p className="mb-2 text-sm font-medium text-slate-500">{item.title}</p>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="flex items-center gap-1.5 text-sm text-slate-700">
-            <span className="h-2 w-2 rounded-full bg-red-500" aria-hidden />
-            위험: {item.riskText.danger}건
-          </span>
-          <span className="flex items-center gap-1.5 text-sm text-slate-700">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
-            상환: {item.riskText.success}건
-          </span>
-        </div>
-      </div>
-    )
-  }
-
   const isProfit = (item.rate ?? 0) >= 0
   const rateColor = isProfit ? 'text-rose-500' : 'text-sky-500'
   const symbol = isProfit ? '▲' : '▼'
