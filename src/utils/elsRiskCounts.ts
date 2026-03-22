@@ -107,25 +107,69 @@ function interpretWorstPerfAsLevel(n: number): number {
   return n
 }
 
+/** 시트 헤더가 `Worst Perf.` / 따옴표 포함 등으로 달라도 셀 값을 찾습니다. */
+function findWorstPerfCell(row: Record<string, unknown>): unknown {
+  const tryKeys = [
+    'Worst Perf.',
+    'Worst Perf',
+    'WorstPerf.',
+    'WorstPerf',
+    'Worst Performance',
+    'Worst performance',
+  ]
+  for (const k of tryKeys) {
+    const v = row[k]
+    if (v != null && String(v).trim() !== '') return v
+  }
+  for (const raw of Object.keys(row)) {
+    const h = normH(raw).replace(/^['"]+|['"]+$/g, '').trim().toLowerCase()
+    if (h === 'worst perf.' || h === 'worst perf' || h.startsWith('worst perf')) {
+      const v = row[raw]
+      if (v != null && String(v).trim() !== '') return v
+    }
+  }
+  return undefined
+}
+
+/**
+ * Worst Perf. 셀 값 → 프로그레스 바 수준(%).
+ * 소수(0.92)는 92%로, 음수·소양의 양수는 기준 100 대비 편차로 해석합니다.
+ */
+function levelFromWorstPerfCell(v: unknown): number | null {
+  if (v == null || v === '') return null
+  if (typeof v === 'number' && !Number.isNaN(v)) {
+    let n = v
+    if (n > 0 && n <= 1.5) n *= 100
+    return interpretWorstPerfAsLevel(n)
+  }
+  const s = String(v).replace(/%/g, '').replace(/,/g, '').trim()
+  const parsed = parseFloat(s)
+  if (Number.isNaN(parsed)) return null
+  let n = parsed
+  if (n > 0 && n <= 1.5) n *= 100
+  return interpretWorstPerfAsLevel(n)
+}
+
 const LEVEL_MIN = 0
 const LEVEL_MAX = 110
 
+/**
+ * ELS 현황 막대용 현재 수준. **스프레드시트 `Worst Perf.`를 최우선**으로 쓰고,
+ * 비어 있을 때만 다른 열·fallback을 사용합니다.
+ */
 export function getCurrentLevelFromRow(
   row: Record<string, unknown>,
   fallback: number
 ): number {
+  const worstRaw = findWorstPerfCell(row)
+  const fromWorst = levelFromWorstPerfCell(worstRaw)
+  if (fromWorst != null && Number.isFinite(fromWorst)) {
+    return Math.max(LEVEL_MIN, Math.min(LEVEL_MAX, fromWorst))
+  }
+
   const fromSheetLevel = parsePercentLikeLevel(row.현재수준 ?? row['현재 수준'])
   if (fromSheetLevel != null) {
     return Math.max(LEVEL_MIN, Math.min(LEVEL_MAX, fromSheetLevel))
-  }
-
-  const worstPerf = row['Worst Perf.'] ?? row['Worst Perf']
-  if (worstPerf != null && worstPerf !== '') {
-    const n = parseFloat(String(worstPerf).replace(/%/g, '').replace(/,/g, '').trim())
-    if (!Number.isNaN(n)) {
-      const level = interpretWorstPerfAsLevel(n)
-      return Math.max(LEVEL_MIN, Math.min(LEVEL_MAX, level))
-    }
   }
 
   const curr = row.현재가 != null ? Number(row.현재가) : NaN
