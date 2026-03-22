@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Bar, BarChart, Cell, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
 import { ElsRiskProgressBar } from '../ElsRiskProgressBar'
 import type { ElsCardItem, EtfRow, PensionRow } from '../../data/dashboardDummy'
@@ -34,7 +35,7 @@ function BarSparkline({ data }: { data: number[] }) {
             if (!active || !payload?.length) return null
             const v = payload[0].value as number
             return (
-              <div className="rounded bg-slate-800 px-2 py-1 text-xs text-white shadow">
+              <div className="rounded-lg border border-slate-700/50 bg-slate-900/80 px-2.5 py-1.5 text-xs font-medium tracking-wide text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] backdrop-blur-md">
                 {v >= 0 ? '+' : ''}{v}%p
               </div>
             )
@@ -71,20 +72,28 @@ export function AssetDetailsTabs({
     <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
       {/* 상단 탭: 항상 고정 */}
       <div className="flex shrink-0 border-b border-slate-200">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'border-b-2 border-slate-900 text-slate-900'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`relative flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                isActive ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="asset-tab-indicator"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900"
+                  transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
+                />
+              )}
+              {tab.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* 상품 목록만 스크롤, 스크롤바 숨김(마우스/터치 스크롤 유지) */}
@@ -95,17 +104,27 @@ export function AssetDetailsTabs({
             <p className="text-sm font-medium">로딩 중...</p>
           </div>
         ) : (
-          <>
+          <AnimatePresence mode="wait">
             {activeTab === 'els' && (
-              <div className="space-y-4">
-                {elsList.map((item) => (
-                  <div
+              <motion.div
+                key="els"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-4"
+              >
+                {elsList.map((item, i) => (
+                  <motion.div
                     key={item.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: i * 0.05 }}
                     className="rounded-lg border border-slate-200 bg-slate-50/50 p-4"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-medium text-slate-900">{item.productName}</p>
-                      <p className="text-sm text-slate-500 shrink-0">
+                      <p className="shrink-0 text-sm text-slate-500">
                         다음 조기 상환 평가일: {item.nextRedemptionDate}
                       </p>
                     </div>
@@ -117,13 +136,20 @@ export function AssetDetailsTabs({
                         barHeight="h-3"
                       />
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             )}
 
             {activeTab === 'etf' && (
-              <div className="overflow-x-hidden overflow-y-visible">
+              <motion.div
+                key="etf"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-x-hidden overflow-y-visible"
+              >
                 <table className="w-full table-fixed text-sm" style={{ minWidth: 0 }}>
                   <colgroup>
                     <col style={{ width: '20%' }} />
@@ -132,7 +158,7 @@ export function AssetDetailsTabs({
                     <col style={{ width: '30%' }} />
                   </colgroup>
                   <thead>
-                    <tr className="sticky top-0 z-10 border-b border-slate-200 bg-white text-slate-500">
+                    <tr className="sticky top-0 z-10 border-b border-slate-200/50 bg-white/80 text-slate-500 shadow-sm backdrop-blur-md">
                       <th className="pb-2 pr-2 text-center font-medium">상품명</th>
                       <th className="pb-2 pr-2 text-center font-medium">원금/평가금</th>
                       <th className="whitespace-nowrap pb-2 pr-2 text-center font-medium">수익률</th>
@@ -140,8 +166,14 @@ export function AssetDetailsTabs({
                     </tr>
                   </thead>
                   <tbody>
-                    {etfTable.map((row) => (
-                      <tr key={row.id} className="border-b border-slate-100 align-middle">
+                    {etfTable.map((row, i) => (
+                      <motion.tr
+                        key={row.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3, delay: i * 0.05 }}
+                        className="border-b border-slate-100 align-middle"
+                      >
                         <td className="py-2 pr-2 text-center text-slate-900">
                           <span className="font-medium">{row.name}</span>
                         </td>
@@ -165,15 +197,22 @@ export function AssetDetailsTabs({
                         <td className="py-2 align-middle text-center">
                           <BarSparkline data={row.monthlyDeltas} />
                         </td>
-                      </tr>
+                      </motion.tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </motion.div>
             )}
 
             {activeTab === 'pension' && (
-              <div className="overflow-x-hidden overflow-y-visible">
+              <motion.div
+                key="pension"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-x-hidden overflow-y-visible"
+              >
                 <table className="w-full table-fixed text-sm" style={{ minWidth: 0 }}>
                   <colgroup>
                     <col style={{ width: '20%' }} />
@@ -182,7 +221,7 @@ export function AssetDetailsTabs({
                     <col style={{ width: '30%' }} />
                   </colgroup>
                   <thead>
-                    <tr className="sticky top-0 z-10 border-b border-slate-200 bg-white text-slate-500">
+                    <tr className="sticky top-0 z-10 border-b border-slate-200/50 bg-white/80 text-slate-500 shadow-sm backdrop-blur-md">
                       <th className="pb-2 pr-2 text-center font-medium">상품명</th>
                       <th className="pb-2 pr-2 text-center font-medium">원금/평가금</th>
                       <th className="whitespace-nowrap pb-2 pr-2 text-center font-medium">수익률</th>
@@ -190,8 +229,14 @@ export function AssetDetailsTabs({
                     </tr>
                   </thead>
                   <tbody>
-                    {pensionTable.map((row) => (
-                      <tr key={row.id} className="border-b border-slate-100 align-middle">
+                    {pensionTable.map((row, i) => (
+                      <motion.tr
+                        key={row.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3, delay: i * 0.05 }}
+                        className="border-b border-slate-100 align-middle"
+                      >
                         <td className="py-2 pr-2 text-center text-slate-900">
                           <span className="font-medium">{row.name}</span>
                         </td>
@@ -215,13 +260,13 @@ export function AssetDetailsTabs({
                         <td className="py-2 align-middle text-center">
                           <BarSparkline data={row.monthlyDeltas} />
                         </td>
-                      </tr>
+                      </motion.tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </motion.div>
             )}
-          </>
+          </AnimatePresence>
         )}
       </div>
     </div>

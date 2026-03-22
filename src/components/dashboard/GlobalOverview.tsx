@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { PieChart as PieChartIcon } from 'lucide-react'
 import {
   PieChart,
   Pie,
@@ -65,7 +66,7 @@ function PrincipalValuationAreaTooltip({
   const row = payload[0]?.payload as TrendStackPoint | undefined
   if (!row) return null
   return (
-    <div className="rounded-xl border border-slate-100 bg-white/95 p-3 shadow-[0_4px_20px_rgba(0,0,0,0.08)] backdrop-blur-md">
+    <div className="rounded-xl border border-white/50 bg-white/70 p-3 shadow-xl ring-1 ring-black/5 backdrop-blur-xl">
       <p className="mb-2 text-xs font-semibold text-slate-500">{label}</p>
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-4">
@@ -134,7 +135,7 @@ export function GlobalOverview({
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6">
-      <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
+      <div className="rounded-2xl border border-slate-200/60 bg-white/90 p-4 shadow-glass-sm ring-1 ring-slate-200/30 transition-all hover:shadow-glass backdrop-blur-sm">
         <h3 className="mb-4 text-sm font-semibold text-slate-700">자산 배분</h3>
 
         {showPie ? (
@@ -187,14 +188,20 @@ export function GlobalOverview({
             </div>
           </div>
         ) : (
-          <p className="flex min-h-[120px] items-center justify-center rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-            총자산 시트의 최신 행에서 연금·ELS·ETF·현금 평가액을 찾지 못했습니다. 열 이름을
-            확인해 주세요.
-          </p>
+          <div className="flex min-h-[220px] flex-col items-center justify-center rounded-xl bg-slate-50/50 px-4 py-8 text-center">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100/80 shadow-sm">
+              <PieChartIcon className="h-6 w-6 text-slate-400" strokeWidth={1.5} />
+            </div>
+            <p className="text-sm font-semibold text-slate-600">차트 데이터가 없습니다</p>
+            <p className="mt-1 text-xs text-slate-400">
+              총자산 시트의 최신 행에서 연금, ELS, ETF<br />
+              또는 현금 평가액 열을 찾을 수 없습니다.
+            </p>
+          </div>
         )}
       </div>
 
-      <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
+      <div className="rounded-2xl border border-slate-200/60 bg-white/90 p-4 shadow-glass-sm ring-1 ring-slate-200/30 transition-all hover:shadow-glass backdrop-blur-sm">
         <div className="mb-3 flex flex-col gap-1">
           <h3 className="text-sm font-semibold text-slate-700">자산 변동 추이</h3>
           {showPrincipalValuation && principalValuationTrend != null && (

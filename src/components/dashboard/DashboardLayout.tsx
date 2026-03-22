@@ -16,6 +16,7 @@ import { RebalancingActionCenter } from './RebalancingActionCenter'
 import { BottomNav, type MainTabId } from './BottomNav'
 import { AmountHideToggle } from './AmountHideToggle'
 import { LogoutButton } from '../LogoutButton'
+import { FileQuestion } from 'lucide-react'
 
 function getNextRedemptionDate(row: Record<string, unknown>): string {
   const next = row['다음 평가일']
@@ -170,9 +171,13 @@ export function DashboardLayout() {
                           hideAmounts={hideAmounts}
                         />
                       ) : (
-                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-500">
-                          총자산 시트에서 표시할 수 있는 최신 행이 없습니다. 평가일·원금·평가금 열을
-                          확인해 주세요.
+                        <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/60 bg-white/80 px-4 py-12 text-center shadow-sm backdrop-blur-sm">
+                          <FileQuestion className="mb-3 h-10 w-10 text-slate-300" strokeWidth={1} />
+                          <p className="text-sm font-semibold text-slate-600">요약 카드가 없습니다</p>
+                          <p className="mt-1 text-xs text-slate-400">
+                            총자산 시트에서 표시할 수 있는 최신 행이 없습니다.<br />
+                            평가일, 원금, 평가금 열을 확인해 주세요.
+                          </p>
                         </div>
                       )}
                     </div>

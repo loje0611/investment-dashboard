@@ -17,7 +17,7 @@ interface BottomNavProps {
 export function BottomNav({ current, onSelect }: BottomNavProps) {
   return (
     <nav
-      className="fixed bottom-0 left-1/2 z-50 w-full max-w-[480px] -translate-x-1/2 border-t border-slate-200 bg-white/95 shadow-[0_-2px_10px_rgba(0,0,0,0.06)] backdrop-blur-sm safe-area-pb"
+      className="fixed bottom-0 left-1/2 z-50 w-full max-w-[480px] -translate-x-1/2 border-t border-slate-200/50 bg-white/80 shadow-[0_-8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl safe-area-pb"
       role="tablist"
       aria-label="메인 메뉴"
     >
@@ -43,12 +43,16 @@ export function BottomNav({ current, onSelect }: BottomNavProps) {
                 />
               )}
               
-              <div className={`relative z-10 flex flex-col items-center gap-0.5 transition-colors duration-200 ${
-                isActive ? 'text-indigo-600' : 'text-slate-400 active:text-slate-600'
-              }`}>
+              <motion.div 
+                animate={{ scale: isActive ? 1.15 : 1 }}
+                transition={{ type: 'spring', bounce: 0.5, duration: 0.5 }}
+                className={`relative z-10 flex flex-col items-center gap-0.5 transition-colors duration-200 ${
+                  isActive ? 'text-indigo-600' : 'text-slate-400 active:text-slate-600'
+                }`}
+              >
                 <tab.Icon className="h-5 w-5" strokeWidth={isActive ? 2.5 : 2} />
                 <span className="text-[10px] font-semibold tracking-wide">{tab.label}</span>
-              </div>
+              </motion.div>
             </button>
           )
         })}
