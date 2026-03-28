@@ -17,6 +17,7 @@
  *   - elsSheetTotals → "ELS" 시트 고정 셀 B4(투자원금)·C4(평가금액) — 홈 카드「ELS 투자 평가」전용
  *   - elsCompleted   → "ELS(완료)" (상환 완료: 수익·투자기간 등)
  *   - cashOther      → "현금" (기타 평가금)
+ *   - ELS 등록(POST) → "ELS목록" 시트에 행 추가 (증권사, 상품회차, 가입금액, 상태, 가입일)
  *
  * 반환 형식: { totalAssets, portfolio, rebalancing, etf, pension, els, elsSheetTotals, elsCompleted, cashOther }
  */
@@ -42,6 +43,111 @@ function doGet(e) {
     return ContentService.createTextOutput(JSON.stringify({ error: message }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+/**
+ * 대시보드에서 ELS 등록(POST, application/json)을 받아 'ELS목록' 시트에 한 행 추가합니다.
+ * 요청 본문 예: { "brokerage":"삼성증권", "productRound":30868, "amount":1000000, "status":"청약 중(대기)" }
+ *
+ * 응답: Content-Type application/json (GAS ContentService는 Access-Control-Allow-Origin 등
+ * 사용자 정의 헤더를 붙일 수 없습니다. 웹앱 배포는「누구나」로 하면 브라우저 fetch(POST)가
+ * 동작하는 경우가 많습니다. CORS가 막히면 프록시 또는 GET 방식을 검토하세요.)
+ */
+function doPost(e) {
+  try {
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var body = parseElsRegisterJsonBody_(e);
+    var check = validateElsRegisterPayload_(body);
+    if (!check.ok) {
+      return jsonResponseForWebApp_({ success: false, error: check.error });
+    }
+    appendElsListRow_(ss, check.brokerage, check.productRound, check.amount, check.status);
+    return jsonResponseForWebApp_({ success: true, message: '등록되었습니다.' });
+  } catch (err) {
+    var msg = err && err.message ? String(err.message) : String(err);
+    return jsonResponseForWebApp_({ success: false, error: msg });
+  }
+}
+
+/** POST 응답: JSON + MIME type (프런트 Content-Type: application/json 과 맞춤) */
+function jsonResponseForWebApp_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
+    ContentService.MimeType.JSON
+  );
+}
+
+function parseElsRegisterJsonBody_(e) {
+  if (!e || !e.postData || !e.postData.contents) return {};
+  try {
+    return JSON.parse(e.postData.contents);
+  } catch (parseErr) {
+    return {};
+  }
+}
+
+var ELS_REGISTER_BROKERS_ = {
+  '삼성증권': true,
+  '키움증권': true,
+  '미래에셋증권': true,
+  'KB증권': true,
+  '메리츠증권': true
+};
+
+/**
+ * @returns {{ ok: true, brokerage, productRound, amount, status } | { ok: false, error: string }}
+ */
+function validateElsRegisterPayload_(body) {
+  if (!body || typeof body !== 'object') {
+    return { ok: false, error: 'JSON 본문이 없습니다.' };
+  }
+  var brokerage =
+    body.brokerage != null
+      ? String(body.brokerage).trim()
+      : body['증권사'] != null
+        ? String(body['증권사']).trim()
+        : '';
+  if (!brokerage || !ELS_REGISTER_BROKERS_[brokerage]) {
+    return { ok: false, error: '유효한 증권사를 선택해 주세요.' };
+  }
+  var roundRaw = body.productRound != null ? body.productRound : body['상품회차'];
+  var productRound = Number(roundRaw);
+  if (!isFinite(productRound) || productRound <= 0 || Math.floor(productRound) !== productRound) {
+    return { ok: false, error: '상품회차는 양의 정수여야 합니다.' };
+  }
+  var amountRaw = body.amount != null ? body.amount : body['가입금액'];
+  var amount = Number(amountRaw);
+  if (!isFinite(amount) || amount <= 0) {
+    return { ok: false, error: '가입금액은 0보다 큰 숫자여야 합니다.' };
+  }
+  var status =
+    body.status != null && String(body.status).trim() !== ''
+      ? String(body.status).trim()
+      : '청약 중(대기)';
+  return {
+    ok: true,
+    brokerage: brokerage,
+    productRound: productRound,
+    amount: amount,
+    status: status
+  };
+}
+
+/**
+ * 'ELS목록' 시트 맨 아래에 [증권사, 상품회차, 가입금액, 상태, 가입일] 추가.
+ * 시트가 비어 있으면 헤더 행을 먼저 넣습니다.
+ */
+function appendElsListRow_(ss, brokerage, productRound, amount, status) {
+  var sheet = ss.getSheetByName('ELS목록');
+  if (!sheet) {
+    throw new Error('ELS목록 시트를 찾을 수 없습니다. 스프레드시트에 탭을 만드세요.');
+  }
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['증권사', '상품회차', '가입금액', '상태', '가입일']);
+  }
+  var tz = Session.getScriptTimeZone();
+  if (!tz) tz = 'Asia/Seoul';
+  var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  sheet.appendRow([brokerage, productRound, amount, status, today]);
 }
 
 /**

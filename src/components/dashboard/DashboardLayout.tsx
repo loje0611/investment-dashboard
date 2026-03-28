@@ -14,6 +14,7 @@ import { GlobalOverview } from './GlobalOverview'
 import { AssetDetailsTabs } from './AssetDetailsTabs'
 import { RebalancingActionCenter } from './RebalancingActionCenter'
 import { BottomNav, type MainTabId } from './BottomNav'
+import { ElsRegisterModal } from './ElsRegisterModal'
 import { AmountHideToggle } from './AmountHideToggle'
 import { LogoutButton } from '../LogoutButton'
 import { FileQuestion } from 'lucide-react'
@@ -237,7 +238,34 @@ export function DashboardLayout() {
               hideAmounts={hideAmounts}
             />
           </div>
+
+          <div
+            className="absolute inset-0 flex flex-col overflow-hidden bg-slate-50 transition-opacity duration-300 ease-out"
+            style={{
+              opacity: mainTab === 'elsRegister' ? 1 : 0,
+              pointerEvents: mainTab === 'elsRegister' ? 'auto' : 'none',
+              zIndex: mainTab === 'elsRegister' ? 1 : 0,
+            }}
+          >
+            <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
+              <h1 className="text-xl font-bold text-slate-900">ELS 등록</h1>
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                <AmountHideToggle />
+                <LogoutButton />
+              </div>
+            </div>
+            <div className="flex flex-1 flex-col items-center justify-start px-4 pt-8 text-center">
+              <p className="max-w-xs text-sm text-slate-500">
+                등록 폼이 열렸습니다. 화면 하단(또는 중앙)의 패널에서 입력하거나, 바깥 영역을 눌러
+                닫을 수 있습니다.
+              </p>
+            </div>
+          </div>
         </div>
+
+        {mainTab === 'elsRegister' && (
+          <ElsRegisterModal open onClose={() => setMainTab('home')} />
+        )}
       </div>
 
       <BottomNav current={mainTab} onSelect={setMainTab} />

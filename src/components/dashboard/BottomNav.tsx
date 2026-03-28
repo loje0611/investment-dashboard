@@ -1,12 +1,13 @@
-import { Home, PieChart, Scale } from 'lucide-react'
+import { Home, PieChart, Scale, ClipboardPlus } from 'lucide-react'
 import { motion } from 'framer-motion'
 
-export type MainTabId = 'home' | 'assets' | 'rebalancing'
+export type MainTabId = 'home' | 'assets' | 'rebalancing' | 'elsRegister'
 
 const TABS: { id: MainTabId; label: string; Icon: typeof Home }[] = [
   { id: 'home', label: '홈', Icon: Home },
   { id: 'assets', label: '자산 상세', Icon: PieChart },
   { id: 'rebalancing', label: '리밸런싱', Icon: Scale },
+  { id: 'elsRegister', label: 'ELS 등록', Icon: ClipboardPlus },
 ]
 
 interface BottomNavProps {
@@ -21,7 +22,7 @@ export function BottomNav({ current, onSelect }: BottomNavProps) {
       role="tablist"
       aria-label="메인 메뉴"
     >
-      <div className="flex h-14 items-center justify-around px-2">
+      <div className="flex h-14 items-center justify-around gap-0 px-1">
         {TABS.map((tab) => {
           const isActive = current === tab.id
           return (
@@ -32,7 +33,7 @@ export function BottomNav({ current, onSelect }: BottomNavProps) {
               aria-selected={isActive}
               aria-label={tab.label}
               onClick={() => onSelect(tab.id)}
-              className="relative flex h-full flex-1 flex-col items-center justify-center gap-0.5"
+              className="relative flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5"
             >
               {/* 활성 인디케이터 배경 (framer-motion) */}
               {isActive && (
@@ -51,7 +52,9 @@ export function BottomNav({ current, onSelect }: BottomNavProps) {
                 }`}
               >
                 <tab.Icon className="h-5 w-5" strokeWidth={isActive ? 2.5 : 2} />
-                <span className="text-[10px] font-semibold tracking-wide">{tab.label}</span>
+                <span className="text-[9px] font-semibold leading-tight tracking-tight sm:text-[10px]">
+                  {tab.label}
+                </span>
               </motion.div>
             </button>
           )
