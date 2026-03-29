@@ -11,10 +11,14 @@ export const ELS_REGISTER_BROKERAGES = [
 export type ElsRegisterBrokerage = (typeof ELS_REGISTER_BROKERAGES)[number]
 
 export interface ElsRegisterPayload {
+  action: 'create'
   brokerage: string
   productRound: number
   amount: number
-  status: string
+  /** YYYY-MM-DD → 시트「발행일」열 */
+  issueDate?: string
+  /** 서버에서 create 시 무시하고「청약 중(대기)」로 고정 */
+  status?: string
 }
 
 interface GasRegisterResponse {
@@ -24,8 +28,9 @@ interface GasRegisterResponse {
 }
 
 /**
- * ELS 등록: GAS 웹앱 doPost(JSON)로 전송.
- * Content-Type: application/json
+ * ELS 등록: GAS 웹앱 doPost로 전송.
+ * - `text/plain;charset=utf-8` + JSON 문자열 본문: application/json 대비 Preflight(OPTIONS) 회피
+ * - `redirect: 'follow'`: GAS 웹앱 POST 후 리다이렉트 체인 대응
  */
 export async function registerElsProduct(
   payload: ElsRegisterPayload,
@@ -42,9 +47,10 @@ export async function registerElsProduct(
   const res = await fetch(url, {
     method: 'POST',
     mode: 'cors',
+    redirect: 'follow',
     headers: {
       Accept: 'application/json',
-      'Content-Type': 'application/json',
+      'Content-Type': 'text/plain;charset=utf-8',
     },
     body: JSON.stringify(payload),
   })

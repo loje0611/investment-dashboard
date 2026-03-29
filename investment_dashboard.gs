@@ -17,89 +17,247 @@
  *   - elsSheetTotals → "ELS" 시트 고정 셀 B4(투자원금)·C4(평가금액) — 홈 카드「ELS 투자 평가」전용
  *   - elsCompleted   → "ELS(완료)" (상환 완료: 수익·투자기간 등)
  *   - cashOther      → "현금" (기타 평가금)
- *   - ELS 등록(POST) → "ELS목록" 시트에 행 추가 (증권사, 상품회차, 가입금액, 상태, 가입일)
+ *   - ELS 목록 API   → 본 파일 doGet (?api=els_pending), doPost (action create/update)
  *
  * 반환 형식: { totalAssets, portfolio, rebalancing, etf, pension, els, elsSheetTotals, elsCompleted, cashOther }
  */
 // 배포 전 본인 스프레드시트 ID로 변경하세요. (URL의 /d/ 다음 부분)
 var SPREADSHEET_ID = '1g1VBYupYjmkiF-85CXgjFvu4qzzSjtKTLGgXYNIhKQM';
 
+// ----- 웹앱 진입점 · ELS목록 API (React / Python 공용) -----
+
 /**
- * 웹 앱으로 GET 요청 시 호출됩니다. JSON을 반환합니다.
- * 쿼리 파라미터 data: summary | assets | rebalancing | all(기본)
- *   - summary: 총자산만 (홈 화면용, 가장 빠름)
- *   - assets: 자산 상세(ELS, ETF, 연금)
- *   - rebalancing: 리밸런싱(포트_API, 포트(New))
- *   - all 또는 생략: 전체 (기존 동작)
+ * GET  ?api=els_pending  → 상태「청약 중(대기)」행만 + row_index
+ * GET  (그 외)           → 아래 getDashboardData (data 파라미터 동일)
+ *
+ * POST JSON action:
+ *   create (또는 생략) → 신규 행, 상태「청약 중(대기)」
+ *   update            → row_index 행 헤더 매핑으로 셀 갱신(빈 값 스킵), 상태「투자 중」
+ *
+ * 크롤러(update) 권장 헤더: 수익률, 발행일, 낙인, 조기상환조건 1~12차, 티커 1~3, 기준가 1~3,
+ * 조기상환평가일 1~12차 (1행 헤더와 body 키는 공백·_ 정규화로 매칭)
+ *
+ * CORS: ContentService 는 Access-Control-Allow-Origin 등 사용자 정의 HTTP 헤더를 붙일 수 없음.
  */
+
+var ELS_LIST_SHEET_NAME_ = 'ELS목록';
+var ELS_PENDING_STATUS_ = '청약 중(대기)';
+var ELS_LIVE_STATUS_ = '투자 중';
+
+/** 빈 시트일 때만 넣는 최소 헤더 */
+var ELS_LIST_MIN_HEADERS_ = ['증권사', '상품회차', '가입금액', '발행일', '상태', '가입일'];
+
+var ELS_REGISTER_BROKERS_ = {
+  삼성증권: true,
+  키움증권: true,
+  미래에셋증권: true,
+  KB증권: true,
+  메리츠증권: true,
+};
+
 function doGet(e) {
-  var param = (e && e.parameter && e.parameter.data) ? String(e.parameter.data).toLowerCase() : 'all';
+  var api = e && e.parameter && e.parameter.api != null ? String(e.parameter.api).trim() : '';
   try {
+    if (api === 'els_pending') {
+      var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      var items = getElsPendingRowsWithIndex_(ss);
+      return jsonResponse_({ success: true, items: items });
+    }
+    var param =
+      e && e.parameter && e.parameter.data ? String(e.parameter.data).toLowerCase() : 'all';
     var data = getDashboardData(param);
-    return ContentService.createTextOutput(JSON.stringify(data))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonResponse_(data);
   } catch (err) {
-    var message = err.message || '데이터를 불러오는 중 오류가 발생했습니다.';
-    return ContentService.createTextOutput(JSON.stringify({ error: message }))
-      .setMimeType(ContentService.MimeType.JSON);
+    var message = err && err.message ? String(err.message) : String(err);
+    if (api === 'els_pending') {
+      return jsonResponse_({ success: false, error: message });
+    }
+    return jsonResponse_({ error: message });
   }
 }
 
-/**
- * 대시보드에서 ELS 등록(POST, application/json)을 받아 'ELS목록' 시트에 한 행 추가합니다.
- * 요청 본문 예: { "brokerage":"삼성증권", "productRound":30868, "amount":1000000, "status":"청약 중(대기)" }
- *
- * 응답: Content-Type application/json (GAS ContentService는 Access-Control-Allow-Origin 등
- * 사용자 정의 헤더를 붙일 수 없습니다. 웹앱 배포는「누구나」로 하면 브라우저 fetch(POST)가
- * 동작하는 경우가 많습니다. CORS가 막히면 프록시 또는 GET 방식을 검토하세요.)
- */
 function doPost(e) {
   try {
-    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    var body = parseElsRegisterJsonBody_(e);
-    var check = validateElsRegisterPayload_(body);
-    if (!check.ok) {
-      return jsonResponseForWebApp_({ success: false, error: check.error });
+    var raw =
+      e && e.postData && e.postData.contents != null ? String(e.postData.contents).trim() : '';
+    if (!raw) {
+      return jsonResponse_({ success: false, error: '요청 본문이 비어 있습니다.' });
     }
-    appendElsListRow_(ss, check.brokerage, check.productRound, check.amount, check.status);
-    return jsonResponseForWebApp_({ success: true, message: '등록되었습니다.' });
+    var body;
+    try {
+      body = JSON.parse(raw);
+    } catch (parseErr) {
+      return jsonResponse_({ success: false, error: 'JSON 파싱에 실패했습니다.' });
+    }
+    if (!body || typeof body !== 'object') {
+      return jsonResponse_({ success: false, error: '유효한 JSON 객체가 아닙니다.' });
+    }
+
+    var action = body.action != null ? String(body.action).trim().toLowerCase() : '';
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+    if (action === 'update') {
+      handleElsUpdate_(ss, body);
+      return jsonResponse_({ success: true, message: '행이 업데이트되었습니다.' });
+    }
+
+    if (action === '' || action === 'create') {
+      handleElsCreate_(ss, body);
+      return jsonResponse_({ success: true, message: '등록되었습니다.' });
+    }
+
+    return jsonResponse_({ success: false, error: '알 수 없는 action: ' + body.action });
   } catch (err) {
     var msg = err && err.message ? String(err.message) : String(err);
-    return jsonResponseForWebApp_({ success: false, error: msg });
+    return jsonResponse_({ success: false, error: msg });
   }
 }
 
-/** POST 응답: JSON + MIME type (프런트 Content-Type: application/json 과 맞춤) */
-function jsonResponseForWebApp_(obj) {
+function jsonResponse_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
     ContentService.MimeType.JSON
   );
 }
 
-function parseElsRegisterJsonBody_(e) {
-  if (!e || !e.postData || !e.postData.contents) return {};
-  try {
-    return JSON.parse(e.postData.contents);
-  } catch (parseErr) {
-    return {};
+function getElsSheetOrThrow_(ss) {
+  var sheet = ss.getSheetByName(ELS_LIST_SHEET_NAME_);
+  if (!sheet) {
+    throw new Error('ELS목록 시트를 찾을 수 없습니다.');
+  }
+  return sheet;
+}
+
+function ensureElsMinimalHeaderRow_(sheet) {
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, ELS_LIST_MIN_HEADERS_.length).setValues([ELS_LIST_MIN_HEADERS_]);
+    return;
+  }
+  var a1 = sheet.getRange(1, 1).getValue();
+  if (a1 == null || String(a1).trim() === '') {
+    sheet.getRange(1, 1, 1, ELS_LIST_MIN_HEADERS_.length).setValues([ELS_LIST_MIN_HEADERS_]);
   }
 }
 
-var ELS_REGISTER_BROKERS_ = {
-  '삼성증권': true,
-  '키움증권': true,
-  '미래에셋증권': true,
-  'KB증권': true,
-  '메리츠증권': true
-};
+function normalizeHeaderKey_(s) {
+  return String(s || '')
+    .replace(/\u3000/g, ' ')
+    .replace(/\s+/g, '')
+    .replace(/_/g, '')
+    .toLowerCase();
+}
 
-/**
- * @returns {{ ok: true, brokerage, productRound, amount, status } | { ok: false, error: string }}
- */
-function validateElsRegisterPayload_(body) {
-  if (!body || typeof body !== 'object') {
-    return { ok: false, error: 'JSON 본문이 없습니다.' };
+function buildHeaderColumnMaps_(headerRow) {
+  var exact = {};
+  var norm = {};
+  for (var c = 0; c < headerRow.length; c++) {
+    var h = headerRow[c] != null ? String(headerRow[c]).trim() : '';
+    if (!h) continue;
+    var col = c + 1;
+    if (exact[h] == null) exact[h] = col;
+    var nk = normalizeHeaderKey_(h);
+    if (nk && norm[nk] == null) norm[nk] = col;
   }
+  return { exact: exact, norm: norm };
+}
+
+function resolveColumnForKey_(maps, key) {
+  if (key == null || key === '') return null;
+  var k = String(key).trim();
+  if (maps.exact[k] != null) return maps.exact[k];
+  var nk = normalizeHeaderKey_(k);
+  if (nk && maps.norm[nk] != null) return maps.norm[nk];
+  return null;
+}
+
+function findStatusColumn_(maps) {
+  var c =
+    maps.exact['상태'] ||
+    maps.norm[normalizeHeaderKey_('상태')] ||
+    maps.exact['status'] ||
+    maps.norm['status'];
+  return c != null ? c : null;
+}
+
+function isEmptyValue_(v) {
+  if (v === undefined || v === null) return true;
+  if (typeof v === 'string' && v.trim() === '') return true;
+  return false;
+}
+
+function getElsPendingRowsWithIndex_(ss) {
+  var sheet = getElsSheetOrThrow_(ss);
+  if (sheet.getLastRow() < 2) return [];
+
+  var lastCol = sheet.getLastColumn();
+  var headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var statusCol = findStatusColumn_(buildHeaderColumnMaps_(headerRow));
+  if (statusCol == null) {
+    throw new Error('ELS목록 1행에「상태」열이 없습니다.');
+  }
+
+  var lastRow = sheet.getLastRow();
+  var rows = sheet.getRange(2, 1, lastRow, lastCol).getValues();
+  var out = [];
+
+  for (var r = 0; r < rows.length; r++) {
+    var sheetRow = r + 2;
+    var statusVal = rows[r][statusCol - 1];
+    var st = statusVal != null ? String(statusVal).trim() : '';
+    if (st !== ELS_PENDING_STATUS_) continue;
+
+    var obj = { row_index: sheetRow };
+    for (var c = 0; c < headerRow.length; c++) {
+      var name = headerRow[c] != null ? String(headerRow[c]).trim() : '';
+      if (!name) continue;
+      var v = rows[r][c];
+      obj[name] = v === '' ? null : v;
+    }
+    out.push(obj);
+  }
+  return out;
+}
+
+function handleElsCreate_(ss, body) {
+  var check = validateElsCreatePayload_(body);
+  if (!check.ok) throw new Error(check.error);
+
+  var sheet = getElsSheetOrThrow_(ss);
+  ensureElsMinimalHeaderRow_(sheet);
+
+  var lastCol = Math.max(sheet.getLastColumn(), ELS_LIST_MIN_HEADERS_.length);
+  var headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var maps = buildHeaderColumnMaps_(headerRow);
+
+  function requireCol(label) {
+    var col = resolveColumnForKey_(maps, label);
+    if (col == null) {
+      throw new Error('ELS목록 1행에「' + label + '」열이 필요합니다.');
+    }
+    return col;
+  }
+
+  var row = [];
+  for (var i = 0; i < lastCol; i++) row.push('');
+
+  row[requireCol('증권사') - 1] = check.brokerage;
+  row[requireCol('상품회차') - 1] = check.productRound;
+  row[requireCol('가입금액') - 1] = check.amount;
+
+  var tz = Session.getScriptTimeZone() || 'Asia/Seoul';
+  var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  row[requireCol('가입일') - 1] = today;
+
+  row[requireCol('상태') - 1] = ELS_PENDING_STATUS_;
+
+  var issueCol = resolveColumnForKey_(maps, '발행일');
+  if (issueCol != null && check.issueDate) {
+    row[issueCol - 1] = check.issueDate;
+  }
+
+  sheet.appendRow(row);
+}
+
+function validateElsCreatePayload_(body) {
   var brokerage =
     body.brokerage != null
       ? String(body.brokerage).trim()
@@ -119,36 +277,55 @@ function validateElsRegisterPayload_(body) {
   if (!isFinite(amount) || amount <= 0) {
     return { ok: false, error: '가입금액은 0보다 큰 숫자여야 합니다.' };
   }
-  var status =
-    body.status != null && String(body.status).trim() !== ''
-      ? String(body.status).trim()
-      : '청약 중(대기)';
-  return {
-    ok: true,
-    brokerage: brokerage,
-    productRound: productRound,
-    amount: amount,
-    status: status
-  };
+  var issueRaw =
+    body.issueDate != null
+      ? String(body.issueDate).trim()
+      : body['발행일'] != null
+        ? String(body['발행일']).trim()
+        : '';
+  var issueDate = issueRaw || null;
+  return { ok: true, brokerage: brokerage, productRound: productRound, amount: amount, issueDate: issueDate };
 }
 
-/**
- * 'ELS목록' 시트 맨 아래에 [증권사, 상품회차, 가입금액, 상태, 가입일] 추가.
- * 시트가 비어 있으면 헤더 행을 먼저 넣습니다.
- */
-function appendElsListRow_(ss, brokerage, productRound, amount, status) {
-  var sheet = ss.getSheetByName('ELS목록');
-  if (!sheet) {
-    throw new Error('ELS목록 시트를 찾을 수 없습니다. 스프레드시트에 탭을 만드세요.');
+function handleElsUpdate_(ss, body) {
+  var rowIndex = body.row_index != null ? Number(body.row_index) : NaN;
+  if (!isFinite(rowIndex) || rowIndex < 2 || Math.floor(rowIndex) !== rowIndex) {
+    throw new Error('유효한 row_index(정수, 2 이상)가 필요합니다.');
   }
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['증권사', '상품회차', '가입금액', '상태', '가입일']);
+
+  var sheet = getElsSheetOrThrow_(ss);
+  var lastRow = sheet.getLastRow();
+  if (rowIndex > lastRow) {
+    throw new Error('row_index가 시트 범위를 벗어났습니다.');
   }
-  var tz = Session.getScriptTimeZone();
-  if (!tz) tz = 'Asia/Seoul';
-  var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
-  sheet.appendRow([brokerage, productRound, amount, status, today]);
+
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) throw new Error('ELS목록에 헤더 행이 없습니다.');
+
+  var headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var maps = buildHeaderColumnMaps_(headerRow);
+
+  var keys = Object.keys(body);
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    if (key === 'action' || key === 'row_index') continue;
+    var val = body[key];
+    if (isEmptyValue_(val)) continue;
+
+    var col = resolveColumnForKey_(maps, key);
+    if (col == null) continue;
+
+    sheet.getRange(rowIndex, col).setValue(val);
+  }
+
+  var statusCol = findStatusColumn_(maps);
+  if (statusCol == null) {
+    throw new Error('「상태」열을 찾을 수 없어 투자 중으로 바꿀 수 없습니다.');
+  }
+  sheet.getRange(rowIndex, statusCol).setValue(ELS_LIVE_STATUS_);
 }
+
+// ----- 대시보드 시트 읽기 -----
 
 /**
  * 대시보드에 필요한 시트 데이터를 가져옵니다.
@@ -255,11 +432,6 @@ function getDashboardData(dataType) {
 }
 
 /**
- * 「ELS」시트 요약 행: B4=투자원금 합계, C4=평가금액 합계 (홈 카드·총자산 집계용).
- * 탭 이름은 정확히 'ELS' 여야 합니다.
- * @returns {{ principal: number, valuation: number }|null}
- */
-/**
  * 후보 시트명 중 첫 번째로 존재하는 시트를 headerRowIndex 행을 헤더로 읽습니다.
  * @returns {Object[]}
  */
@@ -284,6 +456,10 @@ function readSheetAsObjectsFirstNonEmpty(ss, sheetNames, headerRowIndex) {
   return [];
 }
 
+/**
+ * 「ELS」시트 B4·C4: 투자원금·평가금액 합계 (홈 카드·총자산 집계용).
+ * @returns {{ principal: number, valuation: number }|null}
+ */
 function readElsSheetTotalsB4C4(ss) {
   var sh =
     ss.getSheetByName('ELS') ||
@@ -358,112 +534,6 @@ function getRebalancingDataFromPortApi(ss) {
     }
   }
   return out;
-}
-
-/**
- * 행이 헤더 행인지 판별합니다.
- * 첫 셀이 "종류", "종류(연금저축)", "종류(IRP)", "종류(해외)", "종목명", "상품명" 등
- * 알려진 키워드로 시작하고, 비어 있지 않은 셀이 3개 이상이면 헤더로 봅니다.
- */
-function isHeaderLikeRow(row) {
-  if (!row || !row.length) return false;
-  var first = row[0] != null ? String(row[0]).trim() : '';
-  if (first === '' || first === '합계') return false;
-  var keywords = ['종류', '종목명', '상품명', '종목', '계좌'];
-  var matched = false;
-  for (var k = 0; k < keywords.length; k++) {
-    if (first === keywords[k] || first.indexOf(keywords[k]) === 0) {
-      matched = true;
-      break;
-    }
-  }
-  if (!matched) return false;
-  var nonEmpty = 0;
-  for (var c = 0; c < row.length; c++) {
-    if (row[c] != null && String(row[c]).trim() !== '') nonEmpty++;
-  }
-  return nonEmpty >= 3;
-}
-
-/**
- * 시트 내 여러 표를 파싱합니다 (헤더 행 기반 탐색).
- *
- * 전략: 모든 행을 스캔하여 "헤더 행"(isHeaderLikeRow==true)을 먼저 찾고,
- *   - 헤더 바로 윗 행의 A열 → 계좌명 (비어 있으면 시트명 사용)
- *   - 헤더 아래 행 → 데이터 (빈 행 또는 "합계" 행에서 종료)
- *
- * @returns {Array<{ accountLabel: string, rows: Object[] }>}
- */
-function readSheetAsMultipleTables(ss, sheetName) {
-  try {
-    if (!ss || !sheetName) return [];
-    var sheet = ss.getSheetByName(sheetName);
-    if (!sheet) return [];
-    var range = sheet.getDataRange();
-    if (!range) return [];
-    var values = range.getValues();
-    if (!values || values.length < 2) return [];
-
-    // 1) 헤더 행 인덱스 수집
-    var headerIndices = [];
-    for (var h = 0; h < values.length; h++) {
-      if (isHeaderLikeRow(values[h])) {
-        headerIndices.push(h);
-      }
-    }
-    if (headerIndices.length === 0) return [];
-
-    var tables = [];
-
-    for (var t = 0; t < headerIndices.length; t++) {
-      var hi = headerIndices[t];
-
-      // 2) 계좌명: 헤더 바로 윗 행의 A열
-      var accountLabel = sheetName;
-      if (hi > 0) {
-        var above = values[hi - 1][0];
-        var aboveStr = above != null ? String(above).trim() : '';
-        if (aboveStr !== '' && aboveStr !== '합계') {
-          accountLabel = aboveStr;
-        }
-      }
-
-      // 3) 헤더 파싱
-      var headers = values[hi].map(function (cell) {
-        return cell != null ? String(cell).trim() : '';
-      });
-
-      // 4) 데이터 행 읽기 (헤더+1 부터, 빈 행 또는 "합계" 또는 다음 헤더 직전까지)
-      var nextHeaderIdx = (t + 1 < headerIndices.length) ? headerIndices[t + 1] : values.length;
-      var rows = [];
-      for (var d = hi + 1; d < nextHeaderIdx && d < values.length; d++) {
-        var row = values[d];
-        var firstCell = row[0] != null ? String(row[0]).trim() : '';
-        if (firstCell === '' || firstCell === '합계') break;
-        var obj = {};
-        for (var c = 0; c < headers.length; c++) {
-          var key = headers[c] || 'col' + c;
-          var val = row[c];
-          if (typeof val === 'number' && !isNaN(val)) {
-            obj[key] = val;
-          } else if (val != null && val !== '') {
-            obj[key] = val;
-          } else {
-            obj[key] = val === 0 ? 0 : null;
-          }
-        }
-        rows.push(obj);
-      }
-
-      if (rows.length > 0) {
-        tables.push({ accountLabel: accountLabel, rows: rows });
-      }
-    }
-
-    return tables;
-  } catch (e) {
-    return [];
-  }
 }
 
 /**

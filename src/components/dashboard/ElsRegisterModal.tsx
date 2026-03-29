@@ -6,8 +6,6 @@ import {
   type ElsRegisterBrokerage,
 } from '../../api/registerEls'
 
-const STATUS_PENDING = '청약 중(대기)'
-
 function digitsOnly(value: string): string {
   return value.replace(/\D/g, '')
 }
@@ -35,6 +33,7 @@ export function ElsRegisterModal({ open, onClose }: ElsRegisterModalProps) {
   const [brokerage, setBrokerage] = useState<ElsRegisterBrokerage>(ELS_REGISTER_BROKERAGES[0])
   const [productRound, setProductRound] = useState('')
   const [amount, setAmount] = useState('')
+  const [issueDate, setIssueDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -42,6 +41,7 @@ export function ElsRegisterModal({ open, onClose }: ElsRegisterModalProps) {
     setBrokerage(ELS_REGISTER_BROKERAGES[0])
     setProductRound('')
     setAmount('')
+    setIssueDate('')
     setError(null)
   }, [])
 
@@ -64,13 +64,18 @@ export function ElsRegisterModal({ open, onClose }: ElsRegisterModalProps) {
       setError('가입금액을 숫자로 입력해 주세요.')
       return
     }
+    if (!issueDate.trim()) {
+      setError('발행일을 선택해 주세요.')
+      return
+    }
     setLoading(true)
     try {
       await registerElsProduct({
+        action: 'create',
         brokerage,
         productRound: roundNum,
         amount: amountNum,
-        status: STATUS_PENDING,
+        issueDate: issueDate.trim(),
       })
       resetForm()
       onClose()
@@ -176,6 +181,20 @@ export function ElsRegisterModal({ open, onClose }: ElsRegisterModalProps) {
                 ₩{amountFormatted}
               </p>
             )}
+          </div>
+
+          <div>
+            <label htmlFor="els-issue-date" className="mb-1 block text-sm font-medium text-slate-700">
+              발행일
+            </label>
+            <input
+              id="els-issue-date"
+              type="date"
+              value={issueDate}
+              onChange={(ev) => setIssueDate(ev.target.value)}
+              disabled={loading}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 tabular-nums focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60"
+            />
           </div>
 
           {error ? (
