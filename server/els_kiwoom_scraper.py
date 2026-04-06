@@ -8,6 +8,8 @@
 실행 (프로젝트 루트에서, .env에 VITE_WEB_APP_URL 설정):
   python server/els_kiwoom_scraper.py
 
+브라우저(Playwright 등)를 쓰지 않고 requests·HTML 파싱만 사용하므로 별도 헤드리스 설정 없음.
+
 대상 행 (GET ?api=els_pending = 상태「청약 중(대기)」만):
   - 증권사가 키움증권
   - 시트「발행일」이 오늘 또는 과거 (파싱 가능한 경우만)

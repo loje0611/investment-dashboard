@@ -4,6 +4,7 @@
 - DrissionPage를 통해 Eversafe Web을 우회하여 API 응답(JSON) 확인
 - 관련 상품의 PDF(투자설명서/간이투자설명서)를 다운로드해 pdfplumber로 파싱 (KI/평가일 등 추출)
 - 추출된 데이터를 Google Sheets용 앱스스크립트로 전송
+- Chromium 기본 헤드리스. 창으로 보려면 PLAYWRIGHT_HEADLESS=0
 """
 
 import json
@@ -324,7 +325,12 @@ def main() -> int:
 
     co = ChromiumOptions()
     co.auto_port()
-    co.set_headless(True)
+    headless = (os.getenv("PLAYWRIGHT_HEADLESS", "1") or "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+    )
+    co.set_headless(headless)
     co.set_argument('--no-sandbox')
     
     # Playwright의 크로미움 바이너리를 사용 (버전에 따라 다를 수 있으므로 검색)

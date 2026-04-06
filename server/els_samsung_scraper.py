@@ -9,6 +9,8 @@
 실행 (프로젝트 루트에서, .env에 VITE_WEB_APP_URL 설정):
   python server/els_samsung_scraper.py
 
+Playwright 기본 헤드리스. 창으로 보려면 PLAYWRIGHT_HEADLESS=0
+
 대상 행 (GET ?api=els_pending = 상태「청약 중(대기)」만):
   - 증권사가 삼성증권
   - 시트「발행일」이 오늘 또는 과거 (파싱 가능한 경우만)
@@ -1213,9 +1215,14 @@ def main() -> int:
     # 선택: 직접 상세 URL 템플릿이 있으면 search.do 보다 우선 (예: ...?ISCD=...&... 에 {round} 치환 불가 시 생략)
     detail_template = os.getenv("SAMSUNG_ELS_DETAIL_URL_TEMPLATE", "").strip() or None
     nav_timeout = int(os.getenv("PLAYWRIGHT_NAV_TIMEOUT_MS", "45000"))
+    headless = (os.getenv("PLAYWRIGHT_HEADLESS", "1") or "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+    )
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=headless)
         context = browser.new_context(locale="ko-KR")
         page = context.new_page()
 
