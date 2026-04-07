@@ -5,7 +5,7 @@
 설치:
   pip install requests python-dotenv beautifulsoup4
 
-실행 (프로젝트 루트에서, .env에 VITE_WEB_APP_URL 설정):
+실행 (프로젝트 루트에서, .env에 ELS_SCRAPER_WEB_APP_URL 설정):
   python server/els_kiwoom_scraper.py
 
 브라우저(Playwright 등)를 쓰지 않고 requests·HTML 파싱만 사용하므로 별도 헤드리스 설정 없음.
@@ -288,9 +288,9 @@ def main() -> int:
     if os.path.isfile(env_path):
         load_dotenv(env_path)
 
-    api_base = (os.getenv("VITE_WEB_APP_URL") or "").strip()
+    api_base = (os.getenv("ELS_SCRAPER_WEB_APP_URL") or "").strip()
     if not api_base:
-        print("VITE_WEB_APP_URL이 .env에 없습니다.", file=sys.stderr)
+        print("ELS_SCRAPER_WEB_APP_URL이 .env에 없습니다.", file=sys.stderr)
         return 1
 
     try:

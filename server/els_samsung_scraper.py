@@ -6,7 +6,7 @@
   pip install requests playwright python-dotenv
   playwright install chromium
 
-실행 (프로젝트 루트에서, .env에 VITE_WEB_APP_URL 설정):
+실행 (프로젝트 루트에서, .env에 ELS_SCRAPER_WEB_APP_URL 설정):
   python server/els_samsung_scraper.py
 
 Playwright 기본 헤드리스. 창으로 보려면 PLAYWRIGHT_HEADLESS=0
@@ -1193,9 +1193,9 @@ def main() -> int:
     if os.path.isfile(env_path):
         load_dotenv(env_path)
 
-    api_base = (os.getenv("VITE_WEB_APP_URL") or "").strip()
+    api_base = (os.getenv("ELS_SCRAPER_WEB_APP_URL") or "").strip()
     if not api_base:
-        print("VITE_WEB_APP_URL이 .env에 없습니다.", file=sys.stderr)
+        print("ELS_SCRAPER_WEB_APP_URL이 .env에 없습니다.", file=sys.stderr)
         return 1
 
     try:

@@ -124,4 +124,6 @@ export interface DashboardSheetResponse {
   elsCompleted?: ElsCompletedRow[];
   /** 현금(기타) 시트 */
   cashOther?: SheetDataRow[];
+  /** 'ELS목록' 시트 데이터 */
+  elsListSheetData?: ElsRow[];
 }

@@ -7,7 +7,7 @@ const TABS: { id: MainTabId; label: string; Icon: typeof Home }[] = [
   { id: 'home', label: '홈', Icon: Home },
   { id: 'assets', label: '자산 상세', Icon: PieChart },
   { id: 'rebalancing', label: '리밸런싱', Icon: Scale },
-  { id: 'elsRegister', label: 'ELS 등록', Icon: ClipboardPlus },
+  { id: 'elsRegister', label: 'ELS 관리', Icon: ClipboardPlus },
 ]
 
 interface BottomNavProps {

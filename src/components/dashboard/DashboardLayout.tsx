@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useStore, useElsProductsWithMappings } from '../../store/useStore'
+import { motion } from 'framer-motion'
+import { useStore, useElsProductsWithMappings, useElsListSheetProductsWithMappings } from '../../store/useStore'
 import { getWorstPerformer } from '../../utils/elsWorstPerformer'
 import { portfolioToEtfRows } from '../../utils/portfolioToEtf'
 import { pensionToRows } from '../../utils/pensionToRows'
@@ -9,6 +10,7 @@ import { totalAssetsToPrincipalValuationTrend } from '../../utils/totalAssetsToP
 import { buildHomeOverviewFromRawFormulas } from '../../utils/homeOverviewFromRawFormulas'
 import { getCurrentLevelFromRow, parseBarrierPercent } from '../../utils/elsRiskCounts'
 import type { ElsCardItem, EtfRow, PensionRow } from '../../data/dashboardDummy'
+import { ElsRiskProgressBar } from '../ElsRiskProgressBar'
 import { SummaryCardsCarousel } from './SummaryCardsCarousel'
 import { GlobalOverview } from './GlobalOverview'
 import { AssetDetailsTabs } from './AssetDetailsTabs'
@@ -57,6 +59,7 @@ export function DashboardLayout() {
     totalAssets,
     elsCompleted,
     elsSheetTotals,
+    elsListSheetData,
     cashOther,
     isLoading,
     isLoadingAssets,
@@ -67,7 +70,9 @@ export function DashboardLayout() {
     hideAmounts,
   } = useStore()
   const elsProducts = useElsProductsWithMappings()
+  const elsManageProducts = useElsListSheetProductsWithMappings()
   const [mainTab, setMainTab] = useState<MainTabId>('home')
+  const [isElsRegisterModalOpen, setIsElsRegisterModalOpen] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -94,6 +99,29 @@ export function DashboardLayout() {
       }
     })
   }, [els, elsProducts])
+
+  const elsListManageTab = useMemo((): ElsCardItem[] => {
+    if (!elsListSheetData.length) return []
+    return elsListSheetData.map((row, i) => {
+      const product = elsManageProducts[i]
+      const worst = product != null ? getWorstPerformer(product) : null
+      const levelFromWorst = worst != null ? 100 + worst.percentage : 0
+      const currentLevel = getCurrentLevelFromRow(row, levelFromWorst)
+      const kiBarrier = parseBarrierPercent(row.낙인배리어 ?? row.KI) || 70
+      const redemptionBarrier = parseBarrierPercent(row.상환배리어 ?? row['다음 배리어']) || 90
+      const nextDate = getNextRedemptionDate(row)
+      const productName = row.상품명 != null ? String(row.상품명).trim() : 
+        (row.증권사 ? `${row.증권사} ELS ${row.상품회차 || ''}회`.trim() : '')
+      return {
+        id: `els-manage-${i}`,
+        productName: productName || '-',
+        nextRedemptionDate: nextDate ? formatRedemptionDateDisplay(nextDate) : '-',
+        currentLevel,
+        kiBarrier,
+        redemptionBarrier,
+      }
+    })
+  }, [elsListSheetData, elsManageProducts])
 
   const etfTableForTab = useMemo((): EtfRow[] => {
     if (!etf.length) return []
@@ -248,23 +276,63 @@ export function DashboardLayout() {
             }}
           >
             <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
-              <h1 className="text-xl font-bold text-slate-900">ELS 등록</h1>
+              <h1 className="text-xl font-bold text-slate-900">ELS 관리</h1>
               <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsElsRegisterModalOpen(true)}
+                  className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                >
+                  상품 추가
+                </button>
                 <AmountHideToggle />
                 <LogoutButton />
               </div>
             </div>
-            <div className="flex flex-1 flex-col items-center justify-start px-4 pt-8 text-center">
-              <p className="max-w-xs text-sm text-slate-500">
-                등록 폼이 열렸습니다. 화면 하단(또는 중앙)의 패널에서 입력하거나, 바깥 영역을 눌러
-                닫을 수 있습니다.
-              </p>
+            <div className="min-h-0 flex-1 overflow-auto scrollbar-hide p-4">
+              {isLoading || isLoadingAssets ? (
+                <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 py-12 text-slate-500">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" aria-hidden />
+                  <p className="text-sm font-medium">로딩 중...</p>
+                </div>
+              ) : elsListManageTab.length === 0 ? (
+                 <div className="flex flex-col items-center justify-center py-12 text-center text-slate-500">
+                   <p className="text-sm">등록된 ELS 상품이 없습니다.</p>
+                 </div>
+              ) : (
+                <div className="space-y-4">
+                  {elsListManageTab.map((item, i) => (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: i * 0.05 }}
+                      className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-medium text-slate-900">{item.productName}</p>
+                        <p className="shrink-0 text-sm text-slate-500">
+                          다음 조기 상환 평가일: {item.nextRedemptionDate}
+                        </p>
+                      </div>
+                      <div className="mt-3">
+                        <ElsRiskProgressBar
+                          currentLevel={item.currentLevel}
+                          kiBarrier={item.kiBarrier}
+                          redemptionBarrier={item.redemptionBarrier}
+                          barHeight="h-3"
+                        />
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {mainTab === 'elsRegister' && (
-          <ElsRegisterModal open onClose={() => setMainTab('home')} />
+        {isElsRegisterModalOpen && (
+          <ElsRegisterModal open onClose={() => setIsElsRegisterModalOpen(false)} />
         )}
       </div>
 

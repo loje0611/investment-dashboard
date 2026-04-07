@@ -40,6 +40,8 @@ export interface DashboardState {
   elsCompleted: ElsCompletedRow[];
   /** 현금(기타) 시트 */
   cashOther: SheetDataRow[];
+  /** ELS목록 시트 */
+  elsListSheetData: ElsRow[];
   /** 로딩 여부 (전체 또는 summary) */
   isLoading: boolean;
   /** 자산 상세(ELS/ETF/연금) 로딩 여부 */
@@ -74,6 +76,7 @@ const initialState: DashboardState = {
   elsSheetTotals: null,
   elsCompleted: [],
   cashOther: [],
+  elsListSheetData: [],
   isLoading: false,
   isLoadingAssets: false,
   isLoadingRebalancing: false,
@@ -98,6 +101,7 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
         elsSheetTotals: data.elsSheetTotals ?? null,
         elsCompleted: data.elsCompleted ?? [],
         cashOther: data.cashOther ?? [],
+        elsListSheetData: data.elsListSheetData ?? [],
         isLoading: false,
         isLoadingAssets: false,
         isLoadingRebalancing: false,
@@ -125,6 +129,7 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
         elsSheetTotals: data.elsSheetTotals ?? null,
         elsCompleted: data.elsCompleted ?? [],
         cashOther: data.cashOther ?? [],
+        elsListSheetData: data.elsListSheetData ?? [],
         isLoadingAssets: false,
       });
     } catch (err) {
@@ -173,5 +178,13 @@ export function useElsProductsWithMappings(): ElsProduct[] {
   return useMemo(
     () => elsRowsToElsProductsWithMappings(els, ELS_TRY_MAPPINGS),
     [els]
+  );
+}
+
+export function useElsListSheetProductsWithMappings(): ElsProduct[] {
+  const elsListSheetData = useStore((s) => s.elsListSheetData);
+  return useMemo(
+    () => elsRowsToElsProductsWithMappings(elsListSheetData, ELS_TRY_MAPPINGS),
+    [elsListSheetData]
   );
 }
