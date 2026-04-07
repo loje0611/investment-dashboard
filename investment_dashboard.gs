@@ -56,13 +56,22 @@ var ELS_REGISTER_BROKERS_ = {
 };
 
 function doGet(e) {
+  var api = e && e.parameter && e.parameter.api != null ? String(e.parameter.api).trim() : '';
   try {
+    if (api === 'els_pending') {
+      var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      var items = getElsPendingRowsWithIndex_(ss);
+      return jsonResponse_({ success: true, items: items });
+    }
     var param =
       e && e.parameter && e.parameter.data ? String(e.parameter.data).toLowerCase() : 'all';
     var data = getDashboardData(param);
     return jsonResponse_(data);
   } catch (err) {
     var message = err && err.message ? String(err.message) : String(err);
+    if (api === 'els_pending') {
+      return jsonResponse_({ success: false, error: message });
+    }
     return jsonResponse_({ error: message });
   }
 }
@@ -86,6 +95,11 @@ function doPost(e) {
 
     var action = body.action != null ? String(body.action).trim().toLowerCase() : '';
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+    if (action === 'update') {
+      handleElsUpdate_(ss, body);
+      return jsonResponse_({ success: true, message: '행이 업데이트되었습니다.' });
+    }
 
     if (action === '' || action === 'create') {
       handleElsCreate_(ss, body);
@@ -153,6 +167,54 @@ function resolveColumnForKey_(maps, key) {
   var nk = normalizeHeaderKey_(k);
   if (nk && maps.norm[nk] != null) return maps.norm[nk];
   return null;
+}
+
+function findStatusColumn_(maps) {
+  var c =
+    maps.exact['상태'] ||
+    maps.norm[normalizeHeaderKey_('상태')] ||
+    maps.exact['status'] ||
+    maps.norm['status'];
+  return c != null ? c : null;
+}
+
+function isEmptyValue_(v) {
+  if (v === undefined || v === null) return true;
+  if (typeof v === 'string' && v.trim() === '') return true;
+  return false;
+}
+
+function getElsPendingRowsWithIndex_(ss) {
+  var sheet = getElsSheetOrThrow_(ss);
+  if (sheet.getLastRow() < 2) return [];
+
+  var lastCol = sheet.getLastColumn();
+  var headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var statusCol = findStatusColumn_(buildHeaderColumnMaps_(headerRow));
+  if (statusCol == null) {
+    throw new Error('ELS목록 1행에「상태」열이 없습니다.');
+  }
+
+  var lastRow = sheet.getLastRow();
+  var rows = sheet.getRange(2, 1, lastRow, lastCol).getValues();
+  var out = [];
+
+  for (var r = 0; r < rows.length; r++) {
+    var sheetRow = r + 2;
+    var statusVal = rows[r][statusCol - 1];
+    var st = statusVal != null ? String(statusVal).trim() : '';
+    if (st !== ELS_PENDING_STATUS_) continue;
+
+    var obj = { row_index: sheetRow };
+    for (var c = 0; c < headerRow.length; c++) {
+      var name = headerRow[c] != null ? String(headerRow[c]).trim() : '';
+      if (!name) continue;
+      var v = rows[r][c];
+      obj[name] = v === '' ? null : v;
+    }
+    out.push(obj);
+  }
+  return out;
 }
 
 
@@ -224,6 +286,44 @@ function validateElsCreatePayload_(body) {
         : '';
   var issueDate = issueRaw || null;
   return { ok: true, brokerage: brokerage, productRound: productRound, amount: amount, issueDate: issueDate };
+}
+
+function handleElsUpdate_(ss, body) {
+  var rowIndex = body.row_index != null ? Number(body.row_index) : NaN;
+  if (!isFinite(rowIndex) || rowIndex < 2 || Math.floor(rowIndex) !== rowIndex) {
+    throw new Error('유효한 row_index(정수, 2 이상)가 필요합니다.');
+  }
+
+  var sheet = getElsSheetOrThrow_(ss);
+  var lastRow = sheet.getLastRow();
+  if (rowIndex > lastRow) {
+    throw new Error('row_index가 시트 범위를 벗어났습니다.');
+  }
+
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) throw new Error('ELS목록에 헤더 행이 없습니다.');
+
+  var headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var maps = buildHeaderColumnMaps_(headerRow);
+
+  var keys = Object.keys(body);
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    if (key === 'action' || key === 'row_index') continue;
+    var val = body[key];
+    if (isEmptyValue_(val)) continue;
+
+    var col = resolveColumnForKey_(maps, key);
+    if (col == null) continue;
+
+    sheet.getRange(rowIndex, col).setValue(val);
+  }
+
+  var statusCol = findStatusColumn_(maps);
+  if (statusCol == null) {
+    throw new Error('「상태」열을 찾을 수 없어 투자 중으로 바꿀 수 없습니다.');
+  }
+  sheet.getRange(rowIndex, statusCol).setValue(ELS_LIVE_STATUS_);
 }
 
 // ----- 대시보드 시트 읽기 -----

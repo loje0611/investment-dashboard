@@ -310,9 +310,9 @@ def main() -> int:
     if os.path.isfile(env_path):
         load_dotenv(env_path)
 
-    api_base = (os.getenv("ELS_SCRAPER_WEB_APP_URL") or "").strip()
+    api_base = (os.getenv("VITE_WEB_APP_URL") or "").strip()
     if not api_base:
-        print("ELS_SCRAPER_WEB_APP_URL이 없습니다.")
+        print("VITE_WEB_APP_URL이 없습니다.")
         return 1
 
     try:
