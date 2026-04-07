@@ -91,6 +91,9 @@ def fetch_els_items(api_base: str, timeout: float = 60.0) -> list[dict[str, Any]
     return data.get("items", [])
 
 def filter_scrape_targets(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    API가 내려준 청약 대기 행 중, 수익률 비어 있음 + 메리츠증권 + 발행일≤오늘(파싱 가능한 행만).
+    """
     today = date.today()
     out = []
     for row in items:
@@ -320,7 +323,10 @@ def main() -> int:
 
     targets = filter_scrape_targets(items)
     if not targets:
-        print("조건에 맞는 메리츠증권 상품이 없습니다.")
+        print(
+            "조건에 맞는 상품이 없습니다. "
+            "(상태「청약 중(대기)」, 메리츠증권, 시트「발행일」≤오늘, 「수익률」비어 있음)"
+        )
         return 0
 
     co = ChromiumOptions()

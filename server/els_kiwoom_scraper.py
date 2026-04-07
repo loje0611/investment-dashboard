@@ -97,6 +97,9 @@ def fetch_els_items(api_base: str, timeout: float = 60.0) -> list[dict[str, Any]
     return data.get("items", [])
 
 def filter_scrape_targets(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    API가 내려준 청약 대기 행 중, 수익률 비어 있음 + 키움증권 + 발행일≤오늘(파싱 가능한 행만).
+    """
     today = date.today()
     out = []
     for row in items:
