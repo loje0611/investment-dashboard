@@ -138,7 +138,11 @@ export function DashboardLayout() {
 
   const elsListManageTab = useMemo((): ElsCardItem[] => {
     if (!elsListSheetData.length) return []
-    const sorted = [...elsListSheetData].sort(compareElsListRowsByNextEval)
+    const notRedeemed = elsListSheetData.filter(
+      (row) => String(row['상태'] ?? '').trim() !== '상환완료'
+    )
+    if (!notRedeemed.length) return []
+    const sorted = [...notRedeemed].sort(compareElsListRowsByNextEval)
     return sorted.map((row, i) => {
       const [product] = elsRowsToElsProductsWithMappings([row], ELS_TRY_MAPPINGS_FOR_SHEET)
       const worst = product != null ? getWorstPerformer(product) : null
@@ -148,7 +152,6 @@ export function DashboardLayout() {
       const redemptionBarrier = parseBarrierPercent(row.상환배리어 ?? row['다음 배리어']) || 90
       const productName = row.상품명 != null ? String(row.상품명).trim() : 
         (row.증권사 ? `${row.증권사} ELS ${row.상품회차 || ''}회`.trim() : '')
-      const statusText = String(row['상태'] ?? '').trim()
       return {
         id: `els-manage-${i}`,
         productName: productName || '-',
@@ -158,7 +161,6 @@ export function DashboardLayout() {
         redemptionBarrier,
         rowIndex: sheetRowIndexFromRow(row),
         joinAmount: parseJoinAmountFromElsRow(row),
-        isRedeemed: statusText === '상환완료',
       }
     })
   }, [elsListSheetData])
@@ -350,9 +352,9 @@ export function DashboardLayout() {
                     >
                       <button
                         type="button"
-                        disabled={item.isRedeemed || item.rowIndex == null}
+                        disabled={item.rowIndex == null}
                         onClick={() => {
-                          if (item.rowIndex != null && !item.isRedeemed) {
+                          if (item.rowIndex != null) {
                             setRedeemTarget(item)
                           }
                         }}
@@ -364,11 +366,6 @@ export function DashboardLayout() {
                             {item.nextRedemptionDate}
                           </p>
                         </div>
-                        {item.isRedeemed ? (
-                          <p className="mt-2 text-xs font-medium text-emerald-600">상환완료</p>
-                        ) : (
-                          <p className="mt-2 text-xs text-slate-400">탭하여 상환 입력</p>
-                        )}
                         <div className="mt-3">
                           <ElsRiskProgressBar
                             currentLevel={item.currentLevel}
