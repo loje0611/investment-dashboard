@@ -9,6 +9,7 @@ import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAcco
 import { totalAssetsToPrincipalValuationTrend } from '../../utils/totalAssetsToPrincipalValuation'
 import { buildHomeOverviewFromRawFormulas } from '../../utils/homeOverviewFromRawFormulas'
 import { getCurrentLevelFromRow, parseBarrierPercent } from '../../utils/elsRiskCounts'
+import { formatNextEarlyRedemptionWithCountdown } from '../../utils/elsListForDashboard'
 import type { ElsCardItem, EtfRow, PensionRow } from '../../data/dashboardDummy'
 import { ElsRiskProgressBar } from '../ElsRiskProgressBar'
 import { SummaryCardsCarousel } from './SummaryCardsCarousel'
@@ -109,13 +110,12 @@ export function DashboardLayout() {
       const currentLevel = getCurrentLevelFromRow(row, levelFromWorst)
       const kiBarrier = parseBarrierPercent(row.낙인배리어 ?? row.KI) || 70
       const redemptionBarrier = parseBarrierPercent(row.상환배리어 ?? row['다음 배리어']) || 90
-      const nextDate = getNextRedemptionDate(row)
       const productName = row.상품명 != null ? String(row.상품명).trim() : 
         (row.증권사 ? `${row.증권사} ELS ${row.상품회차 || ''}회`.trim() : '')
       return {
         id: `els-manage-${i}`,
         productName: productName || '-',
-        nextRedemptionDate: nextDate ? formatRedemptionDateDisplay(nextDate) : '-',
+        nextRedemptionDate: formatNextEarlyRedemptionWithCountdown(row),
         currentLevel,
         kiBarrier,
         redemptionBarrier,
