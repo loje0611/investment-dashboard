@@ -7,17 +7,17 @@ const LEVEL_MAX = 110
 /** 구글 시트·GAS 기본 타임존과 맞춤 (날짜만 의미 있는 셀·JSON ISO 직렬화 오프셋 보정) */
 const SHEET_TIME_ZONE = 'Asia/Seoul'
 
-function getCalendarPartsInSheetTz(d: Date): { y: number; m: number; d: number } {
+function getCalendarPartsInSheetTz(instant: Date): { y: number; m: number; d: number } {
   const fmt = new Intl.DateTimeFormat('en-CA', {
     timeZone: SHEET_TIME_ZONE,
     year: 'numeric',
     month: 'numeric',
     day: 'numeric',
   })
-  const parts = fmt.formatToParts(d)
+  const parts = fmt.formatToParts(instant)
   const y = Number(parts.find((p) => p.type === 'year')?.value)
   const m = Number(parts.find((p) => p.type === 'month')?.value)
-  const day = Number(parts.find((p) => p.type === 'day')?.value)
+  const d = Number(parts.find((p) => p.type === 'day')?.value)
   return { y, m, d }
 }
 
