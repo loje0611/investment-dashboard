@@ -1,9 +1,57 @@
 import type { ElsRow } from '../types/api'
 import { parseBarrierPercent } from './elsRiskCounts'
-import { getDDay } from './elsDDay'
 
 const LEVEL_MIN = 0
 const LEVEL_MAX = 110
+
+/** 구글 시트·GAS 기본 타임존과 맞춤 (날짜만 의미 있는 셀·JSON ISO 직렬화 오프셋 보정) */
+const SHEET_TIME_ZONE = 'Asia/Seoul'
+
+function getCalendarPartsInSheetTz(d: Date): { y: number; m: number; d: number } {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SHEET_TIME_ZONE,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  })
+  const parts = fmt.formatToParts(d)
+  const y = Number(parts.find((p) => p.type === 'year')?.value)
+  const m = Number(parts.find((p) => p.type === 'month')?.value)
+  const day = Number(parts.find((p) => p.type === 'day')?.value)
+  return { y, m, d }
+}
+
+/** 시트에 보이는 그 날짜(연·월·일)의 시작을 +09:00 한 줄로 고정 (브라우저 로컬 TZ와 무관) */
+function dateAtSheetCalendarDay(y: number, m: number, d: number): Date {
+  return new Date(
+    `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T00:00:00+09:00`
+  )
+}
+
+function ymdKeyInSheetTz(date: Date): string {
+  const { y, m, d } = getCalendarPartsInSheetTz(date)
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
+    return ''
+  }
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
+function formatYmdInSheetTz(date: Date): string {
+  return ymdKeyInSheetTz(date)
+}
+
+/** 시트 타임존 기준 오늘과의 일수 (getDDay와 동일 부호 규칙) */
+function getDDayInSheetTz(targetDate: Date): number | null {
+  const now = new Date()
+  const t0 = ymdKeyInSheetTz(now)
+  const t1 = ymdKeyInSheetTz(targetDate)
+  if (!t0 || !t1) return null
+  const [y0, m0, d0] = t0.split('-').map(Number)
+  const [y1, m1, d1] = t1.split('-').map(Number)
+  const u0 = Date.UTC(y0, m0 - 1, d0)
+  const u1 = Date.UTC(y1, m1 - 1, d1)
+  return Math.round((u1 - u0) / 86400000)
+}
 
 /** GAS 크롤러가 상태를 바꿀 때와 동일한 문구 */
 export const ELS_LIST_LIVE_STATUS = '투자 중'
@@ -51,46 +99,72 @@ export function getElsListProductDisplayName(row: ElsRow): string {
   return parts.join(' ')
 }
 
-/** 시트·API에서 온 평가일 셀 → 로컬 자정 기준 Date */
+/**
+ * 시트·API에서 온 평가일 셀 → 시트 타임존(Asia/Seoul) 달력 날짜에 대응하는 Date.
+ * GAS JSON이 `2026-03-27T15:00:00.000Z`(한국 3/28 자정)처럼 오면, `T` 앞만 자르면 하루 빨라지므로 전체 ISO를 파싱한 뒤 서울 달력으로 맞춤.
+ */
 export function parseElsListSheetDateCell(raw: unknown): Date | null {
   if (raw == null || raw === '') return null
-  if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    const { y, m, d } = getCalendarPartsInSheetTz(raw)
+    if (!Number.isFinite(y)) return null
+    return dateAtSheetCalendarDay(y, m, d)
+  }
   if (typeof raw === 'number' && !Number.isNaN(raw)) {
     if (Number.isInteger(raw) && raw > 35000 && raw < 65000) {
       const epoch = new Date((raw - 25569) * 86400 * 1000)
-      if (!Number.isNaN(epoch.getTime())) return epoch
+      if (!Number.isNaN(epoch.getTime())) {
+        const { y, m, d } = getCalendarPartsInSheetTz(epoch)
+        if (Number.isFinite(y)) return dateAtSheetCalendarDay(y, m, d)
+      }
     }
   }
   const s = String(raw).trim()
   if (!s) return null
-  const beforeT = s.split('T')[0]
-  const head = beforeT || s
 
-  const iso = head.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
-  if (iso) {
-    const y = Number(iso[1])
-    const mo = Number(iso[2]) - 1
-    const day = Number(iso[3])
-    const d = new Date(y, mo, day)
-    return d.getFullYear() === y && d.getMonth() === mo && d.getDate() === day ? d : null
+  // 전체 ISO 날짜시간 (앞 10자만 쓰면 UTC 날짜와 시트 날짜가 어긋남)
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s) || /^\d{4}-\d{2}-\d{2} \d/.test(s)) {
+    const inst = new Date(s.replace(' ', 'T'))
+    if (Number.isNaN(inst.getTime())) return null
+    const { y, m, d } = getCalendarPartsInSheetTz(inst)
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null
+    return dateAtSheetCalendarDay(y, m, d)
+  }
+
+  // 날짜만 (시트에 보이는 그날 = 서울 달력)
+  const dateOnly = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/)
+  if (dateOnly) {
+    const y = Number(dateOnly[1])
+    const m = Number(dateOnly[2])
+    const d = Number(dateOnly[3])
+    const x = dateAtSheetCalendarDay(y, m, d)
+    const chk = getCalendarPartsInSheetTz(x)
+    return chk.y === y && chk.m === m && chk.d === d ? x : null
   }
 
   const ko = s.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/)
   if (ko) {
     const y = Number(ko[1])
-    const mo = Number(ko[2]) - 1
-    const day = Number(ko[3])
-    const d = new Date(y, mo, day)
-    return d.getFullYear() === y && d.getMonth() === mo && d.getDate() === day ? d : null
+    const m = Number(ko[2])
+    const d = Number(ko[3])
+    return dateAtSheetCalendarDay(y, m, d)
+  }
+
+  const head = s.split('T')[0]
+  const iso = head.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (iso) {
+    const y = Number(iso[1])
+    const m = Number(iso[2])
+    const d = Number(iso[3])
+    return dateAtSheetCalendarDay(y, m, d)
   }
 
   const compact = head.replace(/\D/g, '')
   if (compact.length === 8) {
     const y = Number(compact.slice(0, 4))
-    const mo = Number(compact.slice(4, 6)) - 1
-    const day = Number(compact.slice(6, 8))
-    const d = new Date(y, mo, day)
-    return d.getFullYear() === y && d.getMonth() === mo && d.getDate() === day ? d : null
+    const m = Number(compact.slice(4, 6))
+    const d = Number(compact.slice(6, 8))
+    return dateAtSheetCalendarDay(y, m, d)
   }
 
   return null
@@ -98,19 +172,6 @@ export function parseElsListSheetDateCell(raw: unknown): Date | null {
 
 function parseSheetDate(raw: unknown): Date | null {
   return parseElsListSheetDateCell(raw)
-}
-
-function startOfDay(d: Date): Date {
-  const x = new Date(d)
-  x.setHours(0, 0, 0, 0)
-  return x
-}
-
-function formatDateYmd(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
 }
 
 /** getDDay 값을 D-7(7일 남음), D-0(당일), D+3(3일 경과) 형식으로 */
@@ -131,14 +192,15 @@ function resolveChosenEvalOutcome(row: ElsRow): ChosenEvalOutcome {
   for (let i = 1; i <= 12; i++) {
     const key = `${i}차 평가일` as keyof ElsRow
     const d = parseSheetDate(row[key])
-    if (d) dates.push(startOfDay(d))
+    if (d) dates.push(d)
   }
   dates.sort((a, b) => a.getTime() - b.getTime())
 
-  const today = startOfDay(new Date())
+  const todayKey = ymdKeyInSheetTz(new Date())
   let chosen: Date | null = null
   for (const d of dates) {
-    if (d.getTime() >= today.getTime()) {
+    const dk = ymdKeyInSheetTz(d)
+    if (dk && todayKey && dk >= todayKey) {
       chosen = d
       break
     }
@@ -158,7 +220,7 @@ function resolveChosenEvalOutcome(row: ElsRow): ChosenEvalOutcome {
   }
   const parsed = parseElsListSheetDateCell(legacy)
   if (parsed) {
-    return { kind: 'date', chosen: startOfDay(parsed) }
+    return { kind: 'date', chosen: parsed }
   }
   return { kind: 'raw', text: legacy }
 }
@@ -168,7 +230,7 @@ function evalSortMetaForRow(row: ElsRow): { tier: 0 | 1 | 2; key: number } {
   if (o.kind === 'none' || o.kind === 'raw') {
     return { tier: 2, key: 0 }
   }
-  const dday = getDDay(o.chosen)
+  const dday = getDDayInSheetTz(o.chosen)
   if (dday === null) {
     return { tier: 2, key: 0 }
   }
@@ -208,8 +270,8 @@ export function formatNextEarlyRedemptionWithCountdown(row: ElsRow): string {
   if (o.kind === 'raw') {
     return o.text
   }
-  const ymd = formatDateYmd(o.chosen)
-  const dday = getDDay(o.chosen)
+  const ymd = formatYmdInSheetTz(o.chosen)
+  const dday = getDDayInSheetTz(o.chosen)
   if (dday === null) {
     return ymd
   }
@@ -228,7 +290,7 @@ export function getNextElsListEvaluationDateRaw(row: ElsRow): string {
   if (o.kind === 'raw') {
     return o.text
   }
-  return formatDateYmd(o.chosen)
+  return formatYmdInSheetTz(o.chosen)
 }
 
 export function isElsListInvestingRow(row: ElsRow): boolean {
