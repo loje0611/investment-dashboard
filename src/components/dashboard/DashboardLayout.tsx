@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useStore, useElsProductsWithMappings, useElsListSheetProductsWithMappings } from '../../store/useStore'
+import { useStore, useElsProductsWithMappings } from '../../store/useStore'
 import { getWorstPerformer } from '../../utils/elsWorstPerformer'
 import { portfolioToEtfRows } from '../../utils/portfolioToEtf'
 import { pensionToRows } from '../../utils/pensionToRows'
@@ -9,7 +9,16 @@ import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAcco
 import { totalAssetsToPrincipalValuationTrend } from '../../utils/totalAssetsToPrincipalValuation'
 import { buildHomeOverviewFromRawFormulas } from '../../utils/homeOverviewFromRawFormulas'
 import { getCurrentLevelFromRow, parseBarrierPercent } from '../../utils/elsRiskCounts'
-import { formatNextEarlyRedemptionWithCountdown } from '../../utils/elsListForDashboard'
+import {
+  compareElsListRowsByNextEval,
+  formatNextEarlyRedemptionWithCountdown,
+} from '../../utils/elsListForDashboard'
+import {
+  DEFAULT_ELS_ASSET_MAPPING,
+  ELS_INVESTING_SHEET_MAPPING,
+  ELS_SINGLE_PRICE_MAPPING,
+  elsRowsToElsProductsWithMappings,
+} from '../../utils/elsRowToProduct'
 import type { ElsCardItem, EtfRow, PensionRow } from '../../data/dashboardDummy'
 import { ElsRiskProgressBar } from '../ElsRiskProgressBar'
 import { SummaryCardsCarousel } from './SummaryCardsCarousel'
@@ -21,6 +30,12 @@ import { ElsRegisterModal } from './ElsRegisterModal'
 import { AmountHideToggle } from './AmountHideToggle'
 import { LogoutButton } from '../LogoutButton'
 import { FileQuestion } from 'lucide-react'
+
+const ELS_TRY_MAPPINGS_FOR_SHEET = [
+  ELS_INVESTING_SHEET_MAPPING,
+  ELS_SINGLE_PRICE_MAPPING,
+  DEFAULT_ELS_ASSET_MAPPING,
+]
 
 function getNextRedemptionDate(row: Record<string, unknown>): string {
   const next = row['다음 평가일']
@@ -71,7 +86,6 @@ export function DashboardLayout() {
     hideAmounts,
   } = useStore()
   const elsProducts = useElsProductsWithMappings()
-  const elsManageProducts = useElsListSheetProductsWithMappings()
   const [mainTab, setMainTab] = useState<MainTabId>('home')
   const [isElsRegisterModalOpen, setIsElsRegisterModalOpen] = useState(false)
 
@@ -103,8 +117,9 @@ export function DashboardLayout() {
 
   const elsListManageTab = useMemo((): ElsCardItem[] => {
     if (!elsListSheetData.length) return []
-    return elsListSheetData.map((row, i) => {
-      const product = elsManageProducts[i]
+    const sorted = [...elsListSheetData].sort(compareElsListRowsByNextEval)
+    return sorted.map((row, i) => {
+      const [product] = elsRowsToElsProductsWithMappings([row], ELS_TRY_MAPPINGS_FOR_SHEET)
       const worst = product != null ? getWorstPerformer(product) : null
       const levelFromWorst = worst != null ? 100 + worst.percentage : 0
       const currentLevel = getCurrentLevelFromRow(row, levelFromWorst)
@@ -121,7 +136,7 @@ export function DashboardLayout() {
         redemptionBarrier,
       }
     })
-  }, [elsListSheetData, elsManageProducts])
+  }, [elsListSheetData])
 
   const etfTableForTab = useMemo((): EtfRow[] => {
     if (!etf.length) return []
@@ -311,8 +326,8 @@ export function DashboardLayout() {
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="font-medium text-slate-900">{item.productName}</p>
-                        <p className="shrink-0 text-sm text-slate-500">
-                          다음 조기 상환 평가일: {item.nextRedemptionDate}
+                        <p className="shrink-0 text-sm text-slate-500 tabular-nums">
+                          {item.nextRedemptionDate}
                         </p>
                       </div>
                       <div className="mt-3">

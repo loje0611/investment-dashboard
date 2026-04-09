@@ -124,8 +124,8 @@ export function AssetDetailsTabs({
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-medium text-slate-900">{item.productName}</p>
-                      <p className="shrink-0 text-sm text-slate-500">
-                        다음 조기 상환 평가일: {item.nextRedemptionDate}
+                      <p className="shrink-0 text-sm text-slate-500 tabular-nums">
+                        {item.nextRedemptionDate}
                       </p>
                     </div>
                     <div className="mt-3">

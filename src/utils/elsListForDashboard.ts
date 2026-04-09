@@ -120,11 +120,13 @@ function formatCountdownLabel(dday: number): string {
   return `D+${-dday}`
 }
 
-/**
- * ELS 관리 목록용: 1~12차 평가일 중 오늘 이후(당일 포함) 가장 가까운 날짜.
- * 모두 과거면 마지막 평가일. `YYYY-MM-DD (D-n)` 형식, 없으면 `-`.
- */
-export function formatNextEarlyRedemptionWithCountdown(row: ElsRow): string {
+type ChosenEvalOutcome =
+  | { kind: 'date'; chosen: Date }
+  | { kind: 'raw'; text: string }
+  | { kind: 'none' }
+
+/** 1~12차 평가일·레거시 열에서 표시·정렬에 쓸 대상일(또는 비파싱 문자열)을 고릅니다. */
+function resolveChosenEvalOutcome(row: ElsRow): ChosenEvalOutcome {
   const dates: Date[] = []
   for (let i = 1; i <= 12; i++) {
     const key = `${i}차 평가일` as keyof ElsRow
@@ -144,19 +146,73 @@ export function formatNextEarlyRedemptionWithCountdown(row: ElsRow): string {
   if (chosen == null && dates.length > 0) {
     chosen = dates[dates.length - 1]
   }
-  if (chosen == null) {
-    const legacy =
-      trimStr(row['다음 평가일']) ||
-      trimStr(row['1차 날짜'])
-    if (!legacy) return '-'
-    const parsed = parseElsListSheetDateCell(legacy)
-    if (!parsed) return legacy
-    chosen = startOfDay(parsed)
+  if (chosen != null) {
+    return { kind: 'date', chosen }
   }
 
-  const ymd = formatDateYmd(chosen)
-  const dday = getDDay(chosen)
-  if (dday === null) return ymd
+  const legacy =
+    trimStr(row['다음 평가일']) ||
+    trimStr(row['1차 날짜'])
+  if (!legacy) {
+    return { kind: 'none' }
+  }
+  const parsed = parseElsListSheetDateCell(legacy)
+  if (parsed) {
+    return { kind: 'date', chosen: startOfDay(parsed) }
+  }
+  return { kind: 'raw', text: legacy }
+}
+
+function evalSortMetaForRow(row: ElsRow): { tier: 0 | 1 | 2; key: number } {
+  const o = resolveChosenEvalOutcome(row)
+  if (o.kind === 'none' || o.kind === 'raw') {
+    return { tier: 2, key: 0 }
+  }
+  const dday = getDDay(o.chosen)
+  if (dday === null) {
+    return { tier: 2, key: 0 }
+  }
+  if (dday >= 0) {
+    return { tier: 0, key: dday }
+  }
+  return { tier: 1, key: dday }
+}
+
+/**
+ * 다음 평가일 기준 정렬: (1) D-day 양수·0 = 남은 일수 오름차순 (2) 과거만 있는 행 (3) 정보 없음·비파싱 문자열
+ */
+export function compareElsListRowsByNextEval(a: ElsRow, b: ElsRow): number {
+  const ma = evalSortMetaForRow(a)
+  const mb = evalSortMetaForRow(b)
+  if (ma.tier !== mb.tier) {
+    return ma.tier - mb.tier
+  }
+  if (ma.tier === 0) {
+    return ma.key - mb.key
+  }
+  if (ma.tier === 1) {
+    return mb.key - ma.key
+  }
+  return 0
+}
+
+/**
+ * ELS 관리 목록용: 1~12차 평가일 중 오늘 이후(당일 포함) 가장 가까운 날짜.
+ * 모두 과거면 마지막 평가일. `YYYY-MM-DD (D-n)` 형식, 없으면 `-`.
+ */
+export function formatNextEarlyRedemptionWithCountdown(row: ElsRow): string {
+  const o = resolveChosenEvalOutcome(row)
+  if (o.kind === 'none') {
+    return '-'
+  }
+  if (o.kind === 'raw') {
+    return o.text
+  }
+  const ymd = formatDateYmd(o.chosen)
+  const dday = getDDay(o.chosen)
+  if (dday === null) {
+    return ymd
+  }
   return `${ymd} (${formatCountdownLabel(dday)})`
 }
 
@@ -165,24 +221,14 @@ export function formatNextEarlyRedemptionWithCountdown(row: ElsRow): string {
  * 모두 과거이면 마지막 평가일을 반환. 없으면 빈 문자열.
  */
 export function getNextElsListEvaluationDateRaw(row: ElsRow): string {
-  const dates: Date[] = []
-  for (let i = 1; i <= 12; i++) {
-    const key = `${i}차 평가일` as keyof ElsRow
-    const d = parseSheetDate(row[key])
-    if (d) dates.push(startOfDay(d))
+  const o = resolveChosenEvalOutcome(row)
+  if (o.kind === 'none') {
+    return ''
   }
-  if (dates.length === 0) {
-    const legacy =
-      trimStr(row['다음 평가일']) ||
-      trimStr(row['1차 날짜'])
-    return legacy
+  if (o.kind === 'raw') {
+    return o.text
   }
-  dates.sort((a, b) => a.getTime() - b.getTime())
-  const today = startOfDay(new Date())
-  for (const d of dates) {
-    if (d.getTime() >= today.getTime()) return formatDateYmd(d)
-  }
-  return formatDateYmd(dates[dates.length - 1])
+  return formatDateYmd(o.chosen)
 }
 
 export function isElsListInvestingRow(row: ElsRow): boolean {
