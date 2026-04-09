@@ -20,6 +20,7 @@ import {
   elsRowsToElsProductsWithMappings,
 } from '../../utils/elsRowToProduct'
 import type { ElsCardItem, EtfRow, PensionRow } from '../../data/dashboardDummy'
+import type { ElsRow } from '../../types/api'
 import { ElsRiskProgressBar } from '../ElsRiskProgressBar'
 import { SummaryCardsCarousel } from './SummaryCardsCarousel'
 import { GlobalOverview } from './GlobalOverview'
@@ -27,6 +28,7 @@ import { AssetDetailsTabs } from './AssetDetailsTabs'
 import { RebalancingActionCenter } from './RebalancingActionCenter'
 import { BottomNav, type MainTabId } from './BottomNav'
 import { ElsRegisterModal } from './ElsRegisterModal'
+import { ElsRedeemModal } from './ElsRedeemModal'
 import { AmountHideToggle } from './AmountHideToggle'
 import { LogoutButton } from '../LogoutButton'
 import { FileQuestion } from 'lucide-react'
@@ -36,6 +38,24 @@ const ELS_TRY_MAPPINGS_FOR_SHEET = [
   ELS_SINGLE_PRICE_MAPPING,
   DEFAULT_ELS_ASSET_MAPPING,
 ]
+
+function parseJoinAmountFromElsRow(row: ElsRow): number | undefined {
+  const v = row['가입금액']
+  if (v == null) return undefined
+  if (typeof v === 'number' && !Number.isNaN(v)) return v
+  const n = parseFloat(String(v).replace(/,/g, '').replace(/원/g, '').trim())
+  return Number.isFinite(n) ? n : undefined
+}
+
+function sheetRowIndexFromRow(row: ElsRow): number | undefined {
+  const ri = row.row_index
+  if (ri == null) return undefined
+  if (typeof ri === 'number' && Number.isFinite(ri)) return Math.floor(ri)
+  const s = String(ri).trim()
+  if (s === '') return undefined
+  const n = parseInt(s, 10)
+  return Number.isFinite(n) ? n : undefined
+}
 
 function getNextRedemptionDate(row: Record<string, unknown>): string {
   const next = row['다음 평가일']
@@ -88,6 +108,7 @@ export function DashboardLayout() {
   const elsProducts = useElsProductsWithMappings()
   const [mainTab, setMainTab] = useState<MainTabId>('home')
   const [isElsRegisterModalOpen, setIsElsRegisterModalOpen] = useState(false)
+  const [redeemTarget, setRedeemTarget] = useState<ElsCardItem | null>(null)
 
   useEffect(() => {
     fetchData()
@@ -127,6 +148,7 @@ export function DashboardLayout() {
       const redemptionBarrier = parseBarrierPercent(row.상환배리어 ?? row['다음 배리어']) || 90
       const productName = row.상품명 != null ? String(row.상품명).trim() : 
         (row.증권사 ? `${row.증권사} ELS ${row.상품회차 || ''}회`.trim() : '')
+      const statusText = String(row['상태'] ?? '').trim()
       return {
         id: `els-manage-${i}`,
         productName: productName || '-',
@@ -134,6 +156,9 @@ export function DashboardLayout() {
         currentLevel,
         kiBarrier,
         redemptionBarrier,
+        rowIndex: sheetRowIndexFromRow(row),
+        joinAmount: parseJoinAmountFromElsRow(row),
+        isRedeemed: statusText === '상환완료',
       }
     })
   }, [elsListSheetData])
@@ -322,22 +347,37 @@ export function DashboardLayout() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, delay: i * 0.05 }}
-                      className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="font-medium text-slate-900">{item.productName}</p>
-                        <p className="shrink-0 text-sm text-slate-500 tabular-nums">
-                          {item.nextRedemptionDate}
-                        </p>
-                      </div>
-                      <div className="mt-3">
-                        <ElsRiskProgressBar
-                          currentLevel={item.currentLevel}
-                          kiBarrier={item.kiBarrier}
-                          redemptionBarrier={item.redemptionBarrier}
-                          barHeight="h-3"
-                        />
-                      </div>
+                      <button
+                        type="button"
+                        disabled={item.isRedeemed || item.rowIndex == null}
+                        onClick={() => {
+                          if (item.rowIndex != null && !item.isRedeemed) {
+                            setRedeemTarget(item)
+                          }
+                        }}
+                        className="w-full rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50/80 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-slate-200 disabled:hover:bg-white"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-medium text-slate-900">{item.productName}</p>
+                          <p className="shrink-0 text-sm text-slate-500 tabular-nums">
+                            {item.nextRedemptionDate}
+                          </p>
+                        </div>
+                        {item.isRedeemed ? (
+                          <p className="mt-2 text-xs font-medium text-emerald-600">상환완료</p>
+                        ) : (
+                          <p className="mt-2 text-xs text-slate-400">탭하여 상환 입력</p>
+                        )}
+                        <div className="mt-3">
+                          <ElsRiskProgressBar
+                            currentLevel={item.currentLevel}
+                            kiBarrier={item.kiBarrier}
+                            redemptionBarrier={item.redemptionBarrier}
+                            barHeight="h-3"
+                          />
+                        </div>
+                      </button>
                     </motion.div>
                   ))}
                 </div>
@@ -348,6 +388,19 @@ export function DashboardLayout() {
 
         {isElsRegisterModalOpen && (
           <ElsRegisterModal open onClose={() => setIsElsRegisterModalOpen(false)} />
+        )}
+
+        {redeemTarget != null && redeemTarget.rowIndex != null && (
+          <ElsRedeemModal
+            open
+            onClose={() => setRedeemTarget(null)}
+            rowIndex={redeemTarget.rowIndex}
+            productName={redeemTarget.productName}
+            defaultRedeemAmount={redeemTarget.joinAmount}
+            onSuccess={() => {
+              void fetchData()
+            }}
+          />
         )}
       </div>
 

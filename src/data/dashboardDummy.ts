@@ -29,6 +29,12 @@ export interface ElsCardItem {
   currentLevel: number
   kiBarrier: number
   redemptionBarrier: number
+  /** ELS목록 시트 행(1-based). 상환 API용 */
+  rowIndex?: number
+  /** 시트 가입금액(원) — 상환 금액 기본값 힌트 */
+  joinAmount?: number
+  /** 이미 상환완료면 카드 탭 비활성 */
+  isRedeemed?: boolean
 }
 
 /** ETF 테이블 행 */

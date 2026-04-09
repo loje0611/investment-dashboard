@@ -58,6 +58,8 @@ export interface PortfolioRow extends SheetDataRow {
 
 /** ELS 시트 한 행 (시트 컬럼에 맞게 확장 가능) */
 export interface ElsRow extends SheetDataRow {
+  /** GAS가 ELS목록 조회 시 부여하는 시트 행번호(1-based) */
+  row_index?: number;
   상품명?: string;
   평가일?: string;
   /** 다음 평가일 (예: '2026.05.20') */

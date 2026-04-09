@@ -33,6 +33,7 @@ var SPREADSHEET_ID = '1g1VBYupYjmkiF-85CXgjFvu4qzzSjtKTLGgXYNIhKQM';
  * POST JSON action:
  *   create (또는 생략) → 신규 행, 상태「청약 중(대기)」
  *   update            → row_index 행 헤더 매핑으로 셀 갱신(빈 값 스킵), 상태「투자 중」
+ *   redeem            → 상환 처리: 상태「상환완료」, 상환일·상환금액·투자기간·연수익률·수익 기록
  *
  * 크롤러(update) 권장 헤더: 수익률, 발행일, 낙인, 조기상환조건 1~12차, 티커 1~3, 기준가 1~3,
  * 조기상환평가일 1~12차 (1행 헤더와 body 키는 공백·_ 정규화로 매칭)
@@ -43,6 +44,7 @@ var SPREADSHEET_ID = '1g1VBYupYjmkiF-85CXgjFvu4qzzSjtKTLGgXYNIhKQM';
 var ELS_LIST_SHEET_NAME_ = 'ELS목록';
 var ELS_PENDING_STATUS_ = '청약 중(대기)';
 var ELS_LIVE_STATUS_ = '투자 중';
+var ELS_REDEEMED_STATUS_ = '상환완료';
 
 /** 빈 시트일 때만 넣는 최소 헤더 */
 var ELS_LIST_MIN_HEADERS_ = ['증권사', '상품회차', '가입금액', '발행일', '상태', '가입일'];
@@ -99,6 +101,11 @@ function doPost(e) {
     if (action === 'update') {
       handleElsUpdate_(ss, body);
       return jsonResponse_({ success: true, message: '행이 업데이트되었습니다.' });
+    }
+
+    if (action === 'redeem') {
+      handleElsRedeem_(ss, body);
+      return jsonResponse_({ success: true, message: '상환 처리되었습니다.' });
     }
 
     if (action === '' || action === 'create') {
@@ -326,6 +333,118 @@ function handleElsUpdate_(ss, body) {
   sheet.getRange(rowIndex, statusCol).setValue(ELS_LIVE_STATUS_);
 }
 
+function parseYmdDateGas_(v) {
+  if (v == null || v === '') return null;
+  if (v instanceof Date && !isNaN(v.getTime())) return new Date(v.getFullYear(), v.getMonth(), v.getDate());
+  var s = String(v).trim();
+  var m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) {
+    var y = Number(m[1]);
+    var mo = Number(m[2]) - 1;
+    var d = Number(m[3]);
+    var dt = new Date(y, mo, d);
+    if (dt.getFullYear() === y && dt.getMonth() === mo && dt.getDate() === d) return dt;
+  }
+  return null;
+}
+
+function investmentDaysBetween_(start, end) {
+  var ms = end.getTime() - start.getTime();
+  var days = Math.round(ms / (24 * 60 * 60 * 1000));
+  return days < 1 ? 1 : days;
+}
+
+/**
+ * ELS 상환: 상태·상환일·상환금액·투자기간·연수익률(연복리 환산 %)·수익(상환−가입)
+ * body: row_index, 상환일(yyyy-MM-dd), 상환금액(숫자)
+ */
+function handleElsRedeem_(ss, body) {
+  var rowIndex = body.row_index != null ? Number(body.row_index) : NaN;
+  if (!isFinite(rowIndex) || rowIndex < 2 || Math.floor(rowIndex) !== rowIndex) {
+    throw new Error('유효한 row_index(정수, 2 이상)가 필요합니다.');
+  }
+
+  var redeemDateStr =
+    body['상환일'] != null
+      ? String(body['상환일']).trim()
+      : body.redeemDate != null
+        ? String(body.redeemDate).trim()
+        : '';
+  if (!redeemDateStr) {
+    throw new Error('상환일을 입력해 주세요.');
+  }
+  var redeemDate = parseYmdDateGas_(redeemDateStr);
+  if (!redeemDate) {
+    throw new Error('상환일 형식이 올바르지 않습니다. (YYYY-MM-DD)');
+  }
+
+  var amtRaw =
+    body['상환금액'] != null ? body['상환금액'] : body.redeemAmount != null ? body.redeemAmount : body.amount;
+  var redeemAmt = Number(amtRaw);
+  if (!isFinite(redeemAmt) || redeemAmt <= 0) {
+    throw new Error('상환금액은 0보다 큰 숫자여야 합니다.');
+  }
+
+  var sheet = getElsSheetOrThrow_(ss);
+  var lastRow = sheet.getLastRow();
+  if (rowIndex > lastRow) {
+    throw new Error('row_index가 시트 범위를 벗어났습니다.');
+  }
+
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) throw new Error('ELS목록에 헤더 행이 없습니다.');
+
+  var headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var maps = buildHeaderColumnMaps_(headerRow);
+
+  function colOrThrow(label) {
+    var c = resolveColumnForKey_(maps, label);
+    if (c == null) {
+      throw new Error('ELS목록 1행에「' + label + '」열이 필요합니다.');
+    }
+    return c;
+  }
+
+  var joinAmtCol = colOrThrow('가입금액');
+  var joinDateCol = colOrThrow('가입일');
+  var statusCol = findStatusColumn_(maps);
+  if (statusCol == null) throw new Error('「상태」열을 찾을 수 없습니다.');
+
+  var joinAmt = gasCoerceNumber_(sheet.getRange(rowIndex, joinAmtCol).getValue());
+  if (joinAmt == null || joinAmt <= 0) {
+    throw new Error('시트의 가입금액을 읽을 수 없습니다.');
+  }
+  var joinDate = parseYmdDateGas_(sheet.getRange(rowIndex, joinDateCol).getValue());
+  if (!joinDate) {
+    throw new Error('시트의 가입일을 읽을 수 없습니다. (가입일 형식 확인)');
+  }
+
+  var curStatus = sheet.getRange(rowIndex, statusCol).getValue();
+  var st = curStatus != null ? String(curStatus).trim() : '';
+  if (st === ELS_REDEEMED_STATUS_) {
+    throw new Error('이미 상환완료된 상품입니다.');
+  }
+
+  if (redeemDate.getTime() < joinDate.getTime()) {
+    throw new Error('상환일은 가입일 이후여야 합니다.');
+  }
+
+  var days = investmentDaysBetween_(joinDate, redeemDate);
+  var profit = redeemAmt - joinAmt;
+  var ratio = redeemAmt / joinAmt;
+  var annualPct = (Math.pow(ratio, 365 / days) - 1) * 100;
+  if (!isFinite(annualPct)) {
+    annualPct = 0;
+  }
+
+  sheet.getRange(rowIndex, colOrThrow('상환일')).setValue(redeemDateStr);
+  sheet.getRange(rowIndex, colOrThrow('상환금액')).setValue(redeemAmt);
+  sheet.getRange(rowIndex, colOrThrow('투자기간')).setValue(days);
+  sheet.getRange(rowIndex, colOrThrow('연수익률')).setValue(Math.round(annualPct * 100) / 100);
+  sheet.getRange(rowIndex, colOrThrow('수익')).setValue(Math.round(profit));
+  sheet.getRange(rowIndex, statusCol).setValue(ELS_REDEEMED_STATUS_);
+}
+
 // ----- 대시보드 시트 읽기 -----
 
 /**
@@ -419,7 +538,7 @@ function getDashboardData(dataType) {
       }
     }
     try {
-      elsListSheetData = readSheetAsObjects(ss, ELS_LIST_SHEET_NAME_, 0);
+      elsListSheetData = readElsListSheetWithRowIndex_(ss);
     } catch (e) {
       elsListSheetData = [];
     }
@@ -642,4 +761,42 @@ function readSheetAsObjects(ss, sheetName, headerRowIndex) {
   } catch (e) {
     return [];
   }
+}
+
+/** ELS목록: 각 행에 시트 행번호 row_index(1-based, 헤더=1) 부여 — 상환·수정 API용 */
+function readElsListSheetWithRowIndex_(ss) {
+  var sheet = ss.getSheetByName(ELS_LIST_SHEET_NAME_);
+  if (!sheet) return [];
+  var range = sheet.getDataRange();
+  if (!range) return [];
+  var values = range.getValues();
+  if (!values || values.length < 2) return [];
+  var hi = 0;
+  var headers = values[hi].map(function (h) {
+    if (h == null) return '';
+    return String(h)
+      .replace(/\u3000/g, ' ')
+      .replace(/\t/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  });
+  var rows = [];
+  for (var i = hi + 1; i < values.length; i++) {
+    var row = values[i];
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      var key = headers[j] || 'col' + j;
+      var val = row[j];
+      if (typeof val === 'number' && !isNaN(val)) {
+        obj[key] = val;
+      } else if (val != null && val !== '') {
+        obj[key] = val;
+      } else {
+        obj[key] = val === 0 ? 0 : null;
+      }
+    }
+    obj.row_index = i + 1;
+    rows.push(obj);
+  }
+  return rows;
 }
