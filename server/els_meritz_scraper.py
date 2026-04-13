@@ -7,21 +7,12 @@
 - Chromium 기본 헤드리스. 창으로 보려면 PLAYWRIGHT_HEADLESS=0
 """
 
-import json
 import os
 import re
 import sys
+import tempfile
 import time
-from datetime import date, datetime
 from typing import Any, Optional
-from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
-import traceback
-
-try:
-    from dotenv import load_dotenv
-except ModuleNotFoundError:
-    sys.stderr.write("python-dotenv 패키지가 없습니다.\n")
-    sys.exit(1)
 
 import requests
 import urllib3
@@ -39,106 +30,42 @@ except ModuleNotFoundError:
     sys.stderr.write("pdfplumber 패키지가 없습니다. (pip install pdfplumber)\n")
     sys.exit(1)
 
-SHEET_COLUMNS_SCRAPER_FILLS_ORDER = (
-    "수익률", "KI",
-    "1차", "2차", "3차", "4차", "5차", "6차",
-    "7차", "8차", "9차", "10차", "11차", "12차",
-    "티커1", "티커2", "티커3",
-    "기준가1", "기준가2", "기준가3",
-    "현재가1", "현재가2", "현재가3",
-    "1차 평가일", "2차 평가일", "3차 평가일",
-    "4차 평가일", "5차 평가일", "6차 평가일",
-    "7차 평가일", "8차 평가일", "9차 평가일",
-    "10차 평가일", "11차 평가일", "12차 평가일",
+from els_common import (
+    build_update_body,
+    current_price_formula,
+    fetch_els_items,
+    filter_scrape_targets,
+    load_env,
+    normalize_date_str,
+    post_update,
+    setup_logging,
 )
 
-def _append_query(url: str, **params: str) -> str:
-    parts = urlparse(url)
-    q = dict(parse_qsl(parts.query, keep_blank_values=True))
-    q.update({k: v for k, v in params.items() if v is not None})
-    new_query = urlencode(q) if q else ""
-    return urlunparse((parts.scheme, parts.netloc, parts.path, parts.params, new_query, parts.fragment))
-
-def _is_empty_profit_rate(value: Any) -> bool:
-    if value is None: return True
-    if isinstance(value, str) and value.strip() == "": return True
-    return False
-
-def parse_sheet_issue_date(value: Any) -> Optional[date]:
-    if value is None: return None
-    s = str(value).strip()
-    if not s: return None
-    for fmt in ("%Y-%m-%d", "%Y.%m.%d", "%Y/%m/%d"):
-        try:
-            return datetime.strptime(s, fmt).date()
-        except ValueError:
-            pass
-    m = re.search(r"(\d{4})[.\-/년]\s*(\d{1,2})[.\-/월]\s*(\d{1,2})", s)
-    if m:
-        try:
-            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-        except ValueError:
-            pass
-    return None
-
-def fetch_els_items(api_base: str, timeout: float = 60.0) -> list[dict[str, Any]]:
-    url = _append_query(api_base, api="els_pending")
-    r = requests.get(url, timeout=timeout, headers={"Accept": "application/json"})
-    r.raise_for_status()
-    data = r.json()
-    if not data.get("success"):
-        raise RuntimeError(f"API 오류: {data.get('error', '알 수 없는 오류')}")
-    return data.get("items", [])
-
-def filter_scrape_targets(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """
-    API가 내려준 청약 대기 행 중, 수익률 비어 있음 + 메리츠증권 + 발행일≤오늘(파싱 가능한 행만).
-    """
-    today = date.today()
-    out = []
-    for row in items:
-        if not _is_empty_profit_rate(row.get("수익률")): continue
-        if str(row.get("증권사", "")).strip() != "메리츠증권": continue
-        issue_d = parse_sheet_issue_date(row.get("발행일"))
-        if issue_d is None or issue_d > today: continue
-        out.append(row)
-    return out
-
-def _normalize_date_str(d: str) -> str:
-    m = re.search(r"(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})", str(d).strip())
-    if m: return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
-    
-    m2 = re.search(r"(\d{4})(\d{2})(\d{2})", str(d).strip())
-    if m2: return f"{m2.group(1)}-{m2.group(2)}-{m2.group(3)}"
-    return str(d).strip()
-
-def _current_price_formula(ticker: str) -> str:
-    t = (ticker or "").strip()
-    if not t: return ""
-    if "S&P" in t.upper() or "SNP" in t.upper(): return "=SNP500현재가"
-    if "유로스탁스" in t or "EURO" in t.upper() or "EUROSTOXX" in t.upper(): return "=EUROSTOXX50현재가"
-    if "니케이" in t or "NIKKEI" in t.upper(): return "=NIKKEI225현재가"
-    if "KOSPI" in t.upper() or "코스피" in t: return "=KOSPI200현재가"
-    if "HSCEI" in t.upper() or "홍콩" in t: return "=HSCEI현재가"
-    return f"={t}현재가"
+log = setup_logging("meritz")
 
 def parse_meritz_pdf(pdf_url: str) -> dict[str, str]:
     data = {}
-    r = requests.get(pdf_url, verify=False, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+    try:
+        r = requests.get(
+            pdf_url, verify=False,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+            timeout=30,
+        )
+    except requests.RequestException as e:
+        return {"_error": f"PDF 다운로드 실패: {e}"}
     if r.status_code != 200:
         return {"_error": f"PDF 다운로드 실패 ({r.status_code})"}
-        
-    pdf_path = "/tmp/meritz_temp.pdf"
-    with open(pdf_path, "wb") as f:
-        f.write(r.content)
-        
+
     full_text = []
     try:
-        with pdfplumber.open(pdf_path) as pdf:
-            for page in pdf.pages[:15]:
-                text = page.extract_text()
-                if text:
-                    full_text.append(text)
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as tmp:
+            tmp.write(r.content)
+            tmp.flush()
+            with pdfplumber.open(tmp.name) as pdf:
+                for page in pdf.pages[:15]:
+                    text = page.extract_text()
+                    if text:
+                        full_text.append(text)
     except Exception as e:
         return {"_error": f"PDF 파싱 에러: {e}"}
         
@@ -166,21 +93,20 @@ def parse_meritz_pdf(pdf_url: str) -> dict[str, str]:
     # "1차 조기상환평가일 2026.06.24 95% 2차 2026.12.23 90%" 등의 패턴이나 줄단위
     num_map = ["첫", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉", "열", "열한", "열두"]
     for i in range(1, 13):
-        m = re.search(rf"{i}차\s*(?:[^\n]*?평가일)?\s*(\d{{4}}[./년]\s*\d{{1,2}}[./월]\s*\d{{1,2}}[일]?)", text)
+        # (?<!\d) 로 앞에 숫자가 없을 때만 매칭 (11차 검색 시 '1차' 오매칭 방지)
+        m = re.search(rf"(?<!\d){i}차\s*(?:[^\n]*?평가일)?\s*(\d{{4}}[./년]\s*\d{{1,2}}[./월]\s*\d{{1,2}}[일]?)", text)
         if m:
-            data[f"{i}차 평가일"] = _normalize_date_str(m.group(1))
-            
-        rate_m = re.search(rf"{i}차(?:[^\n]*?(?:상환조건|지급조건|가격|상환율))?\s*(?:최초기준가격의\s*)?(\d{{2,3}}\.?\d*)\s*%", text)
+            data[f"{i}차 평가일"] = normalize_date_str(m.group(1))
+
+        rate_m = re.search(rf"(?<!\d){i}차(?:[^\n]*?(?:상환조건|지급조건|가격|상환율))?\s*(?:최초기준가격의\s*)?(\d{{2,3}}\.?\d*)\s*%", text)
         if rate_m:
             data[f"{i}차"] = f"{rate_m.group(1)}%"
         else:
-            # "첫번째 자동조기상환평가가격이 ... \n 85.00% 이상인 경우" 패턴 (멀티라인 대비)
             rate_m2 = re.search(rf"(?:{num_map[i-1]}번째|{i}번째)[\s\S]{{0,100}}?조기상환[\s\S]{{0,100}}?(\d{{2,3}}\.?\d*)\s*%\s*이상", text)
             if rate_m2:
                 data[f"{i}차"] = f"{rate_m2.group(1)}%"
             else:
-                # 테이블 구조인 경우: 1차 2026.06.24 85%
-                rate_m3 = re.search(rf"{i}차\s*(?:[^\n]*?평가일)?\s*\d{{4}}[./년]\s*\d{{1,2}}[./월]\s*\d{{1,2}}[일]?\s*(?:~|~[\\d\\s./]+)?\s*.*?(\d{{2,3}}\.?\d*)\s*%", text)
+                rate_m3 = re.search(rf"(?<!\d){i}차\s*(?:[^\n]*?평가일)?\s*\d{{4}}[./년]\s*\d{{1,2}}[./월]\s*\d{{1,2}}[일]?\s*(?:~|~[\\d\\s./]+)?\s*.*?(\d{{2,3}}\.?\d*)\s*%", text)
                 if rate_m3:
                     data[f"{i}차"] = f"{rate_m3.group(1)}%"
 
@@ -193,11 +119,19 @@ def parse_meritz_pdf(pdf_url: str) -> dict[str, str]:
             m_maturity_date = re.search(r"만기평가일\s*[\]\)>\-]\s*(\d{4}[./년]\s*\d{1,2}[./월]\s*\d{1,2}[일]?)", text)
             
         if m_maturity_date:
-            data[f"{next_idx}차 평가일"] = _normalize_date_str(m_maturity_date.group(1))
+            data[f"{next_idx}차 평가일"] = normalize_date_str(m_maturity_date.group(1))
             
         m_maturity_rate = re.search(r"만기평가가격이[\s\S]{0,100}?최초기준가격의\s*(\d{2,3}(?:\.\d+)?)\s*%\s*이상", text)
         if m_maturity_rate:
             data[f"{next_idx}차"] = f"{float(m_maturity_rate.group(1)):g}%"
+
+    # 4. 기준가(최초기준가격) 추출
+    for idx, bp_m in enumerate(
+        re.finditer(r"최초기준가격[^\n]*?([\d,]+(?:\.\d+)?)\s*(?:포인트|원|pt|p|\n)", text, re.IGNORECASE),
+        start=1,
+    ):
+        if idx <= 3:
+            data[f"기준가{idx}"] = bp_m.group(1).replace(",", "")
 
     return data
 
@@ -262,11 +196,11 @@ def scrape_meritz_els(page: ChromiumPage, product_round: str) -> dict[str, Any]:
     tickers = [x.strip() for x in re.split(r"[,/]", chan) if x.strip()]
     for idx, t in enumerate(tickers[:3], start=1):
         result[f"티커{idx}"] = t
-        result[f"현재가{idx}"] = _current_price_formula(t)
+        result[f"현재가{idx}"] = current_price_formula(t)
         
     # 만기일 / 발행일 (fallback)
     pblc_date = matched_item.get("PblcDate", "")
-    if pblc_date: result["발행일"] = _normalize_date_str(pblc_date)
+    if pblc_date: result["발행일"] = normalize_date_str(pblc_date)
     
     # PDF 추출
     pdf_path = matched_item.get("AtchFilePathName", "")
@@ -289,41 +223,22 @@ def scrape_meritz_els(page: ChromiumPage, product_round: str) -> dict[str, Any]:
             
     return result
 
-def post_update(api_base: str, row_index: int, payload: dict[str, Any], timeout: float = 60.0) -> None:
-    body = {"action": "update", "row_index": row_index, **payload}
-    raw = json.dumps(body, ensure_ascii=False)
-    r = requests.post(
-        api_base,
-        data=raw.encode("utf-8"),
-        timeout=timeout,
-        headers={"Content-Type": "text/plain;charset=utf-8", "Accept": "application/json"},
-    )
-    r.raise_for_status()
-    resp = r.json()
-    if isinstance(resp, dict) and not resp.get("success"):
-        raise RuntimeError(resp.get("error", "업데이트 실패"))
-
 def main() -> int:
-    load_dotenv()
-    root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    env_path = os.path.join(root, ".env")
-    if os.path.isfile(env_path):
-        load_dotenv(env_path)
-
-    api_base = (os.getenv("VITE_WEB_APP_URL") or "").strip()
-    if not api_base:
-        print("VITE_WEB_APP_URL이 없습니다.")
+    try:
+        api_base = load_env()
+    except SystemExit as e:
+        log.error(str(e))
         return 1
 
     try:
-        items = fetch_els_items(api_base)
+        items = fetch_els_items(api_base, logger=log)
     except Exception as e:
-        print(f"목록 조회 실패: {e}")
+        log.error("목록 조회 실패: %s", e)
         return 1
 
-    targets = filter_scrape_targets(items)
+    targets = filter_scrape_targets(items, "메리츠증권")
     if not targets:
-        print(
+        log.info(
             "조건에 맞는 상품이 없습니다. "
             "(상태「청약 중(대기)」, 메리츠증권, 시트「발행일」≤오늘, 「수익률」비어 있음)"
         )
@@ -332,25 +247,22 @@ def main() -> int:
     co = ChromiumOptions()
     co.auto_port()
     headless = (os.getenv("PLAYWRIGHT_HEADLESS", "1") or "1").strip().lower() not in (
-        "0",
-        "false",
-        "no",
+        "0", "false", "no",
     )
     co.set_headless(headless)
     co.set_argument('--no-sandbox')
-    
-    # Playwright의 크로미움 바이너리를 사용 (버전에 따라 다를 수 있으므로 검색)
+
     from pathlib import Path
     try:
         chrome_path = list(Path(os.path.expanduser('~/.cache/ms-playwright/')).glob('chromium-*/chrome-linux64/chrome'))[0]
         co.set_browser_path(str(chrome_path))
     except IndexError:
-        pass # 시스템 기본 chrome 사용 시도
+        pass
 
     try:
         page = ChromiumPage(co)
     except Exception as e:
-        print(f"브라우저 실행 실패: {e}")
+        log.error("브라우저 실행 실패: %s", e)
         return 1
 
     for row in targets:
@@ -359,32 +271,27 @@ def main() -> int:
         if row_index is None or product_round is None:
             continue
 
-        print(f"처리 중: row_index={row_index}, 상품회차={product_round}")
+        log.info("처리 중: row_index=%s, 상품회차=%s", row_index, product_round)
         try:
             scraped = scrape_meritz_els(page, str(product_round))
         except Exception as e:
-            traceback.print_exc()
-            print(f"  스크래핑 예외: {e}")
+            log.error("  스크래핑 예외: %s", e, exc_info=True)
             continue
 
         if scraped.get("_error"):
-            print(f"  페이지 오류: {scraped.get('_error')}")
+            log.error("  페이지 오류: %s", scraped.get("_error"))
             continue
 
-        update_body = {
-            k: scraped[k]
-            for k in SHEET_COLUMNS_SCRAPER_FILLS_ORDER
-            if k in scraped and scraped[k] is not None and str(scraped[k]).strip()
-        }
+        update_body = build_update_body(scraped)
         if not update_body:
-            print("  추출된 필드 없음 — POST 생략")
+            log.info("  추출된 필드 없음 — POST 생략")
             continue
 
         try:
-            post_update(api_base, int(row_index), update_body)
-            print("  시트 업데이트 완료")
+            post_update(api_base, int(row_index), update_body, logger=log)
+            log.info("  시트 업데이트 완료")
         except Exception as e:
-            print(f"  POST 실패: {e}")
+            log.error("  POST 실패: %s", e)
 
     page.quit()
     return 0

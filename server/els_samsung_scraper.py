@@ -33,165 +33,26 @@ Playwright 기본 헤드리스. 창으로 보려면 PLAYWRIGHT_HEADLESS=0
 
 from __future__ import annotations
 
-import json
 import os
 import re
-import time
-import sys
-from datetime import date, datetime
+from datetime import date
 from typing import Any, Optional
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from urllib.parse import urlparse
 
-try:
-    from dotenv import load_dotenv
-except ModuleNotFoundError:
-    sys.stderr.write(
-        "python-dotenv 패키지가 없습니다. 설치 후 다시 실행하세요.\n"
-        "  pip3 install python-dotenv\n"
-        "  또는 프로젝트 루트에서: pip3 install -r server/requirements.txt\n"
-    )
-    raise SystemExit(1) from None
-
-import requests
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
-# ELS목록 시트 1행: A~F는 수동/대시보드, G열부터 아래 순서와 헤더를 시트와 동일하게 둔다.
-SHEET_COLUMNS_SCRAPER_FILLS_ORDER = (
-    "수익률",
-    "KI",
-    "1차",
-    "2차",
-    "3차",
-    "4차",
-    "5차",
-    "6차",
-    "7차",
-    "8차",
-    "9차",
-    "10차",
-    "11차",
-    "12차",
-    "티커1",
-    "티커2",
-    "티커3",
-    "기준가1",
-    "기준가2",
-    "기준가3",
-    "현재가1",
-    "현재가2",
-    "현재가3",
-    "1차 평가일",
-    "2차 평가일",
-    "3차 평가일",
-    "4차 평가일",
-    "5차 평가일",
-    "6차 평가일",
-    "7차 평가일",
-    "8차 평가일",
-    "9차 평가일",
-    "10차 평가일",
-    "11차 평가일",
-    "12차 평가일",
+from els_common import (
+    build_update_body,
+    fetch_els_items,
+    filter_scrape_targets,
+    load_env,
+    normalize_date_str,
+    post_update,
+    setup_logging,
 )
 
-
-def _append_query(url: str, **params: str) -> str:
-    """기존 쿼리를 유지한 채 파라미터 병합."""
-    parts = urlparse(url)
-    q = dict(parse_qsl(parts.query, keep_blank_values=True))
-    q.update({k: v for k, v in params.items() if v is not None})
-    new_query = urlencode(q) if q else ""
-    return urlunparse(
-        (parts.scheme, parts.netloc, parts.path, parts.params, new_query, parts.fragment)
-    )
-
-
-def _is_empty_profit_rate(value: Any) -> bool:
-    if value is None:
-        return True
-    if isinstance(value, str) and value.strip() == "":
-        return True
-    return False
-
-
-def fetch_els_items(api_base: str, timeout: float = 60.0) -> list[dict[str, Any]]:
-    """GET: 대기(청약 중) ELS 목록."""
-    url = _append_query(api_base, api="els_pending")
-    r = requests.get(
-        url,
-        timeout=timeout,
-        headers={"Accept": "application/json"},
-    )
-    r.raise_for_status()
-    data = r.json()
-    if not isinstance(data, dict):
-        raise ValueError("API 응답이 객체가 아닙니다.")
-    if not data.get("success"):
-        err = data.get("error", "알 수 없는 오류")
-        raise RuntimeError(f"API 오류: {err}")
-    items = data.get("items")
-    if not isinstance(items, list):
-        raise ValueError("응답에 items 배열이 없습니다.")
-    return items
-
-
-def parse_sheet_issue_date(value: Any) -> Optional[date]:
-    """시트/API에서 내려온 발행일 값 → date. (YYYY-MM-DD, 한글 날짜 등)"""
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        return None
-    s = str(value).strip()
-    if not s:
-        return None
-    if len(s) >= 10 and s[4] == "-" and s[7] == "-":
-        try:
-            return date.fromisoformat(s[:10])
-        except ValueError:
-            pass
-    return parse_korean_date(s)
-
-
-def filter_scrape_targets(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """
-    수익률 비어 있음 + 삼성증권 + 발행일이 오늘 이전 또는 오늘인 행만.
-    발행일이 비어 있거나 파싱 불가면 제외.
-    """
-    today = date.today()
-    out: list[dict[str, Any]] = []
-    for row in items:
-        if not _is_empty_profit_rate(row.get("수익률")):
-            continue
-        broker = str(row.get("증권사", "")).strip()
-        if broker != "삼성증권":
-            continue
-        issue_d = parse_sheet_issue_date(row.get("발행일"))
-        if issue_d is None:
-            continue
-        if issue_d > today:
-            continue
-        out.append(row)
-    return out
-
-
-def parse_korean_date(text: str) -> Optional[date]:
-    """'2026-03-28', '2026.03.28', '2026/03/28' 등 시도."""
-    if not text:
-        return None
-    s = re.sub(r"\s+", "", str(text).strip())
-    for fmt in ("%Y-%m-%d", "%Y.%m.%d", "%Y/%m/%d", "%Y.%m.%d."):
-        try:
-            return datetime.strptime(s.replace("..", "."), fmt).date()
-        except ValueError:
-            continue
-    m = re.search(r"(\d{4})[.\-/년]\s*(\d{1,2})[.\-/월]\s*(\d{1,2})", text)
-    if m:
-        try:
-            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-        except ValueError:
-            return None
-    return None
+log = setup_logging("samsung")
 
 
 def _safe_text(locator) -> Optional[str]:
@@ -645,21 +506,27 @@ def open_samsung_els_detail_page(
 
 
 def _normalize_sheet_date_slash(d: str) -> str:
-    """2026/06/09 → 2026-06-09 (시트 날짜 열용)."""
-    s = (d or "").strip()
-    m = re.match(r"(\d{4})/(\d{1,2})/(\d{1,2})", s)
-    if m:
-        return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
-    return s
+    """2026/06/09 → 2026-06-09 (시트 날짜 열용). normalize_date_str 래퍼."""
+    return normalize_date_str(d)
 
 
 def _current_price_formula(ticker: str) -> str:
-    """스프레드시트용: =KOSPI200현재가 형태. S&P500 만 =SNP500현재가 (명명된 범위와 맞춤)."""
+    """스프레드시트용: =KOSPI200현재가 형태. 주요 지수 티커를 명명된 범위에 맞춘다."""
     t = (ticker or "").strip()
     if not t:
         return ""
-    if t == "S&P500":
+    if t in ("S&P500", "S&P 500"):
         return "=SNP500현재가"
+    t_upper = t.upper()
+    for keywords, formula in (
+        (("유로스탁스", "EURO", "EUROSTOXX"), "=EUROSTOXX50현재가"),
+        (("니케이", "NIKKEI"), "=NIKKEI225현재가"),
+        (("KOSPI", "코스피"), "=KOSPI200현재가"),
+        (("HSCEI", "홍콩", "항셍"), "=HSCEI현재가"),
+    ):
+        for kw in keywords:
+            if kw.upper() in t_upper or kw in t:
+                return formula
     return f"={t}현재가"
 
 
@@ -1021,11 +888,11 @@ def parse_tab1_inner_text_to_sheet_fields(
 
     # KI: 하락한계가격 행의 행사가격 열 (예: 50%)
     m = re.search(
-        r"하락한계가격\s+[-–\s]*\s+[-–\s]*\s+([\d.]+%)",
+        r"하락한계가격[\s\-–—]*[\s\-–—]*([\d.]+)\s*%",
         text,
     )
     if m:
-        out["KI"] = m.group(1)
+        out["KI"] = f"{m.group(1)}%"
 
     # 1~11차: 중간기준가격 행 → 관련일자, 상환시 수익률, 행사가격, 기준가대비
     for match in re.finditer(
@@ -1057,11 +924,11 @@ def parse_tab1_inner_text_to_sheet_fields(
 
     # 최초기준가격 행 (기초자산별로 여러 줄일 수 있음)
     for i, mm in enumerate(
-        re.finditer(r"최초기준가격\s+([\d/]+)\s+-\s+-\s+([\d.]+)", text),
+        re.finditer(r"최초기준가격\s+([\d/]+)[\s\-–—]+([\d,.]+)", text),
         start=1,
     ):
         if i <= 3:
-            out[f"기준가{i}"] = mm.group(2)
+            out[f"기준가{i}"] = mm.group(2).replace(",", "")
 
     # 현재가: 스크래핑 숫자 대신 수식 (티커 파싱 후)
     for idx in range(1, 4):
@@ -1167,58 +1034,31 @@ def scrape_samsung_els_detail(
     return data
 
 
-def post_update(api_base: str, row_index: int, payload: dict[str, Any], timeout: float = 60.0) -> None:
-    body = {"action": "update", "row_index": row_index, **payload}
-    # 프런트엔드와 동일하게 text/plain + UTF-8 JSON (str 그대로 넣으면 requests가 latin-1로 인코딩 시도해 한글 키에서 실패)
-    raw = json.dumps(body, ensure_ascii=False)
-    r = requests.post(
-        api_base,
-        data=raw.encode("utf-8"),
-        timeout=timeout,
-        headers={
-            "Content-Type": "text/plain;charset=utf-8",
-            "Accept": "application/json",
-        },
-    )
-    r.raise_for_status()
-    resp = r.json()
-    if isinstance(resp, dict) and not resp.get("success"):
-        raise RuntimeError(resp.get("error", "업데이트 실패"))
-
-
 def main() -> int:
-    load_dotenv()
-    root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    env_path = os.path.join(root, ".env")
-    if os.path.isfile(env_path):
-        load_dotenv(env_path)
-
-    api_base = (os.getenv("VITE_WEB_APP_URL") or "").strip()
-    if not api_base:
-        print("VITE_WEB_APP_URL이 .env에 없습니다.", file=sys.stderr)
+    try:
+        api_base = load_env()
+    except SystemExit as e:
+        log.error(str(e))
         return 1
 
     try:
-        items = fetch_els_items(api_base)
+        items = fetch_els_items(api_base, logger=log)
     except Exception as e:
-        print(f"목록 조회 실패: {e}", file=sys.stderr)
+        log.error("목록 조회 실패: %s", e)
         return 1
 
-    targets = filter_scrape_targets(items)
+    targets = filter_scrape_targets(items, "삼성증권")
     if not targets:
-        print(
+        log.info(
             "조건에 맞는 상품이 없습니다. "
             "(상태「청약 중(대기)」, 삼성증권, 시트「발행일」≤오늘, 「수익률」비어 있음)"
         )
         return 0
 
-    # 선택: 직접 상세 URL 템플릿이 있으면 search.do 보다 우선 (예: ...?ISCD=...&... 에 {round} 치환 불가 시 생략)
     detail_template = os.getenv("SAMSUNG_ELS_DETAIL_URL_TEMPLATE", "").strip() or None
     nav_timeout = int(os.getenv("PLAYWRIGHT_NAV_TIMEOUT_MS", "45000"))
     headless = (os.getenv("PLAYWRIGHT_HEADLESS", "1") or "1").strip().lower() not in (
-        "0",
-        "false",
-        "no",
+        "0", "false", "no",
     )
 
     with sync_playwright() as p:
@@ -1230,40 +1070,36 @@ def main() -> int:
             row_index = row.get("row_index")
             product_round = row.get("상품회차")
             if row_index is None or product_round is None:
-                print(f"건너뜀: row_index/상품회차 없음 — {row!r}")
+                log.warning("건너뜀: row_index/상품회차 없음 — %r", row)
                 continue
 
-            print(f"처리 중: row_index={row_index}, 상품회차={product_round}")
+            log.info("처리 중: row_index=%s, 상품회차=%s", row_index, product_round)
             try:
                 scraped = scrape_samsung_els_detail(
                     page, str(product_round), detail_template, nav_timeout
                 )
             except Exception as e:
-                print(f"  스크래핑 예외: {e}")
+                log.error("  스크래핑 예외: %s", e)
                 continue
 
             if scraped.get("_skip_reason") == "not_issued":
-                print("  아직 발행되지 않음 (입고일/발행일 이전)")
+                log.info("  아직 발행되지 않음 (입고일/발행일 이전)")
                 continue
 
             if scraped.get("_error"):
-                print(f"  페이지 오류: {scraped.get('_error')}")
+                log.error("  페이지 오류: %s", scraped.get("_error"))
                 continue
 
-            update_body = {
-                k: scraped[k]
-                for k in SHEET_COLUMNS_SCRAPER_FILLS_ORDER
-                if k in scraped and scraped[k] is not None and str(scraped[k]).strip()
-            }
+            update_body = build_update_body(scraped)
             if not update_body:
-                print("  추출된 필드 없음 — POST 생략")
+                log.info("  추출된 필드 없음 — POST 생략")
                 continue
 
             try:
-                post_update(api_base, int(row_index), update_body)
-                print("  시트 업데이트 완료")
+                post_update(api_base, int(row_index), update_body, logger=log)
+                log.info("  시트 업데이트 완료")
             except Exception as e:
-                print(f"  POST 실패: {e}", file=sys.stderr)
+                log.error("  POST 실패: %s", e)
 
         browser.close()
 
