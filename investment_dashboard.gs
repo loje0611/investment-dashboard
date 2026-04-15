@@ -393,7 +393,8 @@ function getDashboardData(dataType) {
       // 1) 총 자산 평가
       var totalValuation = 0, totalRate = null;
       if (totalAssets && totalAssets.length > 0) {
-        var latestRow = totalAssets[totalAssets.length - 1];
+        // 가장 상위 행(3행) 즉, 배열의 첫 번째 요소 추출 (최신 데이터 상단 삽입 구조)
+        var latestRow = totalAssets[0];
         var v = gasCoerceNumber_(latestRow['평가금총액']) || gasCoerceNumber_(latestRow['평가금액']);
         var p = gasCoerceNumber_(latestRow['원금총액']) || gasCoerceNumber_(latestRow['투자원금']);
         if (v != null) totalValuation = v;
@@ -404,18 +405,30 @@ function getDashboardData(dataType) {
       summaryCards.push({ id: 'total', title: '총 자산 평가', amount: totalValuation || 0, rate: totalRate });
       
       // 2) 연금 평가
-      var penValuation = 0, penPrincipal = 0, penFee = 0;
+      var penValuation = null, penRate = null;
       if (pension) {
         for (var i = 0; i < pension.length; i++) {
           var row = pension[i];
-          var title = String(row['상품명'] || row['종목명'] || row['이름'] || row['항목'] || '').trim();
-          if (!title || /합계|소계|^계$/.test(title)) continue;
-          penValuation += gasCoerceNumber_(row['평가금액']) || gasCoerceNumber_(row['평가금']) || 0;
-          penPrincipal += gasCoerceNumber_(row['투자원금']) || gasCoerceNumber_(row['원금']) || gasCoerceNumber_(row['납입원금']) || 0;
-          penFee += gasCoerceNumber_(row['수수료']) || 0;
+          // A열 혹은 대표 열에 해당하는 객체 키 찾기
+          var title = String(row['상품명'] || row['종목명'] || row['이름'] || row['항목'] || row[Object.keys(row)[0]] || '').trim();
+          if (title.indexOf('개인연금 합계') !== -1) {
+            penValuation = gasCoerceNumber_(row['평가금액']) || gasCoerceNumber_(row['평가금']);
+            var r = gasCoerceNumber_(row['수익률']);
+            if (r != null) {
+              penRate = Math.abs(r) < 1.5 ? r * 100 : r;
+            } else {
+              // 수익률 열이 제대로 파싱 안된 경우 (예: 문자로 인식됨)
+              var rawRate = String(row['수익률'] || '').replace(/%/g, '').trim();
+              var parsed = parseFloat(rawRate);
+              if (!isNaN(parsed)) {
+                penRate = Math.abs(parsed) < 1.5 ? parsed * 100 : parsed;
+              }
+            }
+            break;
+          }
         }
       }
-      var penRate = penPrincipal > 0 ? ((penValuation - penFee - penPrincipal) / penPrincipal) * 100 : null;
+      if (penValuation == null) penValuation = 0;
       summaryCards.push({ id: 'pension', title: '연금 평가', amount: penValuation, rate: penRate });
 
       // 3) ETF 평가
@@ -432,24 +445,37 @@ function getDashboardData(dataType) {
       var etfRate = etfPrincipal > 0 ? ((etfValuation - etfPrincipal) / etfPrincipal) * 100 : null;
       summaryCards.push({ id: 'etf', title: 'ETF 평가', amount: etfValuation, rate: etfRate });
       
-      // 4) ELS 투자 평가
-      var elsValuation = 0, elsSumRate = 0, elsInvCount = 0;
-      if (els) {
-        for (var i = 0; i < els.length; i++) {
-          var row = els[i];
-          var title = String(row['상품명'] || row['이름'] || '').trim();
-          if (/합계|소계|^계$/.test(title)) continue;
-          var v = gasCoerceNumber_(row['평가금액']) || gasCoerceNumber_(row['평가금']);
-          if (v != null) elsValuation += v;
-          var r = gasCoerceNumber_(row['수익률']);
-          if (r != null) {
-             elsSumRate += r;
-             elsInvCount++;
+      // 4) ELS 투자 평가 (ELS 시트 명시적 조회)
+      var elsValuation = null, elsInvRate = null;
+      var elsSummarySheet = [];
+      try {
+        elsSummarySheet = readSheetAsObjects_(ss, 'ELS', 1);
+        if (!elsSummarySheet || elsSummarySheet.length === 0) {
+          elsSummarySheet = readSheetAsObjects_(ss, 'ELS', 0);
+        }
+      } catch(e) {}
+      
+      if (elsSummarySheet && elsSummarySheet.length > 0) {
+        for (var i = 0; i < elsSummarySheet.length; i++) {
+          var row = elsSummarySheet[i];
+          var title = String(row['상품명'] || row['이름'] || row['항목'] || row[Object.keys(row)[0]] || '').trim();
+          if (title.indexOf('합계') !== -1) {
+            elsValuation = gasCoerceNumber_(row['평가금액']) || gasCoerceNumber_(row['평가금']);
+            var r = gasCoerceNumber_(row['수익률']);
+            if (r != null) {
+              elsInvRate = Math.abs(r) < 1.5 ? r * 100 : r;
+            } else {
+              var rawRate = String(row['수익률'] || '').replace(/%/g, '').trim();
+              var parsed = parseFloat(rawRate);
+              if (!isNaN(parsed)) {
+                elsInvRate = Math.abs(parsed) < 1.5 ? parsed * 100 : parsed;
+              }
+            }
+            break;
           }
         }
       }
-      var rawElsRate = elsInvCount > 0 ? (elsSumRate / elsInvCount) : null;
-      var elsInvRate = rawElsRate != null ? (Math.abs(rawElsRate) < 1.5 ? rawElsRate * 100 : rawElsRate) : null;
+      if (elsValuation == null) elsValuation = 0;
       summaryCards.push({ id: 'els', title: 'ELS 투자 평가', amount: elsValuation, rate: elsInvRate });
       
       // 5) ELS 누적 수익금
@@ -470,7 +496,7 @@ function getDashboardData(dataType) {
       var elsCompleteRate = rawCompleteRate != null ? (Math.abs(rawCompleteRate) < 1.5 ? rawCompleteRate * 100 : rawCompleteRate) : null;
       summaryCards.push({ id: 'els-profit', title: 'ELS 누적 수익금', amount: elsProfitSum, rate: elsCompleteRate });
 
-      // 파이 차트 데이터 생성
+      // 파이 차트 데이터 생성 (pieData용 평가금액 변수는 앞선 개별 항목의 Valuation을 그대로 사용하거나, 기존 방식 유지)
       var otherValuation = 0;
       if (cashOther) {
          for (var i = 0; i < cashOther.length; i++) {
@@ -480,6 +506,7 @@ function getDashboardData(dataType) {
             }
          }
       }
+      // pieSum 연산 시 수정된 penValuation, elsValuation 활용
       var pieSum = etfValuation + elsValuation + penValuation + otherValuation;
       if (pieSum > 0) {
         if (etfValuation > 0) pieData.push({ name: 'ETF', value: Math.round((etfValuation / pieSum) * 1000) / 10, color: '#6366f1' });
