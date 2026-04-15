@@ -155,8 +155,37 @@ function isEmptyValue_(v) {
 function gasCoerceNumber_(v) {
   if (v == null || v === '') return null;
   if (typeof v === 'number' && !isNaN(v)) return v;
-  var n = parseFloat(String(v).replace(/,/g, '').replace(/원/g, '').replace(/\s/g, '').trim());
+  var n = parseFloat(String(v).replace(/[₩원%,]/g, '').replace(/\s/g, '').trim());
   return isNaN(n) ? null : n;
+}
+
+/**
+ * 객체(row)에서 여러 후보 키를 순서대로 시도하여 첫 번째로 값이 있는 것을 반환.
+ * 공백 유무 차이(예: '평가금 총액' vs '평가금총액')에 모두 대응하기 위해
+ * 각 후보를 있는 그대로 + 공백 제거 버전 양쪽으로 비교합니다.
+ */
+function findRowValue_(row, candidates) {
+  if (!row || !candidates) return undefined;
+  // 먼저 정확한(exact) 키로 시도
+  for (var i = 0; i < candidates.length; i++) {
+    var v = row[candidates[i]];
+    if (v !== undefined && v !== null && v !== '') return v;
+  }
+  // row 키를 공백 제거한 맵으로 변환 후 비교
+  var keys = Object.keys(row);
+  var stripped = {};
+  for (var k = 0; k < keys.length; k++) {
+    stripped[keys[k].replace(/\s+/g, '')] = keys[k];
+  }
+  for (var i = 0; i < candidates.length; i++) {
+    var norm = candidates[i].replace(/\s+/g, '');
+    var realKey = stripped[norm];
+    if (realKey != null) {
+      var v = row[realKey];
+      if (v !== undefined && v !== null && v !== '') return v;
+    }
+  }
+  return undefined;
 }
 
 function getElsPendingRowsWithIndex_(ss) {
@@ -390,13 +419,12 @@ function getDashboardData(dataType) {
 
     // --- 요약 카드 및 파이 차트 데이터 계산 ---
     try {
-      // 1) 총 자산 평가
+      // 1) 총 자산 평가 — 최신 데이터는 헤더 바로 아래 첫 번째 행 (상단 삽입 구조)
       var totalValuation = 0, totalRate = null;
       if (totalAssets && totalAssets.length > 0) {
-        // 가장 상위 행(3행) 즉, 배열의 첫 번째 요소 추출 (최신 데이터 상단 삽입 구조)
         var latestRow = totalAssets[0];
-        var v = gasCoerceNumber_(latestRow['평가금총액']) || gasCoerceNumber_(latestRow['평가금액']);
-        var p = gasCoerceNumber_(latestRow['원금총액']) || gasCoerceNumber_(latestRow['투자원금']);
+        var v = gasCoerceNumber_(findRowValue_(latestRow, ['평가금 총액', '평가금총액', '평가금액']));
+        var p = gasCoerceNumber_(findRowValue_(latestRow, ['원금 총액', '원금총액', '투자원금', '원금']));
         if (v != null) totalValuation = v;
         if (v != null && p != null && p > 0) {
           totalRate = ((v - p) / p) * 100;
@@ -404,25 +432,17 @@ function getDashboardData(dataType) {
       }
       summaryCards.push({ id: 'total', title: '총 자산 평가', amount: totalValuation || 0, rate: totalRate });
       
-      // 2) 연금 평가
+      // 2) 연금 평가 — A열에서 '개인연금 합계' 행을 동적 스캔
       var penValuation = null, penRate = null;
       if (pension) {
         for (var i = 0; i < pension.length; i++) {
           var row = pension[i];
-          // A열 혹은 대표 열에 해당하는 객체 키 찾기
-          var title = String(row['상품명'] || row['종목명'] || row['이름'] || row['항목'] || row[Object.keys(row)[0]] || '').trim();
+          var title = String(findRowValue_(row, ['상품명', '종목명', '이름', '항목']) || row[Object.keys(row)[0]] || '').trim();
           if (title.indexOf('개인연금 합계') !== -1) {
-            penValuation = gasCoerceNumber_(row['평가금액']) || gasCoerceNumber_(row['평가금']);
-            var r = gasCoerceNumber_(row['수익률']);
+            penValuation = gasCoerceNumber_(findRowValue_(row, ['평가금액', '평가금']));
+            var r = gasCoerceNumber_(findRowValue_(row, ['수익률']));
             if (r != null) {
               penRate = Math.abs(r) < 1.5 ? r * 100 : r;
-            } else {
-              // 수익률 열이 제대로 파싱 안된 경우 (예: 문자로 인식됨)
-              var rawRate = String(row['수익률'] || '').replace(/%/g, '').trim();
-              var parsed = parseFloat(rawRate);
-              if (!isNaN(parsed)) {
-                penRate = Math.abs(parsed) < 1.5 ? parsed * 100 : parsed;
-              }
             }
             break;
           }
@@ -435,17 +455,17 @@ function getDashboardData(dataType) {
       var etfValuation = 0, etfPrincipal = 0;
       if (etf) {
         for (var i = 0; i < etf.length; i++) {
-          var title = String(etf[i]['상품명'] || etf[i]['종목명'] || '').trim();
+          var title = String(findRowValue_(etf[i], ['상품명', '종목명']) || '').trim();
           if (!/합계|소계|^계$/.test(title)) {
-             etfValuation += gasCoerceNumber_(etf[i]['평가금액']) || gasCoerceNumber_(etf[i]['평가금']) || 0;
-             etfPrincipal += gasCoerceNumber_(etf[i]['투자원금']) || gasCoerceNumber_(etf[i]['매수금액']) || gasCoerceNumber_(etf[i]['원금']) || 0;
+             etfValuation += gasCoerceNumber_(findRowValue_(etf[i], ['평가금액', '평가금'])) || 0;
+             etfPrincipal += gasCoerceNumber_(findRowValue_(etf[i], ['투자원금', '매수금액', '원금'])) || 0;
           }
         }
       }
       var etfRate = etfPrincipal > 0 ? ((etfValuation - etfPrincipal) / etfPrincipal) * 100 : null;
       summaryCards.push({ id: 'etf', title: 'ETF 평가', amount: etfValuation, rate: etfRate });
       
-      // 4) ELS 투자 평가 (ELS 시트 명시적 조회)
+      // 4) ELS 투자 평가 — 'ELS' 시트에서 '합계' 행을 동적 스캔
       var elsValuation = null, elsInvRate = null;
       var elsSummarySheet = [];
       try {
@@ -458,18 +478,12 @@ function getDashboardData(dataType) {
       if (elsSummarySheet && elsSummarySheet.length > 0) {
         for (var i = 0; i < elsSummarySheet.length; i++) {
           var row = elsSummarySheet[i];
-          var title = String(row['상품명'] || row['이름'] || row['항목'] || row[Object.keys(row)[0]] || '').trim();
+          var title = String(findRowValue_(row, ['상품명', '이름', '항목']) || row[Object.keys(row)[0]] || '').trim();
           if (title.indexOf('합계') !== -1) {
-            elsValuation = gasCoerceNumber_(row['평가금액']) || gasCoerceNumber_(row['평가금']);
-            var r = gasCoerceNumber_(row['수익률']);
+            elsValuation = gasCoerceNumber_(findRowValue_(row, ['평가금액', '평가금']));
+            var r = gasCoerceNumber_(findRowValue_(row, ['수익률']));
             if (r != null) {
               elsInvRate = Math.abs(r) < 1.5 ? r * 100 : r;
-            } else {
-              var rawRate = String(row['수익률'] || '').replace(/%/g, '').trim();
-              var parsed = parseFloat(rawRate);
-              if (!isNaN(parsed)) {
-                elsInvRate = Math.abs(parsed) < 1.5 ? parsed * 100 : parsed;
-              }
             }
             break;
           }
