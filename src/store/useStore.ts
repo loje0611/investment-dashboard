@@ -42,6 +42,10 @@ export interface DashboardState {
   cashOther: SheetDataRow[];
   /** ELS목록 시트 */
   elsListSheetData: ElsRow[];
+  /** 서버 연산 요약 카드 */
+  summaryCards: import('../data/dashboardDummy').SummaryCardItem[];
+  /** 서버 연산 파이 차트 */
+  pieData: import('../data/dashboardDummy').PieSegment[];
   /** 로딩 여부 (전체 또는 summary) */
   isLoading: boolean;
   /** 자산 상세(ELS/ETF/연금) 로딩 여부 */
@@ -77,6 +81,8 @@ const initialState: DashboardState = {
   elsCompleted: [],
   cashOther: [],
   elsListSheetData: [],
+  summaryCards: [],
+  pieData: [],
   isLoading: false,
   isLoadingAssets: false,
   isLoadingRebalancing: false,
@@ -102,6 +108,8 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
         elsCompleted: data.elsCompleted ?? [],
         cashOther: data.cashOther ?? [],
         elsListSheetData: data.elsListSheetData ?? [],
+        summaryCards: data.summaryCards ?? [],
+        pieData: data.pieData ?? [],
         isLoading: false,
         isLoadingAssets: false,
         isLoadingRebalancing: false,
@@ -130,6 +138,8 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
         elsCompleted: data.elsCompleted ?? [],
         cashOther: data.cashOther ?? [],
         elsListSheetData: data.elsListSheetData ?? [],
+        summaryCards: data.summaryCards ?? [],
+        pieData: data.pieData ?? [],
         isLoadingAssets: false,
       });
     } catch (err) {

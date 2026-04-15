@@ -7,7 +7,6 @@ import { pensionToRows } from '../../utils/pensionToRows'
 import { portfolioToRebalancingAccounts } from '../../utils/portfolioToRebalancing'
 import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAccounts'
 import { totalAssetsToPrincipalValuationTrend } from '../../utils/totalAssetsToPrincipalValuation'
-import { buildHomeOverviewFromRawFormulas } from '../../utils/homeOverviewFromRawFormulas'
 import { getCurrentLevelFromRow, parseBarrierPercent } from '../../utils/elsRiskCounts'
 import {
   compareElsListRowsByNextEval,
@@ -93,10 +92,9 @@ export function DashboardLayout() {
     portfolio,
     rebalancing,
     totalAssets,
-    elsCompleted,
-    elsSheetTotals,
     elsListSheetData,
-    cashOther,
+    summaryCards,
+    pieData,
     isLoading,
     isLoadingAssets,
     isLoadingRebalancing,
@@ -180,12 +178,6 @@ export function DashboardLayout() {
     [totalAssets]
   )
 
-  const homeOverview = useMemo(
-    () =>
-      buildHomeOverviewFromRawFormulas(pension, etf, els, elsCompleted, cashOther, elsSheetTotals),
-    [pension, etf, els, elsCompleted, cashOther, elsSheetTotals]
-  )
-
   const rebalancingAccounts = useMemo(() => {
     if (rebalancing && rebalancing.length > 0) {
       const fromTables = rebalancingTablesToAccounts(rebalancing)
@@ -236,9 +228,9 @@ export function DashboardLayout() {
                 ) : (
                   <>
                     <div className="mb-6">
-                      {homeOverview.summaryCards.length > 0 ? (
+                      {summaryCards && summaryCards.length > 0 ? (
                         <SummaryCardsCarousel
-                          items={homeOverview.summaryCards}
+                          items={summaryCards}
                           hideAmounts={hideAmounts}
                         />
                       ) : (
@@ -255,7 +247,7 @@ export function DashboardLayout() {
                     <div className="space-y-6">
                       <h2 className="text-sm font-semibold text-slate-700">전체 현황</h2>
                       <GlobalOverview
-                        pieData={homeOverview.pieData}
+                        pieData={pieData || []}
                         principalValuationTrend={principalValuationTrend}
                         totalAssetsRowCount={totalAssets.length}
                         hideAmounts={hideAmounts}

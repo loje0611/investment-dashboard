@@ -350,6 +350,8 @@ function getDashboardData(dataType) {
 
   var totalAssets = [], portfolio = [], rebalancing = [], etf = [], pension = [], els = [], elsCompleted = [], cashOther = [], elsListSheetData = [];
   var elsSheetTotals = null;
+  var summaryCards = [];
+  var pieData = [];
 
   if (dataType === 'summary' || dataType === 'all') {
     try { totalAssets = readTotalAssetsSheet_(ss); } catch (e) { totalAssets = []; }
@@ -385,6 +387,107 @@ function getDashboardData(dataType) {
       if (!cashOther || cashOther.length === 0) cashOther = readSheetAsObjects_(ss, '현금', 0);
     } catch (e) { cashOther = []; }
     try { elsListSheetData = readElsListSheetWithRowIndex_(ss); } catch (e) { elsListSheetData = []; }
+
+    // --- 요약 카드 및 파이 차트 데이터 계산 ---
+    try {
+      // 1) 총 자산 평가
+      var totalValuation = 0, totalRate = null;
+      if (totalAssets && totalAssets.length > 0) {
+        var latestRow = totalAssets[totalAssets.length - 1];
+        var v = gasCoerceNumber_(latestRow['평가금총액']) || gasCoerceNumber_(latestRow['평가금액']);
+        var p = gasCoerceNumber_(latestRow['원금총액']) || gasCoerceNumber_(latestRow['투자원금']);
+        if (v != null) totalValuation = v;
+        if (v != null && p != null && p > 0) {
+          totalRate = ((v - p) / p) * 100;
+        }
+      }
+      summaryCards.push({ id: 'total', title: '총 자산 평가', amount: totalValuation || 0, rate: totalRate });
+      
+      // 2) 연금 평가
+      var penValuation = 0, penPrincipal = 0, penFee = 0;
+      if (pension) {
+        for (var i = 0; i < pension.length; i++) {
+          var row = pension[i];
+          var title = String(row['상품명'] || row['종목명'] || row['이름'] || row['항목'] || '').trim();
+          if (!title || /합계|소계|^계$/.test(title)) continue;
+          penValuation += gasCoerceNumber_(row['평가금액']) || gasCoerceNumber_(row['평가금']) || 0;
+          penPrincipal += gasCoerceNumber_(row['투자원금']) || gasCoerceNumber_(row['원금']) || gasCoerceNumber_(row['납입원금']) || 0;
+          penFee += gasCoerceNumber_(row['수수료']) || 0;
+        }
+      }
+      var penRate = penPrincipal > 0 ? ((penValuation - penFee - penPrincipal) / penPrincipal) * 100 : null;
+      summaryCards.push({ id: 'pension', title: '연금 평가', amount: penValuation, rate: penRate });
+
+      // 3) ETF 평가
+      var etfValuation = 0, etfPrincipal = 0;
+      if (etf) {
+        for (var i = 0; i < etf.length; i++) {
+          var title = String(etf[i]['상품명'] || etf[i]['종목명'] || '').trim();
+          if (!/합계|소계|^계$/.test(title)) {
+             etfValuation += gasCoerceNumber_(etf[i]['평가금액']) || gasCoerceNumber_(etf[i]['평가금']) || 0;
+             etfPrincipal += gasCoerceNumber_(etf[i]['투자원금']) || gasCoerceNumber_(etf[i]['매수금액']) || gasCoerceNumber_(etf[i]['원금']) || 0;
+          }
+        }
+      }
+      var etfRate = etfPrincipal > 0 ? ((etfValuation - etfPrincipal) / etfPrincipal) * 100 : null;
+      summaryCards.push({ id: 'etf', title: 'ETF 평가', amount: etfValuation, rate: etfRate });
+      
+      // 4) ELS 투자 평가
+      var elsValuation = 0, elsSumRate = 0, elsInvCount = 0;
+      if (els) {
+        for (var i = 0; i < els.length; i++) {
+          var row = els[i];
+          var title = String(row['상품명'] || row['이름'] || '').trim();
+          if (/합계|소계|^계$/.test(title)) continue;
+          var v = gasCoerceNumber_(row['평가금액']) || gasCoerceNumber_(row['평가금']);
+          if (v != null) elsValuation += v;
+          var r = gasCoerceNumber_(row['수익률']);
+          if (r != null) {
+             elsSumRate += r;
+             elsInvCount++;
+          }
+        }
+      }
+      var rawElsRate = elsInvCount > 0 ? (elsSumRate / elsInvCount) : null;
+      var elsInvRate = rawElsRate != null ? (Math.abs(rawElsRate) < 1.5 ? rawElsRate * 100 : rawElsRate) : null;
+      summaryCards.push({ id: 'els', title: 'ELS 투자 평가', amount: elsValuation, rate: elsInvRate });
+      
+      // 5) ELS 누적 수익금
+      var elsProfitSum = 0, elsCompleteRateSum = 0, elsCompleteCount = 0;
+      if (elsListSheetData) {
+        for (var i = 0; i < elsListSheetData.length; i++) {
+          var row = elsListSheetData[i];
+          var pf = gasCoerceNumber_(row['수익']);
+          if (pf != null) elsProfitSum += pf;
+          var cr = gasCoerceNumber_(row['연수익률']);
+          if (cr != null) {
+            elsCompleteRateSum += cr;
+            elsCompleteCount++;
+          }
+        }
+      }
+      var rawCompleteRate = elsCompleteCount > 0 ? (elsCompleteRateSum / elsCompleteCount) : null;
+      var elsCompleteRate = rawCompleteRate != null ? (Math.abs(rawCompleteRate) < 1.5 ? rawCompleteRate * 100 : rawCompleteRate) : null;
+      summaryCards.push({ id: 'els-profit', title: 'ELS 누적 수익금', amount: elsProfitSum, rate: elsCompleteRate });
+
+      // 파이 차트 데이터 생성
+      var otherValuation = 0;
+      if (cashOther) {
+         for (var i = 0; i < cashOther.length; i++) {
+            var title = String(cashOther[i]['항목'] || cashOther[i]['이름'] || '').trim();
+            if (!/합계|소계|^계$/.test(title)) {
+               otherValuation += gasCoerceNumber_(cashOther[i]['평가금액']) || gasCoerceNumber_(cashOther[i]['잔여금']) || gasCoerceNumber_(cashOther[i]['잔액']) || 0;
+            }
+         }
+      }
+      var pieSum = etfValuation + elsValuation + penValuation + otherValuation;
+      if (pieSum > 0) {
+        if (etfValuation > 0) pieData.push({ name: 'ETF', value: Math.round((etfValuation / pieSum) * 1000) / 10, color: '#6366f1' });
+        if (elsValuation > 0) pieData.push({ name: 'ELS', value: Math.round((elsValuation / pieSum) * 1000) / 10, color: '#f59e0b' });
+        if (penValuation > 0) pieData.push({ name: '연금', value: Math.round((penValuation / pieSum) * 1000) / 10, color: '#10b981' });
+        if (otherValuation > 0) pieData.push({ name: '기타', value: Math.round((otherValuation / pieSum) * 1000) / 10, color: '#64748b' });
+      }
+    } catch(e) {}
   }
 
   return {
@@ -397,7 +500,9 @@ function getDashboardData(dataType) {
     elsSheetTotals: elsSheetTotals,
     elsCompleted: elsCompleted,
     cashOther: cashOther,
-    elsListSheetData: elsListSheetData
+    elsListSheetData: elsListSheetData,
+    summaryCards: summaryCards,
+    pieData: pieData
   };
 }
 

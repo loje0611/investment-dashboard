@@ -128,4 +128,8 @@ export interface DashboardSheetResponse {
   cashOther?: SheetDataRow[];
   /** 'ELS목록' 시트 데이터 */
   elsListSheetData?: ElsRow[];
+  /** 서버 연산 요약 카드 */
+  summaryCards?: import('../data/dashboardDummy').SummaryCardItem[];
+  /** 서버 연산 파이 차트 */
+  pieData?: import('../data/dashboardDummy').PieSegment[];
 }

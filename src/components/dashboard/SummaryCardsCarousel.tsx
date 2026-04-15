@@ -27,7 +27,7 @@ function HeroCard({ item, hideAmounts }: { item: SummaryCardItem; hideAmounts: b
       {item.rate != null && (
         <div className={`mt-2 flex items-center gap-1.5 text-sm font-semibold tabular-nums ${rateColor}`}>
           <Icon className="h-4 w-4" strokeWidth={2.5} />
-          <span>{symbol} {Math.abs(item.rate)}%</span>
+          <span>{symbol} {Math.abs(item.rate).toFixed(2)}%</span>
           <span className="ml-1 text-xs font-normal text-white/50">투자원금 대비</span>
         </div>
       )}
@@ -55,7 +55,7 @@ function SummaryCardSlide({
       </p>
       {item.rate != null && (
         <p className={`mt-1 text-xs font-semibold tabular-nums ${rateColor}`}>
-          {symbol} {Math.abs(item.rate)}%
+          {symbol} {Math.abs(item.rate).toFixed(2)}%
         </p>
       )}
     </div>
