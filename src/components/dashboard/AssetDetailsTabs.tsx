@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Bar, BarChart, Cell, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
-import { ElsRiskProgressBar } from '../ElsRiskProgressBar'
-import type { ElsCardItem, EtfRow, PensionRow } from '../../data/dashboardDummy'
+import type { EtfRow, PensionRow } from '../../data/dashboardDummy'
 import { formatWonDigits } from '../../utils/maskSensitiveAmount'
 
-type TabId = 'els' | 'etf' | 'pension'
+type TabId = 'etf' | 'pension'
 
 interface AssetDetailsTabsProps {
-  elsList: ElsCardItem[]
   etfTable: EtfRow[]
   pensionTable: PensionRow[]
   /** 상세 현황 데이터 로딩 중일 때 true */
@@ -54,16 +52,14 @@ function BarSparkline({ data }: { data: number[] }) {
 }
 
 export function AssetDetailsTabs({
-  elsList,
   etfTable,
   pensionTable,
   isLoading = false,
   hideAmounts,
 }: AssetDetailsTabsProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('els')
+  const [activeTab, setActiveTab] = useState<TabId>('etf')
 
   const tabs: { id: TabId; label: string }[] = [
-    { id: 'els', label: 'ELS 현황' },
     { id: 'etf', label: 'ETF 현황' },
     { id: 'pension', label: '연금 현황' },
   ]
@@ -105,42 +101,6 @@ export function AssetDetailsTabs({
           </div>
         ) : (
           <AnimatePresence mode="wait">
-            {activeTab === 'els' && (
-              <motion.div
-                key="els"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-4"
-              >
-                {elsList.map((item, i) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: i * 0.05 }}
-                    className="rounded-lg border border-slate-200 bg-slate-50/50 p-4"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-medium text-slate-900">{item.productName}</p>
-                      <p className="shrink-0 text-sm text-slate-500 tabular-nums">
-                        {item.nextRedemptionDate}
-                      </p>
-                    </div>
-                    <div className="mt-3">
-                      <ElsRiskProgressBar
-                        currentLevel={item.currentLevel}
-                        kiBarrier={item.kiBarrier}
-                        redemptionBarrier={item.redemptionBarrier}
-                        barHeight="h-3"
-                      />
-                    </div>
-                  </motion.div>
-                ))}
-              </motion.div>
-            )}
-
             {activeTab === 'etf' && (
               <motion.div
                 key="etf"

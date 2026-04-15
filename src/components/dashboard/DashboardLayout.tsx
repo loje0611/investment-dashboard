@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useStore, useElsProductsWithMappings } from '../../store/useStore'
+import { useStore } from '../../store/useStore'
 import { getWorstPerformer } from '../../utils/elsWorstPerformer'
 import { portfolioToEtfRows } from '../../utils/portfolioToEtf'
 import { pensionToRows } from '../../utils/pensionToRows'
@@ -56,22 +56,6 @@ function sheetRowIndexFromRow(row: ElsRow): number | undefined {
   return Number.isFinite(n) ? n : undefined
 }
 
-function getNextRedemptionDate(row: Record<string, unknown>): string {
-  const next = row['다음 평가일']
-  if (next != null && String(next).trim() !== '') return String(next).trim()
-  const first = row['1차 날짜']
-  if (first != null && String(first).trim() !== '') return String(first).trim()
-  return ''
-}
-
-function formatRedemptionDateDisplay(dateStr: string): string {
-  if (!dateStr || dateStr === '-') return dateStr
-  const s = String(dateStr).trim()
-  const beforeT = s.split('T')[0]
-  if (beforeT && /^\d{4}-\d{2}-\d{2}$/.test(beforeT)) return beforeT
-  return s
-}
-
 function HomeLoadingScreen() {
   return (
     <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 py-16 text-slate-500">
@@ -86,7 +70,6 @@ function HomeLoadingScreen() {
 
 export function DashboardLayout() {
   const {
-    els,
     etf,
     pension,
     portfolio,
@@ -103,7 +86,6 @@ export function DashboardLayout() {
     clearError,
     hideAmounts,
   } = useStore()
-  const elsProducts = useElsProductsWithMappings()
   const [mainTab, setMainTab] = useState<MainTabId>('home')
   const [isElsRegisterModalOpen, setIsElsRegisterModalOpen] = useState(false)
   const [redeemTarget, setRedeemTarget] = useState<ElsCardItem | null>(null)
@@ -111,28 +93,6 @@ export function DashboardLayout() {
   useEffect(() => {
     fetchData()
   }, [fetchData])
-
-  const elsListForTab = useMemo((): ElsCardItem[] => {
-    if (!els.length) return []
-    return els.map((row, i) => {
-      const product = elsProducts[i]
-      const worst = product != null ? getWorstPerformer(product) : null
-      const levelFromWorst = worst != null ? 100 + worst.percentage : 0
-      const currentLevel = getCurrentLevelFromRow(row, levelFromWorst)
-      const kiBarrier = parseBarrierPercent(row.낙인배리어 ?? row.KI) || 70
-      const redemptionBarrier = parseBarrierPercent(row.상환배리어 ?? row['다음 배리어']) || 90
-      const nextDate = getNextRedemptionDate(row)
-      const productName = row.상품명 != null ? String(row.상품명).trim() : ''
-      return {
-        id: `els-${i}`,
-        productName: productName || '-',
-        nextRedemptionDate: nextDate ? formatRedemptionDateDisplay(nextDate) : '-',
-        currentLevel,
-        kiBarrier,
-        redemptionBarrier,
-      }
-    })
-  }, [els, elsProducts])
 
   const elsListManageTab = useMemo((): ElsCardItem[] => {
     if (!elsListSheetData.length) return []
@@ -276,7 +236,6 @@ export function DashboardLayout() {
             </div>
             <div className="flex min-h-0 flex-1 flex-col px-4 pb-4">
               <AssetDetailsTabs
-                elsList={elsListForTab}
                 etfTable={etfTableForTab}
                 pensionTable={pensionTableForTab}
                 isLoading={isLoading || isLoadingAssets}
