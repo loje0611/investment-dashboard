@@ -23,36 +23,36 @@ export function ElsRiskProgressBar({ currentLevel, kiBarrier, redemptionBarrier,
   const isBelowKi = level < ki;
   const isAtOrAboveRedemption = level >= redemption;
 
-  const fillColorClass = isBelowKi
-    ? 'bg-loss'
+  const fillColor = isBelowKi
+    ? '#F87171'
     : isAtOrAboveRedemption
-      ? 'bg-profit'
-      : 'bg-[var(--color-chart-3)]';
+      ? '#34D399'
+      : '#FBBF24';
 
   return (
     <div className="w-full" role="img" aria-label={`현재 ${level.toFixed(1)}%, 낙인(KI) ${kiBarrier}%, 조기상환 ${redemptionBarrier}%`}>
-      <div className={`relative w-full ${barHeight} overflow-visible rounded-full bg-surface-primary`}>
+      <div className={`relative w-full ${barHeight} overflow-visible rounded-full bg-[#1E293B]`}>
         <div
-          className={`absolute left-0 top-0 h-full rounded-full transition-all duration-300 ${fillColorClass}`}
-          style={{ width: `${levelBar}%` }}
+          className="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
+          style={{ width: `${levelBar}%`, backgroundColor: fillColor }}
         />
         <div
-          className="absolute top-1/2 z-10 h-6 w-0.5 -translate-x-px -translate-y-1/2 bg-content-tertiary"
+          className="absolute top-1/2 z-10 h-6 w-0.5 -translate-x-px -translate-y-1/2 bg-slate-400"
           style={{ left: `${kiBar}%` }}
           title={`낙인(KI) ${kiBarrier}%`}
           aria-hidden
         />
         <div
-          className="absolute top-1/2 z-10 h-6 w-0.5 -translate-x-px -translate-y-1/2 bg-content-secondary"
+          className="absolute top-1/2 z-10 h-6 w-0.5 -translate-x-px -translate-y-1/2 bg-slate-300"
           style={{ left: `${redemptionBar}%` }}
           title={`조기상환 ${redemptionBarrier}%`}
           aria-hidden
         />
       </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-content-tertiary">
-        <span>KI(낙인) {kiBarrier}%</span>
-        <span>조기상환 {redemptionBarrier}%</span>
-        <span className="ml-auto tabular-nums">현재 {level.toFixed(1)}%</span>
+      <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-slate-300">
+        <span>KI(낙인) <strong className="text-slate-100">{kiBarrier}%</strong></span>
+        <span>조기상환 <strong className="text-slate-100">{redemptionBarrier}%</strong></span>
+        <span className="ml-auto font-semibold tabular-nums text-slate-100">현재 {level.toFixed(1)}%</span>
       </div>
     </div>
   );

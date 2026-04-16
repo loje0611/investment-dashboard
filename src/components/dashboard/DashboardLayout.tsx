@@ -106,9 +106,10 @@ export function DashboardLayout() {
   const handleSyncAll = useCallback(async () => {
     if (!window.confirm('현재 자산 현황을 시트에 기록하시겠습니까?')) return
     setIsSyncingAll(true)
+    setSyncToast({ message: '기록 중…', tone: 'success' })
     try {
       await postSyncAllInvestment()
-      setSyncToast({ message: '모든 데이터가 성공적으로 기록되었습니다.', tone: 'success' })
+      setSyncToast({ message: '정산 완료', tone: 'success' })
       await fetchData()
     } catch (e) {
       const msg = e instanceof Error ? e.message : '동기화에 실패했습니다.'

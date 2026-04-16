@@ -162,7 +162,18 @@ export function GlobalOverview({ pieData, principalValuationTrend, totalAssetsRo
                   >
                     {pieData.map((entry, i) => (<Cell key={`cell-${i}`} fill={entry.color} />))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => [`${formatPiePercent(value)}%`, '비중']} contentStyle={{ backgroundColor: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-strong)', borderRadius: '0.75rem', color: 'var(--color-text-primary)' }} />
+                  <Tooltip
+                    formatter={(value: number) => [`${formatPiePercent(value)}%`, '비중']}
+                    contentStyle={{
+                      backgroundColor: 'rgba(15, 18, 25, 0.95)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: '0.75rem',
+                      color: '#FFFFFF',
+                      backdropFilter: 'blur(12px)',
+                    }}
+                    itemStyle={{ color: '#E2E8F0' }}
+                    labelStyle={{ color: '#CBD5E1', fontWeight: 600, marginBottom: 4 }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>

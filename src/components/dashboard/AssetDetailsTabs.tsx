@@ -5,7 +5,6 @@ import { formatWonDigits } from '../../utils/maskSensitiveAmount'
 import { ProductHistoryModal } from './ProductHistoryModal'
 import type { ProductHistoryKind } from '../../api/api'
 import { ElsRiskProgressBar } from '../ElsRiskProgressBar'
-import { Sparkline } from '../ui/Sparkline'
 import { SkeletonCard } from '../ui/SkeletonCard'
 
 type TabId = 'etf' | 'pension' | 'els'
@@ -20,12 +19,11 @@ interface AssetDetailsTabsProps {
   onElsRedeem?: (item: ElsCardItem) => void
 }
 
-function AssetCard({ name, principal, valuation, returnRate, sparkData, hideAmounts, onTap, index }: {
-  name: string; principal: number; valuation: number; returnRate: number
-  sparkData?: number[]; hideAmounts: boolean; onTap: () => void; index: number
+function AssetCard({ name, valuation, returnRate, hideAmounts, onTap, index }: {
+  name: string; valuation: number; returnRate: number
+  hideAmounts: boolean; onTap: () => void; index: number
 }) {
   const isProfit = returnRate >= 0
-  const profit = valuation - principal
 
   return (
     <motion.button
@@ -37,30 +35,16 @@ function AssetCard({ name, principal, valuation, returnRate, sparkData, hideAmou
       transition={{ duration: 0.3, delay: index * 0.05 }}
       className="w-full rounded-2xl border border-stroke bg-surface-card p-4 text-left transition-colors hover:bg-surface-hover active:scale-[0.98]"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-accent">{name}</p>
-          <p className="mt-1.5 text-lg font-bold tabular-nums leading-snug text-content-primary">
-            ₩{formatWonDigits(hideAmounts, valuation)}
-          </p>
-          <div className="mt-1 flex items-center gap-2">
-            <span className={`text-xs font-semibold tabular-nums ${isProfit ? 'text-profit' : 'text-loss'}`}>
-              {isProfit ? '+' : ''}{returnRate.toFixed(2)}%
-            </span>
-            <span className="text-[11px] tabular-nums text-content-tertiary">
-              {isProfit ? '+' : ''}₩{formatWonDigits(hideAmounts, profit)}
-            </span>
-          </div>
-        </div>
-        {sparkData && sparkData.length >= 2 && (
-          <div className="shrink-0 pt-1">
-            <Sparkline data={sparkData} width={72} height={32} />
-          </div>
-        )}
-      </div>
-      <div className="mt-3 flex items-center justify-between border-t border-stroke pt-2.5">
-        <span className="text-[11px] text-content-tertiary">투자원금</span>
-        <span className="text-xs tabular-nums text-content-secondary">₩{formatWonDigits(hideAmounts, principal)}</span>
+      <p className="truncate text-sm font-semibold text-accent">{name}</p>
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <p className="text-xl font-bold tabular-nums leading-snug text-content-primary">
+          ₩{formatWonDigits(hideAmounts, valuation)}
+        </p>
+        <span className={`shrink-0 rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums ${
+          isProfit ? 'bg-profit-bg text-profit' : 'bg-loss-bg text-loss'
+        }`}>
+          {isProfit ? '+' : ''}{returnRate.toFixed(2)}%
+        </span>
       </div>
     </motion.button>
   )
@@ -149,8 +133,8 @@ export function AssetDetailsTabs({
                     {etfTable.map((row, i) => (
                       <AssetCard
                         key={row.id} name={row.name} index={i}
-                        principal={row.principal} valuation={row.valuation} returnRate={row.returnRate}
-                        sparkData={row.sparklineData} hideAmounts={hideAmounts}
+                        valuation={row.valuation} returnRate={row.returnRate}
+                        hideAmounts={hideAmounts}
                         onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'ETF' })}
                       />
                     ))}
@@ -168,8 +152,8 @@ export function AssetDetailsTabs({
                     {pensionTable.map((row, i) => (
                       <AssetCard
                         key={row.id} name={row.name} index={i}
-                        principal={row.principal} valuation={row.valuation} returnRate={row.returnRate}
-                        sparkData={row.monthlyDeltas} hideAmounts={hideAmounts}
+                        valuation={row.valuation} returnRate={row.returnRate}
+                        hideAmounts={hideAmounts}
                         onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'PENSION' })}
                       />
                     ))}
@@ -202,8 +186,8 @@ export function AssetDetailsTabs({
                           className="w-full rounded-2xl border border-stroke bg-surface-card p-4 text-left transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="font-semibold text-content-primary">{item.productName}</p>
-                            <p className="shrink-0 text-xs tabular-nums text-content-tertiary">{item.nextRedemptionDate}</p>
+                            <p className="font-semibold text-slate-100">{item.productName}</p>
+                            <p className="shrink-0 text-xs font-medium tabular-nums text-slate-300">{item.nextRedemptionDate}</p>
                           </div>
                           <div className="mt-3">
                             <ElsRiskProgressBar currentLevel={item.currentLevel} kiBarrier={item.kiBarrier} redemptionBarrier={item.redemptionBarrier} barHeight="h-3" />

@@ -29,31 +29,6 @@ const DONUT_COLORS = [
   '#EC4899', '#14B8A6',
 ]
 
-function WeightBar({ current, target }: { current: number; target: number }) {
-  const c = Math.min(100, Math.max(0, current))
-  const t = Math.min(100, Math.max(0, target))
-
-  return (
-    <div
-      className="h-1 w-full overflow-hidden rounded-full bg-surface-primary"
-      role="meter"
-      aria-valuenow={c}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-label={`현재 비중 ${c.toFixed(1)}%, 목표 ${t.toFixed(1)}%`}
-    >
-      <div className="relative flex h-full w-full">
-        <div className="bg-content-tertiary/50" style={{ width: `${c}%` }} />
-        <div
-          className="absolute top-0 h-full w-0.5 bg-accent"
-          style={{ left: `${t}%` }}
-          aria-hidden
-        />
-      </div>
-    </div>
-  )
-}
-
 export function RebalancingActionCenter({ accounts, isLoading = false, compact = false, hideAmounts }: RebalancingActionCenterProps) {
   const [selectedId, setSelectedId] = useState(accounts[0]?.id ?? 'all')
   const [additionalInvestment, setAdditionalInvestment] = useState<string>('')
@@ -210,40 +185,46 @@ export function RebalancingActionCenter({ accounts, isLoading = false, compact =
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-content-primary">{row.name}</p>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-content-tertiary">
+                    <p className="text-base font-semibold text-content-primary">{row.name}</p>
+                    <div className="mt-1.5 flex items-center gap-2.5 text-sm text-content-secondary">
                       <span className="tabular-nums">{row.quantity}주</span>
-                      <span>·</span>
+                      <span className="text-content-tertiary">·</span>
                       <span className="tabular-nums">₩{formatWonDigits(hideAmounts, row.currentPrice)}</span>
                     </div>
                   </div>
                   {row.rebalancingShares > 0 ? (
-                    <span className="shrink-0 rounded-lg bg-profit-bg px-2.5 py-1 text-xs font-semibold text-profit">
+                    <span className="shrink-0 rounded-lg bg-profit-bg px-3 py-1.5 text-sm font-bold text-profit">
                       +{row.rebalancingShares}주 매수
                     </span>
                   ) : row.rebalancingShares < 0 ? (
-                    <span className="shrink-0 rounded-lg bg-loss-bg px-2.5 py-1 text-xs font-semibold text-loss">
+                    <span className="shrink-0 rounded-lg bg-loss-bg px-3 py-1.5 text-sm font-bold text-loss">
                       {row.rebalancingShares}주 매도
                     </span>
                   ) : (
-                    <span className="shrink-0 rounded-lg bg-surface-elevated px-2.5 py-1 text-xs font-semibold text-content-tertiary">
+                    <span className="shrink-0 rounded-lg bg-surface-elevated px-3 py-1.5 text-sm font-bold text-content-tertiary">
                       유지
                     </span>
                   )}
                 </div>
-                <div className="mt-3 space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-content-tertiary">현재 {row.currentWeight.toFixed(1)}%</span>
-                    <span className="text-content-tertiary">목표 {row.targetWeight.toFixed(1)}%</span>
-                    <span className={`font-semibold tabular-nums ${delta >= 0 ? 'text-profit' : 'text-loss'}`}>
+                <div className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-surface-elevated px-3.5 py-3">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[11px] text-content-tertiary">현재</span>
+                    <span className="text-sm font-bold tabular-nums text-content-primary">{row.currentWeight.toFixed(1)}%</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[11px] text-content-tertiary">목표</span>
+                    <span className="text-sm font-bold tabular-nums text-content-primary">{row.targetWeight.toFixed(1)}%</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[11px] text-content-tertiary">차이</span>
+                    <span className={`text-sm font-bold tabular-nums ${delta >= 0 ? 'text-profit' : 'text-loss'}`}>
                       {delta >= 0 ? '+' : ''}{delta.toFixed(1)}%p
                     </span>
                   </div>
-                  <WeightBar current={row.currentWeight} target={row.targetWeight} />
                 </div>
-                <div className="mt-2.5 flex items-center justify-between text-[11px]">
-                  <span className="text-content-tertiary">평가금액</span>
-                  <span className="font-medium tabular-nums text-content-secondary">₩{formatWonDigits(hideAmounts, row.currentValue)}</span>
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-xs text-content-tertiary">평가금액</span>
+                  <span className="text-sm font-semibold tabular-nums text-content-primary">₩{formatWonDigits(hideAmounts, row.currentValue)}</span>
                 </div>
               </motion.div>
             )
