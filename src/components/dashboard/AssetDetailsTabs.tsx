@@ -31,6 +31,7 @@ function AssetCard({ name, principal, valuation, returnRate, sparkData, hideAmou
     <motion.button
       type="button"
       onClick={onTap}
+      aria-label={`${name} — 평가금 ${valuation.toLocaleString('ko-KR')}원, 수익률 ${returnRate.toFixed(2)}%`}
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
@@ -90,13 +91,17 @@ export function AssetDetailsTabs({
       />
 
       {/* Tab Pills */}
-      <div className="mb-3 flex shrink-0 gap-1.5">
+      <div className="mb-3 flex shrink-0 gap-1.5" role="tablist" aria-label="자산 유형">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id
           return (
             <button
               key={tab.id}
               type="button"
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={`tabpanel-${tab.id}`}
+              id={`tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={`relative rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                 isActive ? 'text-content-primary' : 'text-content-tertiary hover:text-content-secondary'
@@ -123,7 +128,12 @@ export function AssetDetailsTabs({
       </div>
 
       {/* Content */}
-      <div className="min-h-0 flex-1 overflow-auto scrollbar-hide">
+      <div
+        className="min-h-0 flex-1 overflow-auto scrollbar-hide"
+        role="tabpanel"
+        id={`tabpanel-${activeTab}`}
+        aria-labelledby={`tab-${activeTab}`}
+      >
         {isLoading ? (
           <div className="space-y-3">
             {[0, 1, 2].map((i) => <SkeletonCard key={i} lines={2} />)}

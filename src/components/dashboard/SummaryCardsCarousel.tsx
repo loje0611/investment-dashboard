@@ -1,11 +1,23 @@
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { SummaryCardItem } from '../../data/dashboardDummy'
-import { formatWonDigits } from '../../utils/maskSensitiveAmount'
+import { useCountUp } from '../../hooks/useCountUp'
 
 interface SummaryCardsCarouselProps {
   items: SummaryCardItem[]
   hideAmounts: boolean
+}
+
+function formatWon(n: number): string {
+  return n.toLocaleString('ko-KR')
+}
+
+const MASK = '#'
+
+function HeroAmount({ amount, hide }: { amount: number; hide: boolean }) {
+  const display = useCountUp(amount, 900)
+  if (hide) return <>{MASK}</>
+  return <>{formatWon(display)}</>
 }
 
 function HeroCard({ item, hideAmounts }: { item: SummaryCardItem; hideAmounts: boolean }) {
@@ -24,7 +36,7 @@ function HeroCard({ item, hideAmounts }: { item: SummaryCardItem; hideAmounts: b
 
       <p className="mb-1 text-sm font-medium text-content-secondary">{item.title}</p>
       <p className="text-[28px] font-bold tracking-tight tabular-nums text-content-primary leading-tight">
-        {item.amount != null ? `₩${formatWonDigits(hideAmounts, item.amount)}` : '-'}
+        ₩{item.amount != null ? <HeroAmount amount={item.amount} hide={hideAmounts} /> : '-'}
       </p>
       {item.rate != null && (
         <div className={`mt-2.5 flex items-center gap-1.5 text-sm font-semibold tabular-nums ${isProfit ? 'text-profit' : 'text-loss'}`}>
@@ -50,7 +62,7 @@ function BentoCard({ item, hideAmounts, index }: { item: SummaryCardItem; hideAm
       <p className="text-[11px] font-medium uppercase tracking-wide text-content-tertiary">{item.title}</p>
       <div className="mt-2">
         <p className="text-lg font-bold tabular-nums leading-snug text-content-primary">
-          {item.amount != null ? `₩${formatWonDigits(hideAmounts, item.amount)}` : '-'}
+          {item.amount != null ? `₩${hideAmounts ? MASK : formatWon(item.amount)}` : '-'}
         </p>
         {item.rate != null && (
           <p className={`mt-1 text-xs font-semibold tabular-nums ${isProfit ? 'text-profit' : 'text-loss'}`}>

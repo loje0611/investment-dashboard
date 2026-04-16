@@ -34,13 +34,20 @@ function WeightBar({ current, target }: { current: number; target: number }) {
   const t = Math.min(100, Math.max(0, target))
 
   return (
-    <div className="h-1 w-full overflow-hidden rounded-full bg-surface-primary">
+    <div
+      className="h-1 w-full overflow-hidden rounded-full bg-surface-primary"
+      role="meter"
+      aria-valuenow={c}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={`현재 비중 ${c.toFixed(1)}%, 목표 ${t.toFixed(1)}%`}
+    >
       <div className="relative flex h-full w-full">
         <div className="bg-content-tertiary/50" style={{ width: `${c}%` }} />
-        {/* Target marker */}
         <div
           className="absolute top-0 h-full w-0.5 bg-accent"
           style={{ left: `${t}%` }}
+          aria-hidden
         />
       </div>
     </div>
@@ -110,13 +117,15 @@ export function RebalancingActionCenter({ accounts, isLoading = false, compact =
       <div className="flex-1 overflow-auto scrollbar-hide px-4">
         {/* Controls */}
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto scrollbar-hide">
+          <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto scrollbar-hide" role="tablist" aria-label="계좌 선택">
             {accounts.map((acc) => {
               const isActive = selectedId === acc.id
               return (
                 <button
                   key={acc.id}
                   type="button"
+                  role="tab"
+                  aria-selected={isActive}
                   onClick={() => setSelectedId(acc.id)}
                   className={`relative shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
                     isActive ? 'text-content-primary' : 'text-content-tertiary hover:text-content-secondary'
@@ -143,6 +152,7 @@ export function RebalancingActionCenter({ accounts, isLoading = false, compact =
             type="text"
             inputMode="numeric"
             placeholder="0"
+            aria-label="추가 투자금 입력"
             value={additionalInvestment}
             onChange={(e) => setAdditionalInvestment(e.target.value)}
             className="min-w-0 flex-1 bg-transparent text-right text-sm tabular-nums text-content-primary outline-none placeholder:text-content-tertiary"

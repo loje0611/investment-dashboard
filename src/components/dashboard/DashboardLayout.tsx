@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useShallow } from 'zustand/react/shallow'
-import { Loader2, Calculator } from 'lucide-react'
+import { Loader2, Calculator, RefreshCw } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import { getWorstPerformer } from '../../utils/elsWorstPerformer'
 import { portfolioToEtfRows } from '../../utils/portfolioToEtf'
@@ -25,6 +25,7 @@ import {
   ELS_SINGLE_PRICE_MAPPING,
   elsRowsToElsProductsWithMappings,
 } from '../../utils/elsRowToProduct'
+import { generateInsightText } from '../../utils/generateInsight'
 import type { ElsCardItem, EtfRow, PensionRow } from '../../data/dashboardDummy'
 import type { ElsRow } from '../../types/api'
 import { SummaryCardsCarousel } from './SummaryCardsCarousel'
@@ -34,6 +35,8 @@ import { EmptyState } from '../ui/EmptyState'
 import { HomeSkeleton } from '../ui/SkeletonCard'
 import { Toast, type ToastData } from '../ui/Toast'
 import { postSyncAllInvestment } from '../../api/api'
+import { usePullToRefresh } from '../../hooks/usePullToRefresh'
+import { useHashTab } from '../../hooks/useHashTab'
 
 const GlobalOverview = lazy(() => import('./GlobalOverview').then(m => ({ default: m.GlobalOverview })))
 const AssetDetailsTabs = lazy(() => import('./AssetDetailsTabs').then(m => ({ default: m.AssetDetailsTabs })))
@@ -41,6 +44,7 @@ const RebalancingActionCenter = lazy(() => import('./RebalancingActionCenter').t
 const ElsRegisterModal = lazy(() => import('./ElsRegisterModal').then(m => ({ default: m.ElsRegisterModal })))
 const ElsRedeemModal = lazy(() => import('./ElsRedeemModal').then(m => ({ default: m.ElsRedeemModal })))
 
+const VALID_TABS = ['home', 'assets', 'rebalancing'] as const
 const ELS_TRY_MAPPINGS_FOR_SHEET = [
   ELS_INVESTING_SHEET_MAPPING, ELS_SINGLE_PRICE_MAPPING, DEFAULT_ELS_ASSET_MAPPING,
 ]
@@ -86,13 +90,18 @@ export function DashboardLayout() {
   )
   const fetchData = useStore((s) => s.fetchData)
   const clearError = useStore((s) => s.clearError)
-  const [mainTab, setMainTab] = useState<MainTabId>('home')
+
+  const [mainTab, setMainTab] = useHashTab<MainTabId>(VALID_TABS, 'home')
   const [isElsRegisterModalOpen, setIsElsRegisterModalOpen] = useState(false)
   const [redeemTarget, setRedeemTarget] = useState<ElsCardItem | null>(null)
   const [isSyncingAll, setIsSyncingAll] = useState(false)
   const [syncToast, setSyncToast] = useState<ToastData | null>(null)
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  const { scrollRef, pullDistance, refreshing, handlers } = usePullToRefresh(
+    useCallback(async () => { await fetchData() }, [fetchData])
+  )
 
   const handleSyncAll = useCallback(async () => {
     if (!window.confirm('현재 자산 현황을 시트에 기록하시겠습니까?')) return
@@ -146,6 +155,7 @@ export function DashboardLayout() {
     }
     return []
   }, [rebalancing])
+  const insightText = useMemo(() => generateInsightText(principalValuationTrend), [principalValuationTrend])
 
   return (
     <div className="min-h-screen bg-surface-primary">
@@ -153,7 +163,23 @@ export function DashboardLayout() {
         <div className="relative min-h-[calc(100vh-3.5rem)]">
 
           {mainTab === 'home' && (
-            <div className="absolute inset-0 overflow-y-auto overflow-x-hidden scrollbar-hide">
+            <div
+              ref={scrollRef}
+              className="absolute inset-0 overflow-y-auto overflow-x-hidden scrollbar-hide"
+              {...handlers}
+            >
+              {/* Pull to refresh indicator */}
+              <div
+                className="flex items-center justify-center overflow-hidden transition-[height] duration-200"
+                style={{ height: pullDistance > 0 ? pullDistance : 0 }}
+                aria-hidden
+              >
+                <RefreshCw
+                  className={`h-5 w-5 text-accent transition-transform ${refreshing ? 'animate-spin' : ''}`}
+                  style={{ transform: refreshing ? undefined : `rotate(${Math.min(pullDistance * 3, 360)}deg)` }}
+                />
+              </div>
+
               <div className="flex flex-col pb-6">
                 <PageHeader title="종합 자산" />
                 <div className="px-4">
@@ -183,6 +209,21 @@ export function DashboardLayout() {
                           />
                         )}
                       </div>
+
+                      {/* Smart Insight */}
+                      {insightText && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.3 }}
+                          className="mb-4 rounded-xl bg-accent-muted px-4 py-3"
+                        >
+                          <p className="text-xs font-medium leading-relaxed text-accent">
+                            💡 {insightText}
+                          </p>
+                        </motion.div>
+                      )}
+
                       <div className="space-y-4">
                         <h2 className="text-sm font-semibold text-content-secondary">전체 현황</h2>
                         <Suspense fallback={<LazyChunkFallback label="차트 영역을 불러오는 중…" />}>
