@@ -4,7 +4,6 @@ import { useStore } from '../../store/useStore'
 import { getWorstPerformer } from '../../utils/elsWorstPerformer'
 import { portfolioToEtfRows } from '../../utils/portfolioToEtf'
 import { pensionToRows } from '../../utils/pensionToRows'
-import { portfolioToRebalancingAccounts } from '../../utils/portfolioToRebalancing'
 import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAccounts'
 import { totalAssetsToPrincipalValuationTrend } from '../../utils/totalAssetsToPrincipalValuation'
 import {
@@ -76,14 +75,12 @@ function HomeLoadingScreen() {
 
 export function DashboardLayout() {
   const {
-    etf,
-    pension,
-    portfolio,
+    etfList,
+    pensionList,
     rebalancing,
     totalAssets,
     elsListSheetData,
     summaryCards,
-    pieData,
     isLoading,
     isLoadingAssets,
     isLoadingRebalancing,
@@ -91,7 +88,6 @@ export function DashboardLayout() {
     fetchData,
     clearError,
     hideAmounts,
-    sheetErrors,
   } = useStore()
   const [mainTab, setMainTab] = useState<MainTabId>('home')
   const [isElsRegisterModalOpen, setIsElsRegisterModalOpen] = useState(false)
@@ -159,21 +155,21 @@ export function DashboardLayout() {
   }, [elsListSheetData])
 
   const etfTableForTab = useMemo((): EtfRow[] => {
-    if (!etf.length) return []
-    return portfolioToEtfRows(etf)
-  }, [etf])
+    if (!etfList.length) return []
+    return portfolioToEtfRows(etfList)
+  }, [etfList])
 
   const pensionTableForTab = useMemo((): PensionRow[] => {
-    if (!pension.length) return []
-    return pensionToRows(pension)
-  }, [pension])
+    if (!pensionList.length) return []
+    return pensionToRows(pensionList)
+  }, [pensionList])
 
   const principalValuationTrend = useMemo(
     () => totalAssetsToPrincipalValuationTrend(totalAssets),
     [totalAssets]
   )
 
-  /** 총자산 14열 최신 행 기준(헤더 정확 매칭). 없으면 API 요약·파이 사용 */
+  /** 총자산 14열 최신 행 기준(헤더 정확 매칭). 없으면 API summaryCards 사용 */
   const homeSummaryCards = useMemo(
     () =>
       mergeSummaryWithElsProfitCard(
@@ -183,19 +179,18 @@ export function DashboardLayout() {
     [totalAssets, summaryCards]
   )
 
-  const homePieData = useMemo(() => {
-    const fromTotal = buildPieSegmentsFromLatestTotalAssets(totalAssets)
-    return fromTotal.length > 0 ? fromTotal : pieData || []
-  }, [totalAssets, pieData])
+  const homePieData = useMemo(
+    () => buildPieSegmentsFromLatestTotalAssets(totalAssets),
+    [totalAssets]
+  )
 
   const rebalancingAccounts = useMemo(() => {
     if (rebalancing && rebalancing.length > 0) {
       const fromTables = rebalancingTablesToAccounts(rebalancing)
       if (fromTables.length > 0) return fromTables
     }
-    const fromPortfolio = portfolioToRebalancingAccounts(portfolio)
-    return fromPortfolio.length > 0 ? fromPortfolio : []
-  }, [rebalancing, portfolio])
+    return []
+  }, [rebalancing])
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -289,7 +284,6 @@ export function DashboardLayout() {
                 etfTable={etfTableForTab}
                 pensionTable={pensionTableForTab}
                 isLoading={isLoading || isLoadingAssets}
-                sheetErrors={sheetErrors}
                 hideAmounts={hideAmounts}
               />
             </div>

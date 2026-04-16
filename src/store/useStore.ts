@@ -3,14 +3,11 @@ import { create } from 'zustand';
 import { fetchDashboardData } from '../api/api';
 import type {
   TotalAssetRow,
-  PortfolioRow,
   EtfSheetRow,
   PensionSheetRow,
   ElsRow,
   RebalancingTable,
   SheetDataRow,
-  ElsCompletedRow,
-  ElsSheetTotals,
 } from '../types/api';
 import type { ElsProduct, AssetColumnMapping } from '../types/els';
 import {
@@ -22,76 +19,56 @@ import {
 } from '../utils/elsRowToProduct';
 
 export interface DashboardState {
-  /** 총자산 데이터 */
   totalAssets: TotalAssetRow[];
-  /** 포트폴리오 데이터 (포트(New) 시트) */
-  portfolio: PortfolioRow[];
-  /** ETF현황 시트 (자산 상세 탭) */
-  etf: EtfSheetRow[];
-  /** 연금현황 시트 (자산 상세 탭) */
-  pension: PensionSheetRow[];
-  /** 리밸런싱용 계좌별 표 (포트 Old/New 시트에서 파싱) */
+  etfList: EtfSheetRow[];
+  pensionList: PensionSheetRow[];
   rebalancing: RebalancingTable[];
-  /** ELS 데이터 */
-  els: ElsRow[];
-  /** 'ELS' 시트 B4·C4 요약 (없으면 null) */
-  elsSheetTotals: ElsSheetTotals | null;
-  /** ELS(완료) 시트 */
-  elsCompleted: ElsCompletedRow[];
-  /** 현금(기타) 시트 */
   cashOther: SheetDataRow[];
-  /** ELS목록 시트 */
   elsListSheetData: ElsRow[];
-  /** 서버 연산 요약 카드 */
   summaryCards: import('../data/dashboardDummy').SummaryCardItem[];
-  /** 서버 연산 파이 차트 */
-  pieData: import('../data/dashboardDummy').PieSegment[];
-  /** GAS가 반환한 시트 오류 안내(ETF현황·연금현황 등) */
-  sheetErrors: string[];
-  /** 로딩 여부 (전체 또는 summary) */
   isLoading: boolean;
-  /** 자산 상세(ELS/ETF/연금) 로딩 여부 */
   isLoadingAssets: boolean;
-  /** 리밸런싱 데이터 로딩 여부 */
   isLoadingRebalancing: boolean;
-  /** 에러 메시지 (없으면 null) */
   error: string | null;
-  /** 홈 등에서 금액을 #으로 마스크 */
   hideAmounts: boolean;
 }
 
 export interface DashboardActions {
-  /** 진입 시: 웹앱에서 전체 데이터(summary·assets·rebalancing)를 한 번에 조회 */
   fetchData: (endpoint?: string) => Promise<void>;
-  /** 자산 상세용(els, etf, pension)만 조회 (탭 전용 또는 보강) */
   fetchAssets: (endpoint?: string) => Promise<void>;
-  /** 리밸런싱용(portfolio, rebalancing)만 조회 (탭 전용 또는 보강) */
   fetchRebalancing: (endpoint?: string) => Promise<void>;
-  /** 에러 상태 초기화 */
   clearError: () => void;
   setHideAmounts: (hide: boolean) => void;
 }
 
 const initialState: DashboardState = {
   totalAssets: [],
-  portfolio: [],
-  etf: [],
-  pension: [],
+  etfList: [],
+  pensionList: [],
   rebalancing: [],
-  els: [],
-  elsSheetTotals: null,
-  elsCompleted: [],
   cashOther: [],
   elsListSheetData: [],
   summaryCards: [],
-  pieData: [],
-  sheetErrors: [],
   isLoading: false,
   isLoadingAssets: false,
   isLoadingRebalancing: false,
   error: null,
   hideAmounts: false,
 };
+
+function applyDashboardPayload(
+  data: import('../types/api').DashboardSheetResponse
+): Partial<DashboardState> {
+  return {
+    totalAssets: data.totalAssets ?? [],
+    etfList: data.etfList ?? [],
+    pensionList: data.pensionList ?? [],
+    rebalancing: data.rebalancing ?? [],
+    cashOther: data.cashOther ?? [],
+    elsListSheetData: data.elsListSheetData ?? [],
+    summaryCards: data.summaryCards ?? [],
+  };
+}
 
 export const useStore = create<DashboardState & DashboardActions>((set) => ({
   ...initialState,
@@ -101,19 +78,7 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
     try {
       const data = await fetchDashboardData(endpoint, 'all');
       set({
-        totalAssets: data.totalAssets ?? [],
-        portfolio: data.portfolio ?? [],
-        rebalancing: data.rebalancing ?? [],
-        etf: data.etf ?? data.etfList ?? [],
-        pension: data.pension ?? data.pensionList ?? [],
-        els: data.els ?? [],
-        elsSheetTotals: data.elsSheetTotals ?? null,
-        elsCompleted: data.elsCompleted ?? [],
-        cashOther: data.cashOther ?? [],
-        elsListSheetData: data.elsListSheetData ?? [],
-        summaryCards: data.summaryCards ?? [],
-        pieData: data.pieData ?? [],
-        sheetErrors: data.sheetErrors ?? [],
+        ...applyDashboardPayload(data),
         isLoading: false,
         isLoadingAssets: false,
         isLoadingRebalancing: false,
@@ -126,7 +91,6 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
         isLoadingAssets: false,
         isLoadingRebalancing: false,
         error: message,
-        sheetErrors: [],
       });
     }
   },
@@ -136,20 +100,15 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
     try {
       const data = await fetchDashboardData(endpoint, 'assets');
       set({
-        etf: data.etf ?? data.etfList ?? [],
-        pension: data.pension ?? data.pensionList ?? [],
-        els: data.els ?? [],
-        elsSheetTotals: data.elsSheetTotals ?? null,
-        elsCompleted: data.elsCompleted ?? [],
+        etfList: data.etfList ?? [],
+        pensionList: data.pensionList ?? [],
         cashOther: data.cashOther ?? [],
         elsListSheetData: data.elsListSheetData ?? [],
         summaryCards: data.summaryCards ?? [],
-        pieData: data.pieData ?? [],
-        sheetErrors: data.sheetErrors ?? [],
         isLoadingAssets: false,
       });
-    } catch (err) {
-      set({ isLoadingAssets: false, sheetErrors: [] });
+    } catch {
+      set({ isLoadingAssets: false });
     }
   },
 
@@ -158,11 +117,10 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
     try {
       const data = await fetchDashboardData(endpoint, 'rebalancing');
       set({
-        portfolio: data.portfolio ?? [],
         rebalancing: data.rebalancing ?? [],
         isLoadingRebalancing: false,
       });
-    } catch (err) {
+    } catch {
       set({ isLoadingRebalancing: false });
     }
   },
@@ -172,29 +130,20 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
   setHideAmounts: (hide) => set({ hideAmounts: hide }),
 }));
 
-/**
- * 스토어의 els(ElsRow[])를 ElsProduct[]로 변환해 반환합니다.
- * getWorstPerformer, ElsRiskProgressBar 등 ElsProduct 기반 로직에 사용하세요.
- * 시트 컬럼명이 기본값과 다르면 mapping을 넘겨주세요.
- */
+/** @deprecated API에서 ELS(투자중) 시트를 내려주지 않음. 빈 배열 기준 변환만 수행합니다. */
 export function useElsProducts(mapping?: AssetColumnMapping): ElsProduct[] {
-  const els = useStore((s) => s.els);
-  return useMemo(() => elsRowsToElsProducts(els, mapping), [els, mapping]);
+  return useMemo(() => elsRowsToElsProducts([], mapping), [mapping]);
 }
 
-/** ELS(투자중) 시트 등 컬럼명이 다양할 때 여러 매핑을 순서대로 시도합니다. */
 const ELS_TRY_MAPPINGS = [
   ELS_INVESTING_SHEET_MAPPING,
   ELS_SINGLE_PRICE_MAPPING,
   DEFAULT_ELS_ASSET_MAPPING,
 ];
 
+/** @deprecated API에서 ELS(투자중) 시트를 내려주지 않음. */
 export function useElsProductsWithMappings(): ElsProduct[] {
-  const els = useStore((s) => s.els);
-  return useMemo(
-    () => elsRowsToElsProductsWithMappings(els, ELS_TRY_MAPPINGS),
-    [els]
-  );
+  return useMemo(() => elsRowsToElsProductsWithMappings([], ELS_TRY_MAPPINGS), []);
 }
 
 export function useElsListSheetProductsWithMappings(): ElsProduct[] {

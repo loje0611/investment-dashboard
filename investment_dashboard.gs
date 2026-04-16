@@ -6,7 +6,7 @@
  * 스프레드시트 ID로 openById()를 사용해야 합니다.
  * 아래 SPREADSHEET_ID를 본인 스프레드시트 ID로 변경하세요.
  *
- * 반환 형식: { totalAssets, portfolio, rebalancing, etf, etfList, etfSummary, pension, pensionList, pensionSummary, els, elsSheetTotals, elsCompleted, cashOther, elsListSheetData, summaryCards, pieData, sheetErrors }
+ * 반환 형식: { totalAssets, summaryCards, etfList, pensionList, elsListSheetData, cashOther, rebalancing }
  */
 var SPREADSHEET_ID = '1MEr9roiooSY-BOG02gO_jJ-UNSaWOmnNmFLyLBKfdI4';
 
@@ -398,46 +398,28 @@ function getDashboardData(dataType) {
   var ss;
   try { ss = SpreadsheetApp.openById(SPREADSHEET_ID); } catch (e) { throw new Error('스프레드시트를 열 수 없습니다. SPREADSHEET_ID를 확인하세요.'); }
 
-  var totalAssets = [], portfolio = [], rebalancing = [], etf = [], pension = [], els = [], elsCompleted = [], cashOther = [], elsListSheetData = [];
-  var etfSummary = null;
-  var pensionSummary = null;
-  var elsSheetTotals = null;
+  var totalAssets = [];
   var summaryCards = [];
-  var pieData = [];
-  var sheetErrors = [];
+  var etfList = [];
+  var pensionList = [];
+  var elsListSheetData = [];
+  var cashOther = [];
+  var rebalancing = [];
 
   if (dataType === 'summary' || dataType === 'all') {
     try { totalAssets = readTotalAssetsSheet_(ss); } catch (e) { totalAssets = []; }
   }
 
   if (dataType === 'rebalancing' || dataType === 'all') {
-    try { portfolio = readSheetAsObjects_(ss, '포트(New)', 0); } catch (e) { portfolio = []; }
     try { rebalancing = getRebalancingDataFromPortApi_(ss); } catch (e) { rebalancing = []; }
   }
 
   if (dataType === 'assets' || dataType === 'summary' || dataType === 'all') {
-    var etfPack = readEtfOrPensionStatusSheet_(ss, ETF_DASHBOARD_SHEET_, sheetErrors);
-    etf = etfPack.list;
-    etfSummary = etfPack.summary;
-    var penPack = readEtfOrPensionStatusSheet_(ss, PENSION_DASHBOARD_SHEET_, sheetErrors);
-    pension = penPack.list;
-    pensionSummary = penPack.summary;
-    try { els = readSheetAsObjectsFirstNonEmpty_(ss, ['ELS(투자중)', 'ELS (투자중)', '투자중ELS'], 1); } catch (e) { els = []; }
-    try { elsCompleted = readSheetAsObjectsFirstNonEmpty_(ss, ['ELS(완료)', 'ELS (완료)', 'ELS완료'], 1); } catch (e) { elsCompleted = []; }
-    
-    // JS reduce 로 메모리 상에서 합산 계산 (다중 참조 제거, 초고속 연산 처리)
-    if (els && els.length > 0) {
-      elsSheetTotals = els.reduce(function(acc, item) {
-        var p = gasCoerceNumber_(item['투자원금'] != null ? item['투자원금'] : item['가입금액']);
-        var v = gasCoerceNumber_(item['평가금액']);
-        return {
-          principal: acc.principal + (p || 0),
-          valuation: acc.valuation + (v || 0)
-        };
-      }, { principal: 0, valuation: 0 });
-    } else {
-      elsSheetTotals = { principal: 0, valuation: 0 };
-    }
+    var etfPack = readEtfOrPensionStatusSheet_(ss, ETF_DASHBOARD_SHEET_);
+    etfList = etfPack.list;
+    var penPack = readEtfOrPensionStatusSheet_(ss, PENSION_DASHBOARD_SHEET_);
+    pensionList = penPack.list;
+    var pensionSummary = penPack.summary;
 
     try {
       cashOther = readSheetAsObjects_(ss, '현금', 1);
@@ -445,12 +427,11 @@ function getDashboardData(dataType) {
     } catch (e) { cashOther = []; }
     try { elsListSheetData = readElsListSheetWithRowIndex_(ss); } catch (e) { elsListSheetData = []; }
 
-    // --- 요약 카드 및 파이 차트 데이터 계산 ---
+    // --- 요약 카드 (파이 차트는 프론트에서 totalAssets 기반 계산) ---
     try {
-      // 1) 총 자산 평가 — 최신 데이터는 헤더 바로 아래 첫 번째 행 (상단 삽입 구조)
       var totalValuation = 0, totalRate = null;
       if (totalAssets && totalAssets.length > 0) {
-        var latestRow = totalAssets[totalAssets.length - 1]; // 하단 추가(오름차순) 구조이므로 마지막 행이 최신
+        var latestRow = totalAssets[totalAssets.length - 1];
         var v = gasCoerceNumber_(findRowValue_(latestRow, ['평가금 총액', '평가금총액', '평가금액']));
         var p = gasCoerceNumber_(findRowValue_(latestRow, ['원금 총액', '원금총액', '투자원금', '원금']));
         if (v != null) totalValuation = v;
@@ -459,10 +440,9 @@ function getDashboardData(dataType) {
         }
       }
       summaryCards.push({ id: 'total', title: '총 자산 평가', amount: totalValuation || 0, rate: totalRate });
-      
-      // 2) 연금 평가 — 목록 또는 연금현황 summary(합계 행)에서 '개인연금 합계' 스캔
+
       var penValuation = null, penRate = null;
-      var penScan = pension ? pension.slice() : [];
+      var penScan = pensionList ? pensionList.slice() : [];
       if (pensionSummary) penScan.push(pensionSummary);
       if (penScan.length > 0) {
         for (var i = 0; i < penScan.length; i++) {
@@ -470,9 +450,9 @@ function getDashboardData(dataType) {
           var title = String(findRowValue_(row, ['상품명', '종목명', '이름', '항목']) || row[Object.keys(row)[0]] || '').trim();
           if (title.indexOf('개인연금 합계') !== -1) {
             penValuation = gasCoerceNumber_(findRowValue_(row, ['평가금액', '평가금']));
-            var r = gasCoerceNumber_(findRowValue_(row, ['수익률']));
-            if (r != null) {
-              penRate = Math.abs(r) < 1.5 ? r * 100 : r;
+            var rPen = gasCoerceNumber_(findRowValue_(row, ['수익률']));
+            if (rPen != null) {
+              penRate = Math.abs(rPen) < 1.5 ? rPen * 100 : rPen;
             }
             break;
           }
@@ -481,21 +461,19 @@ function getDashboardData(dataType) {
       if (penValuation == null) penValuation = 0;
       summaryCards.push({ id: 'pension', title: '연금 평가', amount: penValuation, rate: penRate });
 
-      // 3) ETF 평가
       var etfValuation = 0, etfPrincipal = 0;
-      if (etf) {
-        for (var i = 0; i < etf.length; i++) {
-          var title = String(findRowValue_(etf[i], ['상품명', '종목명']) || '').trim();
-          if (!/합계|소계|^계$/.test(title)) {
-             etfValuation += gasCoerceNumber_(findRowValue_(etf[i], ['평가금액', '평가금'])) || 0;
-             etfPrincipal += gasCoerceNumber_(findRowValue_(etf[i], ['투자원금', '매수금액', '원금'])) || 0;
+      if (etfList) {
+        for (var j = 0; j < etfList.length; j++) {
+          var titleE = String(findRowValue_(etfList[j], ['상품명', '종목명']) || '').trim();
+          if (!/합계|소계|^계$/.test(titleE)) {
+            etfValuation += gasCoerceNumber_(findRowValue_(etfList[j], ['평가금액', '평가금'])) || 0;
+            etfPrincipal += gasCoerceNumber_(findRowValue_(etfList[j], ['투자원금', '매수금액', '원금'])) || 0;
           }
         }
       }
       var etfRate = etfPrincipal > 0 ? ((etfValuation - etfPrincipal) / etfPrincipal) * 100 : null;
       summaryCards.push({ id: 'etf', title: 'ETF 평가', amount: etfValuation, rate: etfRate });
-      
-      // 4) ELS 평가 — 'ELS' 시트에서 '합계' 행을 동적 스캔
+
       var elsValuation = null, elsInvRate = null;
       var elsSummarySheet = [];
       try {
@@ -503,17 +481,17 @@ function getDashboardData(dataType) {
         if (!elsSummarySheet || elsSummarySheet.length === 0) {
           elsSummarySheet = readSheetAsObjects_(ss, 'ELS', 0);
         }
-      } catch(e) {}
-      
+      } catch (e2) {}
+
       if (elsSummarySheet && elsSummarySheet.length > 0) {
-        for (var i = 0; i < elsSummarySheet.length; i++) {
-          var row = elsSummarySheet[i];
-          var title = String(findRowValue_(row, ['상품명', '이름', '항목']) || row[Object.keys(row)[0]] || '').trim();
-          if (title.indexOf('합계') !== -1) {
-            elsValuation = gasCoerceNumber_(findRowValue_(row, ['평가금액', '평가금']));
-            var r = gasCoerceNumber_(findRowValue_(row, ['수익률']));
-            if (r != null) {
-              elsInvRate = Math.abs(r) < 1.5 ? r * 100 : r;
+        for (var k = 0; k < elsSummarySheet.length; k++) {
+          var rowEls = elsSummarySheet[k];
+          var titleEls = String(findRowValue_(rowEls, ['상품명', '이름', '항목']) || rowEls[Object.keys(rowEls)[0]] || '').trim();
+          if (titleEls.indexOf('합계') !== -1) {
+            elsValuation = gasCoerceNumber_(findRowValue_(rowEls, ['평가금액', '평가금']));
+            var rEls = gasCoerceNumber_(findRowValue_(rowEls, ['수익률']));
+            if (rEls != null) {
+              elsInvRate = Math.abs(rEls) < 1.5 ? rEls * 100 : rEls;
             }
             break;
           }
@@ -521,15 +499,14 @@ function getDashboardData(dataType) {
       }
       if (elsValuation == null) elsValuation = 0;
       summaryCards.push({ id: 'els', title: 'ELS 평가', amount: elsValuation, rate: elsInvRate });
-      
-      // 5) ELS 누적 수익금
+
       var elsProfitSum = 0, elsCompleteRateSum = 0, elsCompleteCount = 0;
       if (elsListSheetData) {
-        for (var i = 0; i < elsListSheetData.length; i++) {
-          var row = elsListSheetData[i];
-          var pf = gasCoerceNumber_(row['수익']);
+        for (var m = 0; m < elsListSheetData.length; m++) {
+          var rowLs = elsListSheetData[m];
+          var pf = gasCoerceNumber_(rowLs['수익']);
           if (pf != null) elsProfitSum += pf;
-          var cr = gasCoerceNumber_(row['연수익률']);
+          var cr = gasCoerceNumber_(rowLs['연수익률']);
           if (cr != null) {
             elsCompleteRateSum += cr;
             elsCompleteCount++;
@@ -539,48 +516,17 @@ function getDashboardData(dataType) {
       var rawCompleteRate = elsCompleteCount > 0 ? (elsCompleteRateSum / elsCompleteCount) : null;
       var elsCompleteRate = rawCompleteRate != null ? (Math.abs(rawCompleteRate) < 1.5 ? rawCompleteRate * 100 : rawCompleteRate) : null;
       summaryCards.push({ id: 'els-profit', title: 'ELS 누적 수익금', amount: elsProfitSum, rate: elsCompleteRate });
-
-      // 파이 차트 데이터 생성 (pieData용 평가금액 변수는 앞선 개별 항목의 Valuation을 그대로 사용하거나, 기존 방식 유지)
-      var otherValuation = 0;
-      if (cashOther) {
-         for (var i = 0; i < cashOther.length; i++) {
-            var title = String(cashOther[i]['항목'] || cashOther[i]['이름'] || '').trim();
-            if (!/합계|소계|^계$/.test(title)) {
-               otherValuation += gasCoerceNumber_(cashOther[i]['평가금액']) || gasCoerceNumber_(cashOther[i]['잔여금']) || gasCoerceNumber_(cashOther[i]['잔액']) || 0;
-            }
-         }
-      }
-      // pieSum 연산 시 수정된 penValuation, elsValuation 활용
-      var pieSum = etfValuation + elsValuation + penValuation + otherValuation;
-      if (pieSum > 0) {
-        if (etfValuation > 0) pieData.push({ name: 'ETF', value: Math.round((etfValuation / pieSum) * 1000) / 10, color: '#6366f1' });
-        if (elsValuation > 0) pieData.push({ name: 'ELS', value: Math.round((elsValuation / pieSum) * 1000) / 10, color: '#f59e0b' });
-        if (penValuation > 0) pieData.push({ name: '연금', value: Math.round((penValuation / pieSum) * 1000) / 10, color: '#10b981' });
-        if (otherValuation > 0) pieData.push({ name: '기타', value: Math.round((otherValuation / pieSum) * 1000) / 10, color: '#64748b' });
-      }
-    } catch(e) {}
+    } catch (e3) {}
   }
 
   return {
     totalAssets: totalAssets,
-    portfolio: portfolio,
-    rebalancing: rebalancing,
-    etf: etf,
-    pension: pension,
-    /** 합계·소계 행(목록 제외). 없으면 null */
-    etfSummary: etfSummary,
-    pensionSummary: pensionSummary,
-    /** 프론트 별칭(etf / etfList 동일 데이터) */
-    etfList: etf,
-    pensionList: pension,
-    els: els,
-    elsSheetTotals: elsSheetTotals,
-    elsCompleted: elsCompleted,
-    cashOther: cashOther,
-    elsListSheetData: elsListSheetData,
     summaryCards: summaryCards,
-    pieData: pieData,
-    sheetErrors: sheetErrors
+    etfList: etfList,
+    pensionList: pensionList,
+    elsListSheetData: elsListSheetData,
+    cashOther: cashOther,
+    rebalancing: rebalancing
   };
 }
 
@@ -740,11 +686,11 @@ function isAssetStatusMetaRow_(obj) {
  * 각 데이터 행을 { 상품명, 투자원금, 평가금액, 수익률, … } 고정 키로 매핑합니다.
  * 합계·소계·계 행은 list 에서 제외하고 summary 에만 둡니다.
  */
-function readEtfOrPensionStatusSheet_(ss, sheetName, sheetErrors) {
+function readEtfOrPensionStatusSheet_(ss, sheetName) {
   var result = { list: [], summary: null };
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
-    sheetErrors.push('시트를 찾을 수 없습니다: ' + sheetName);
+    Logger.log('시트를 찾을 수 없습니다: ' + sheetName);
     return result;
   }
   var values = getSheetValuesCached_(ss, sheetName);
@@ -793,18 +739,6 @@ function getRebalancingDataFromPortApi_(ss) {
   return accountOrder.map(function(accountLabel) {
     return { accountLabel: accountLabel, sheet: '포트_API', rows: byAccount[accountLabel] };
   });
-}
-
-function readSheetAsObjectsFirstNonEmpty_(ss, sheetNames, hi) {
-  if (!sheetNames || !sheetNames.length) return [];
-  for (var i = 0; i < sheetNames.length; i++) {
-    var values = getSheetValuesCached_(ss, sheetNames[i]);
-    if (values && values.length > 0) {
-      var rows = convertValuesToObjects_(values, hi);
-      if (rows && rows.length > 0) return rows;
-    }
-  }
-  return [];
 }
 
 function readElsListSheetWithRowIndex_(ss) {

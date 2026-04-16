@@ -43,10 +43,10 @@ export type DashboardDataKind = 'summary' | 'assets' | 'rebalancing' | 'all';
 
 /**
  * 대시보드 데이터를 타입별로 가져옵니다.
- * - summary: 총자산만 (홈용, 가장 빠름)
- * - assets: els, etf, pension (자산 상세용)
- * - rebalancing: portfolio, rebalancing (리밸런싱용)
- * - all: 전체 (기존 동작)
+ * - summary: totalAssets + summaryCards + etfList, pensionList, elsListSheetData, cashOther (리밸런싱 제외)
+ * - assets: etfList, pensionList, elsListSheetData, cashOther, summaryCards
+ * - rebalancing: rebalancing 만
+ * - all: 위 키 전체
  *
  * @param endpoint - Web App URL (미입력 시 VITE_WEB_APP_URL 사용)
  * @param kind - 조회할 데이터 종류 (기본 'all')
@@ -76,9 +76,6 @@ export async function fetchDashboardData(
   if (typeof data !== 'object' || data === null) {
     throw new Error('응답이 객체가 아닙니다.');
   }
-
-  // 일시 디버깅: 자산 상세(etf/pension) 응답 구조 확인 (F12 콘솔)
-  console.log('Fetched Data:', data);
 
   return data as DashboardSheetResponse;
 }

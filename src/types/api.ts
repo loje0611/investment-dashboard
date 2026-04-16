@@ -115,33 +115,13 @@ export interface ElsSheetTotals {
   valuation: number;
 }
 
-/** 대시보드용 GAS 응답 */
+/** 대시보드용 GAS 응답 (최소 키만) */
 export interface DashboardSheetResponse {
   totalAssets?: TotalAssetRow[];
-  portfolio?: PortfolioRow[];
-  rebalancing?: RebalancingTable[];
-  etf?: EtfSheetRow[];
-  /** ETF현황 시트 합계·소계 행(목록 제외) */
-  etfSummary?: SheetDataRow | null;
-  pension?: PensionSheetRow[];
-  /** 연금현황 시트 합계·소계 행(목록 제외) */
-  pensionSummary?: SheetDataRow | null;
-  els?: ElsRow[];
-  /** 'ELS' 탭 고정 셀 합계 (B4, C4). 없으면 ELS(투자중) 행 합산으로 대체 */
-  elsSheetTotals?: ElsSheetTotals | null;
-  elsCompleted?: ElsCompletedRow[];
-  /** 현금(기타) 시트 */
-  cashOther?: SheetDataRow[];
-  /** 'ELS목록' 시트 데이터 */
-  elsListSheetData?: ElsRow[];
-  /** 서버 연산 요약 카드 */
   summaryCards?: import('../data/dashboardDummy').SummaryCardItem[];
-  /** 서버 연산 파이 차트 */
-  pieData?: import('../data/dashboardDummy').PieSegment[];
-  /** ETF현황·연금현황 시트 없음 등 (예: 시트를 찾을 수 없습니다: ETF현황) */
-  sheetErrors?: string[];
-  /** etf 와 동일 (백엔드 별칭) */
   etfList?: EtfSheetRow[];
-  /** pension 와 동일 (백엔드 별칭) */
   pensionList?: PensionSheetRow[];
+  elsListSheetData?: ElsRow[];
+  cashOther?: SheetDataRow[];
+  rebalancing?: RebalancingTable[];
 }
