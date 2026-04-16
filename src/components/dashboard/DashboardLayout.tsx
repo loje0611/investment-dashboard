@@ -7,6 +7,11 @@ import { pensionToRows } from '../../utils/pensionToRows'
 import { portfolioToRebalancingAccounts } from '../../utils/portfolioToRebalancing'
 import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAccounts'
 import { totalAssetsToPrincipalValuationTrend } from '../../utils/totalAssetsToPrincipalValuation'
+import {
+  buildPieSegmentsFromLatestTotalAssets,
+  buildSummaryCardsFromLatestTotalAssets,
+  mergeSummaryWithElsProfitCard,
+} from '../../utils/homeFromTotalAssets'
 import { getCurrentLevelFromRow, parseBarrierPercent } from '../../utils/elsRiskCounts'
 import {
   compareElsListRowsByNextEval,
@@ -167,6 +172,21 @@ export function DashboardLayout() {
     [totalAssets]
   )
 
+  /** 총자산 14열 최신 행 기준(헤더 정확 매칭). 없으면 API 요약·파이 사용 */
+  const homeSummaryCards = useMemo(
+    () =>
+      mergeSummaryWithElsProfitCard(
+        buildSummaryCardsFromLatestTotalAssets(totalAssets),
+        summaryCards
+      ),
+    [totalAssets, summaryCards]
+  )
+
+  const homePieData = useMemo(() => {
+    const fromTotal = buildPieSegmentsFromLatestTotalAssets(totalAssets)
+    return fromTotal.length > 0 ? fromTotal : pieData || []
+  }, [totalAssets, pieData])
+
   const rebalancingAccounts = useMemo(() => {
     if (rebalancing && rebalancing.length > 0) {
       const fromTables = rebalancingTablesToAccounts(rebalancing)
@@ -217,9 +237,9 @@ export function DashboardLayout() {
                 ) : (
                   <>
                     <div className="mb-6">
-                      {summaryCards && summaryCards.length > 0 ? (
+                      {homeSummaryCards && homeSummaryCards.length > 0 ? (
                         <SummaryCardsCarousel
-                          items={summaryCards}
+                          items={homeSummaryCards}
                           hideAmounts={hideAmounts}
                         />
                       ) : (
@@ -228,7 +248,7 @@ export function DashboardLayout() {
                           <p className="text-sm font-semibold text-slate-600">요약 카드가 없습니다</p>
                           <p className="mt-1 text-xs text-slate-400">
                             총자산 시트에서 표시할 수 있는 최신 행이 없습니다.<br />
-                            평가일, 원금, 평가금 열을 확인해 주세요.
+                            총자산 14열(평가일·원금 총액·평가금 총액 등)을 확인해 주세요.
                           </p>
                         </div>
                       )}
@@ -236,7 +256,7 @@ export function DashboardLayout() {
                     <div className="space-y-6">
                       <h2 className="text-sm font-semibold text-slate-700">전체 현황</h2>
                       <GlobalOverview
-                        pieData={pieData || []}
+                        pieData={homePieData}
                         principalValuationTrend={principalValuationTrend}
                         totalAssetsRowCount={totalAssets.length}
                         hideAmounts={hideAmounts}

@@ -29,8 +29,9 @@ function normalizeKey(k: string): string {
 }
 
 /**
- * 「총자산」시트 표준 헤더(1행):
- * 평가일 | 원금 총액 | 연금 평가금 | ELS 평가금 | ETF 평가금 | 현금 평가금 | 평가금 총액 | 수익률 | 원금 증감액 | 평가 증감액
+ * 「총자산」시트 표준 헤더(1행, 14열):
+ * 평가일, 연금 원금, 연금 평가금, ELS 원금, ELS 평가금, ETF 원금, ETF 평가금, 현금 원금, 현금 평가금,
+ * 원금 총액, 평가금 총액, 수익률, 원금 증감액, 평가 증감액
  * 차트·추이는 평가일·원금 총액·평가금 총액 열만 사용합니다.
  */
 const DATE_KEYS = [
@@ -93,6 +94,9 @@ function serialToDate(serial: number): Date | null {
 
 function parseDateValue(v: unknown): Date | null {
   if (v == null || v === '') return null
+  if (v instanceof Date && !Number.isNaN(v.getTime())) {
+    return new Date(v.getFullYear(), v.getMonth(), v.getDate())
+  }
   if (typeof v === 'number' && !Number.isNaN(v)) {
     const fromSerial = serialToDate(v)
     if (fromSerial) return fromSerial

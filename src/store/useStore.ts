@@ -26,9 +26,9 @@ export interface DashboardState {
   totalAssets: TotalAssetRow[];
   /** 포트폴리오 데이터 (포트(New) 시트) */
   portfolio: PortfolioRow[];
-  /** ETF 데이터 (ETF 시트, ETF 현황 탭 전용) */
+  /** ETF현황 시트 (자산 상세 탭) */
   etf: EtfSheetRow[];
-  /** 연금 데이터 (연금 시트, 연금 현황 탭 전용) */
+  /** 연금현황 시트 (자산 상세 탭) */
   pension: PensionSheetRow[];
   /** 리밸런싱용 계좌별 표 (포트 Old/New 시트에서 파싱) */
   rebalancing: RebalancingTable[];

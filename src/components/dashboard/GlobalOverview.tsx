@@ -194,8 +194,9 @@ export function GlobalOverview({
             </div>
             <p className="text-sm font-semibold text-slate-600">차트 데이터가 없습니다</p>
             <p className="mt-1 text-xs text-slate-400">
-              총자산 시트의 최신 행에서 연금, ELS, ETF<br />
-              또는 현금 평가액 열을 찾을 수 없습니다.
+              총자산 시트 최신 행에 다음 열 값이 없거나 합계가 0입니다.
+              <br />
+              연금 평가금 · ELS 평가금 · ETF 평가금 · 현금 평가금
             </p>
           </div>
         )}
@@ -294,7 +295,7 @@ export function GlobalOverview({
         ) : (
           <div className="space-y-2 text-xs leading-relaxed text-slate-500">
             <p>
-              평가일·원금 총액·평가금 총액이 있는 총자산 이력이 있으면 추이 그래프가 표시됩니다.
+              평가일·원금 총액·평가금 총액(14열 구조의 합계 열)이 있는 총자산 이력이 있으면 추이 그래프가 표시됩니다.
             </p>
             {totalAssetsRowCount === 0 ? (
               <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900">

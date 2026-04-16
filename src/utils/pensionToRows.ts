@@ -26,6 +26,24 @@ function toString(value: string | number | boolean | null | undefined): string {
   return String(value).trim();
 }
 
+function normalizeHeaderKey(k: string): string {
+  return k
+    .replace(/\u3000/g, ' ')
+    .replace(/\t/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function keysAfterYieldColumn(row: SheetDataRow, max: number): string[] {
+  const keys = Object.keys(row)
+  const idx = keys.findIndex((k) => normalizeHeaderKey(k) === '수익률')
+  if (idx >= 0 && idx < keys.length - 1) {
+    return keys.slice(idx + 1, idx + 1 + max)
+  }
+  if (keys.length >= 11) return keys.slice(5, 11)
+  return []
+}
+
 function getPensionProductLabel(row: SheetDataRow): string {
   return (
     toString(row.상품명) ||
@@ -46,27 +64,30 @@ function isPensionDetailProductRow(row: SheetDataRow): boolean {
   return true;
 }
 
-const PENSION_DETAIL_MAX_ROWS = 4;
+const PENSION_DETAIL_MAX_ROWS = 80
 
-/** 시트 6~11번째 컬럼(수익률 오른쪽 6개) 값을 배열로 */
+/** 수익률 열 오른쪽 최대 6개 셀(월별 수익률 등) */
 function parseSixValues(row: SheetDataRow, fallback: number): number[] {
-  const keys = Object.keys(row);
-  if (keys.length < 11) return [0, 0, 0, 0, 0, fallback];
-  const sixKeys = keys.slice(5, 11);
-  const values = sixKeys.map((k) => parseRate(row[k]));
-  const hasData = values.some((v) => v !== 0);
-  if (!hasData) return [0, 0, 0, 0, 0, fallback];
-  while (values.length < 6) values.push(values[values.length - 1] ?? 0);
-  return values.slice(0, 6);
+  const sixKeys = keysAfterYieldColumn(row, 6)
+  if (sixKeys.length === 0) return [0, 0, 0, 0, 0, fallback]
+  const values = sixKeys.map((k) => parseRate(row[k]))
+  const hasData = values.some((v) => v !== 0)
+  if (!hasData) return [0, 0, 0, 0, 0, fallback]
+  while (values.length < 6) values.push(values[values.length - 1] ?? 0)
+  return values.slice(0, 6)
 }
 
 /**
  * 연금 시트 행 배열을 연금 현황 탭용 PensionRow[]로 변환합니다.
  * 컬럼 구조: 상품명, 투자시점(등), 투자원금, 평가금액, 수익률, 이후 6개 월별 수익률.
- * 상품 행만 남기고(개인연금 합계·날짜·빈 행 제외) 시트 순서대로 최대 4행만 노출합니다.
+ * 상품 행만 남기고(개인연금 합계·날짜·빈 행 제외) 시트 순서대로 상한까지 노출합니다.
  */
 export function pensionToRows(rows: SheetDataRow[]): PensionRow[] {
-  const detailRows = rows.filter(isPensionDetailProductRow).slice(0, PENSION_DETAIL_MAX_ROWS);
+  if (import.meta.env.DEV && rows.length > 0) {
+    console.log('[연금현황] 첫 데이터 행 키:', Object.keys(rows[0]))
+  }
+
+  const detailRows = rows.filter(isPensionDetailProductRow).slice(0, PENSION_DETAIL_MAX_ROWS)
 
   return detailRows.map((row, i) => {
     const name = getPensionProductLabel(row) || '-';

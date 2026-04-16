@@ -29,17 +29,19 @@ export function isGasErrorResponse(
 }
 
 /**
- * 총자산 시트 한 행
- * 헤더: 평가일, 원금 총액, 연금 평가금, ELS 평가금, ETF 평가금, 현금 평가금, 평가금 총액, 수익률, 원금 증감액, 평가 증감액
+ * 총자산 시트 한 행 (14열 헤더, 띄어쓰기 포함)
  */
 export interface TotalAssetRow extends SheetDataRow {
-  평가일?: string;
-  '원금 총액'?: number | string;
+  평가일?: string | number;
+  '연금 원금'?: number | string;
   '연금 평가금'?: number | string;
+  'ELS 원금'?: number | string;
   'ELS 평가금'?: number | string;
+  'ETF 원금'?: number | string;
   'ETF 평가금'?: number | string;
+  '현금 원금'?: number | string;
   '현금 평가금'?: number | string;
-  /** 합계(추이 차트에 사용) */
+  '원금 총액'?: number | string;
   '평가금 총액'?: number | string;
   수익률?: number | string;
   '원금 증감액'?: number | string;
@@ -71,7 +73,7 @@ export interface ElsRow extends SheetDataRow {
   [key: string]: string | number | boolean | null | undefined;
 }
 
-/** ETF 시트 한 행 (ETF 현황 탭 전용, 'ETF' 시트에서만 읽음) */
+/** ETF현황 시트 한 행 (GAS `readSheetAsObjects_('ETF현황', …)`) */
 export interface EtfSheetRow extends SheetDataRow {
   상품명?: string;
   투자원금?: number;
@@ -80,7 +82,7 @@ export interface EtfSheetRow extends SheetDataRow {
   [key: string]: string | number | boolean | null | undefined;
 }
 
-/** 연금 시트 한 행 (연금 현황 탭 전용, '연금' 시트에서만 읽음) */
+/** 연금현황 시트 한 행 (GAS `readSheetAsObjects_('연금현황', …)`) */
 export interface PensionSheetRow extends SheetDataRow {
   상품명?: string;
   투자원금?: number;
@@ -107,7 +109,7 @@ export interface ElsCompletedRow extends SheetDataRow {
   투자기간?: number | string;
 }
 
-/** 'ELS' 시트 B4·C4 요약 (투자원금·평가금액). 홈「ELS 투자 평가」전용 */
+/** 'ELS' 시트 B4·C4 요약 (투자원금·평가금액) */
 export interface ElsSheetTotals {
   principal: number;
   valuation: number;

@@ -65,7 +65,7 @@ export const SUMMARY_CARDS: SummaryCardItem[] = [
   { id: 'total', title: '총 자산 평가', amount: 245_158_004, rate: 18.4 },
   { id: 'pension', title: '연금 평가', amount: 35_214_403, rate: 26.2 },
   { id: 'etf', title: 'ETF 평가', amount: 155_063_090, rate: 20.9 },
-  { id: 'els', title: 'ELS 투자 평가', amount: 43_880_511, rate: 9.7 },
+  { id: 'els', title: 'ELS 평가', amount: 43_880_511, rate: 9.7 },
   { id: 'els-profit', title: 'ELS 누적 수익금', amount: 6_583_870, rate: 4.6 },
 ]
 

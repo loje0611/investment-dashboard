@@ -157,7 +157,7 @@ const PIE_COLORS: Record<string, string> = {
 /**
  * 스프레드시트 원본 시트만으로 홈 요약을 계산합니다 (Dashboard 탭 미사용).
  *
- * - ELS 투자 평가·원금: `elsSheetTotals`가 있으면 'ELS' 시트 B4·C4와 동일. 없으면 ELS(투자중) 행 합산.
+ * - ELS 평가·원금: `elsSheetTotals`가 있으면 'ELS' 시트 B4·C4와 동일. 없으면 ELS(투자중) 행 합산.
  * - 총 자산 평가 = 연금평가금(개인연금만) + ELS평가 + ETF평가 + 기타평가
  * - 연금 수익률 = (연금평가 − 연금원금) / 연금원금 (위와 동일 행 집합)
  * - ELS 누적 수익 = SUM(ELS(완료)[수익]), 수익률 분모 = SUMPRODUCT(원금,투자기간)/365
@@ -218,7 +218,7 @@ export function buildHomeOverviewFromRawFormulas(
     },
     {
       id: 'els',
-      title: 'ELS 투자 평가',
+      title: 'ELS 평가',
       amount: elsInv.valuation,
       rate: elsRate != null ? round1(elsRate) : undefined,
     },

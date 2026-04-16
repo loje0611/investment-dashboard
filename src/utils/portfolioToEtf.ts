@@ -27,16 +27,33 @@ function toString(value: string | number | boolean | null | undefined): string {
   return String(value).trim();
 }
 
+function normalizeHeaderKey(k: string): string {
+  return k
+    .replace(/\u3000/g, ' ')
+    .replace(/\t/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** '수익률' 열 다음부터 최대 6개 키(월별 등). 없으면 레거시: 6~11번째 키 */
+function keysAfterYieldColumn(row: SheetDataRow, max: number): string[] {
+  const keys = Object.keys(row);
+  const idx = keys.findIndex((k) => normalizeHeaderKey(k) === '수익률');
+  if (idx >= 0 && idx < keys.length - 1) {
+    return keys.slice(idx + 1, idx + 1 + max);
+  }
+  if (keys.length >= 11) return keys.slice(5, 11);
+  return [];
+}
+
 /**
- * 시트에서 6~11번째 컬럼(수익률 오른쪽 6개) 값을 열 순서대로 사용.
- * GAS가 헤더 순서대로 객체를 만들므로 keys 순서 = 시트 열 순서.
- * 왼쪽=최신, 오른쪽=과거.
+ * 수익률 오른쪽 월별(또는 시계열) 셀에서 스파크라인용 값 추출.
+ * 퍼센트 문자열·숫자 혼재 시 parseRate로 통일.
  */
 function parseSparkline(row: SheetDataRow, fallbackRate: number): number[] {
-  const keys = Object.keys(row);
-  if (keys.length < 11) return [0, 0, 0, 0, 0, fallbackRate];
+  const sixKeys = keysAfterYieldColumn(row, 6);
+  if (sixKeys.length === 0) return [0, 0, 0, 0, 0, fallbackRate];
 
-  const sixKeys = keys.slice(5, 11);
   const values = sixKeys.map((k) => parseRate(row[k]));
   const hasData = values.some((v) => v !== 0);
   if (!hasData) return [0, 0, 0, 0, 0, fallbackRate];
@@ -45,12 +62,28 @@ function parseSparkline(row: SheetDataRow, fallbackRate: number): number[] {
   return values.slice(0, 6);
 }
 
+function isEtfSummaryOrEmptyRow(row: SheetDataRow): boolean {
+  const name =
+    toString(row.상품명) ||
+    toString(row.종목명) ||
+    toString(row.이름) ||
+    toString(row.종목) ||
+    '';
+  if (!name || name === '-') return true;
+  return /합계|소계|^계$/i.test(name);
+}
+
 /**
- * ETF 시트 행 배열을 ETF 현황 탭용 EtfRow[]로 변환합니다.
+ * ETF현황 시트 행 배열을 ETF 현황 탭용 EtfRow[]로 변환합니다.
  * 컬럼명: 상품명/종목명, 투자원금/원금, 평가금액/평가금, 수익률/전체 수익률 등
  */
 export function portfolioToEtfRows(rows: SheetDataRow[]): EtfRow[] {
-  return rows.map((row, i) => {
+  if (import.meta.env.DEV && rows.length > 0) {
+    // 시트→JSON 키 순서 확인 (ETF현황/연금현황 헤더 변경 시 디버깅용)
+    console.log('[ETF현황] 첫 데이터 행 키:', Object.keys(rows[0]))
+  }
+
+  return rows.filter((row) => !isEtfSummaryOrEmptyRow(row)).map((row, i) => {
     const name =
       toString(row.상품명) ||
       toString(row.종목명) ||

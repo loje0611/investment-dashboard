@@ -409,8 +409,8 @@ function getDashboardData(dataType) {
   }
 
   if (dataType === 'assets' || dataType === 'summary' || dataType === 'all') {
-    try { etf = readSheetAsObjects_(ss, 'ETF', 1); } catch (e) { etf = []; }
-    try { pension = readSheetAsObjects_(ss, '연금', 1); } catch (e) { pension = []; }
+    try { etf = readSheetAsObjects_(ss, 'ETF현황', 1); } catch (e) { etf = []; }
+    try { pension = readSheetAsObjects_(ss, '연금현황', 1); } catch (e) { pension = []; }
     try { els = readSheetAsObjectsFirstNonEmpty_(ss, ['ELS(투자중)', 'ELS (투자중)', '투자중ELS'], 1); } catch (e) { els = []; }
     try { elsCompleted = readSheetAsObjectsFirstNonEmpty_(ss, ['ELS(완료)', 'ELS (완료)', 'ELS완료'], 1); } catch (e) { elsCompleted = []; }
     
@@ -482,7 +482,7 @@ function getDashboardData(dataType) {
       var etfRate = etfPrincipal > 0 ? ((etfValuation - etfPrincipal) / etfPrincipal) * 100 : null;
       summaryCards.push({ id: 'etf', title: 'ETF 평가', amount: etfValuation, rate: etfRate });
       
-      // 4) ELS 투자 평가 — 'ELS' 시트에서 '합계' 행을 동적 스캔
+      // 4) ELS 평가 — 'ELS' 시트에서 '합계' 행을 동적 스캔
       var elsValuation = null, elsInvRate = null;
       var elsSummarySheet = [];
       try {
@@ -507,7 +507,7 @@ function getDashboardData(dataType) {
         }
       }
       if (elsValuation == null) elsValuation = 0;
-      summaryCards.push({ id: 'els', title: 'ELS 투자 평가', amount: elsValuation, rate: elsInvRate });
+      summaryCards.push({ id: 'els', title: 'ELS 평가', amount: elsValuation, rate: elsInvRate });
       
       // 5) ELS 누적 수익금
       var elsProfitSum = 0, elsCompleteRateSum = 0, elsCompleteCount = 0;
