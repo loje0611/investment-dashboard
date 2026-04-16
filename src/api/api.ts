@@ -126,3 +126,63 @@ export async function postSyncAllInvestment(
 
   return data;
 }
+
+export type ProductHistoryKind = 'ETF' | 'PENSION';
+
+/** GAS doPost `getHistory` 응답: history는 [날짜(yyyy-MM-dd), 수익률(%)] 튜플 배열 */
+export interface ProductHistoryGasResponse {
+  success?: boolean;
+  error?: string;
+  history?: [string, number][];
+}
+
+/**
+ * 상품별 수익률 히스토리 조회: GAS doPost `action: "getHistory"`.
+ * - `text/plain` + JSON: ELS 등록·동기화 API와 동일하게 preflight 회피
+ */
+export async function fetchProductHistory(
+  productName: string,
+  type: ProductHistoryKind,
+  endpoint?: string
+): Promise<[string, number][]> {
+  const baseUrl = endpoint ?? getDefaultWebAppUrl();
+  if (!baseUrl) throw new Error('VITE_WEB_APP_URL이 설정되지 않았습니다. .env 파일을 확인하세요.');
+  if (baseUrl.endsWith('/dev')) {
+    throw new Error(
+      '웹앱 URL이 /dev(테스트 배포)입니다. CORS 문제가 있을 수 있습니다. /exec 로 끝나는 주소를 사용하세요.'
+    );
+  }
+
+  const res = await fetch(baseUrl, {
+    method: 'POST',
+    mode: 'cors',
+    redirect: 'follow',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'text/plain;charset=utf-8',
+    },
+    body: JSON.stringify({
+      action: 'getHistory',
+      productName: productName.trim(),
+      type,
+    }),
+  });
+
+  const text = await res.text();
+  let data: ProductHistoryGasResponse;
+  try {
+    data = JSON.parse(text) as ProductHistoryGasResponse;
+  } catch {
+    throw new Error('서버 응답을 JSON으로 읽을 수 없습니다.');
+  }
+
+  if (!data.success) {
+    throw new Error(data.error ?? '히스토리를 불러오지 못했습니다.');
+  }
+
+  if (!Array.isArray(data.history)) {
+    return [];
+  }
+
+  return data.history as [string, number][];
+}

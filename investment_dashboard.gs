@@ -92,6 +92,16 @@ function doPost(e) {
       syncAllInvestmentData();
       return jsonResponse_({ success: true, message: '모든 데이터가 성공적으로 기록되었습니다.' });
     }
+    if (action === 'gethistory') {
+      var pname = body.productName != null ? String(body.productName).trim() : '';
+      var ptype = body.type != null ? String(body.type).trim().toUpperCase() : '';
+      if (!pname) return jsonResponse_({ success: false, error: 'productName이 필요합니다.' });
+      if (ptype !== 'ETF' && ptype !== 'PENSION') {
+        return jsonResponse_({ success: false, error: 'type은 ETF 또는 PENSION이어야 합니다.' });
+      }
+      var historyRows = getProductHistory(pname, ptype);
+      return jsonResponse_({ success: true, history: historyRows });
+    }
     if (action === '' || action === 'create') {
       handleElsCreate_(ss, body);
       return jsonResponse_({ success: true, message: '등록되었습니다.' });
@@ -859,6 +869,74 @@ function findRowByText(sheet, text) {
   const match = finder.findNext();
   if (match) return match.getRow();
   return -1;
+}
+
+/**
+ * ETF기록 또는 연금기록 시트에서 상품명이 일치하는 모든 행을 찾아
+ * [날짜(yyyy-MM-dd), 수익률(%)] 배열로 반환합니다. 날짜 기준 오름차순 정렬.
+ *
+ * @param {string} productName 시트 A열 상품명과 trim 후 정확히 일치
+ * @param {string} type 'ETF' → ETF기록, 'PENSION' → 연금기록
+ * @returns {Array<Array>} 예: [["2025-01-01", 12.34], ...]
+ */
+function getProductHistory(productName, type) {
+  var t = String(type || '').trim().toUpperCase();
+  var sheetName = t === 'ETF' ? 'ETF기록' : '연금기록';
+  if (t !== 'ETF' && t !== 'PENSION') {
+    return [];
+  }
+
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var values = getSheetValuesCached_(ss, sheetName);
+  if (!values || values.length < 2) {
+    return [];
+  }
+
+  var tz = Session.getScriptTimeZone() || 'Asia/Seoul';
+  var needle = String(productName || '').trim();
+  var tmp = [];
+
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var nameCell = row[0];
+    var name = nameCell != null ? String(nameCell).trim() : '';
+    if (name !== needle) {
+      continue;
+    }
+
+    var dateVal = row[1];
+    var dateObj = null;
+    if (Object.prototype.toString.call(dateVal) === '[object Date]') {
+      dateObj = dateVal;
+    } else if (dateVal != null && dateVal !== '') {
+      dateObj = new Date(dateVal);
+    }
+    if (!dateObj || isNaN(dateObj.getTime())) {
+      continue;
+    }
+
+    var rateCell = row[2];
+    var rate = gasCoerceNumber_(rateCell);
+    if (rate === null && typeof rateCell === 'number' && !isNaN(rateCell)) {
+      rate = rateCell;
+    }
+    if (rate === null) {
+      continue;
+    }
+
+    tmp.push({ ms: dateObj.getTime(), ymd: Utilities.formatDate(dateObj, tz, 'yyyy-MM-dd'), rate: rate });
+  }
+
+  tmp.sort(function (a, b) {
+    if (a.ms !== b.ms) return a.ms - b.ms;
+    return 0;
+  });
+
+  var out = [];
+  for (var i = 0; i < tmp.length; i++) {
+    out.push([tmp[i].ymd, tmp[i].rate]);
+  }
+  return out;
 }
 
 /**

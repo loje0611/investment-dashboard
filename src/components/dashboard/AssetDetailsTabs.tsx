@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bar, BarChart, Cell, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
 import type { EtfRow, PensionRow } from '../../data/dashboardDummy'
 import { formatWonDigits } from '../../utils/maskSensitiveAmount'
+import { ProductHistoryModal } from './ProductHistoryModal'
+import type { ProductHistoryKind } from '../../api/api'
 
 type TabId = 'etf' | 'pension'
 
@@ -14,43 +15,6 @@ interface AssetDetailsTabsProps {
   hideAmounts: boolean
 }
 
-const BAR_SPARKLINE_WIDTH = 80
-const BAR_SPARKLINE_HEIGHT = 40
-
-function BarSparkline({ data }: { data: number[] }) {
-  const safe = Array.isArray(data) && data.length > 0 ? data : [0]
-  const chartData = safe.map((v, i) => ({ index: i, delta: Number(v) }))
-  const maxAbs = Math.max(...safe.map((v) => Math.abs(v)), 0.01)
-  const yDomain = [-maxAbs - 0.5, maxAbs + 0.5]
-
-  return (
-    <div className="flex items-center justify-center py-0.5" style={{ minHeight: BAR_SPARKLINE_HEIGHT }}>
-      <BarChart width={BAR_SPARKLINE_WIDTH} height={BAR_SPARKLINE_HEIGHT} data={chartData} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
-        <XAxis dataKey="index" hide />
-        <YAxis hide domain={yDomain} />
-        <Tooltip
-          content={({ active, payload }) => {
-            if (!active || !payload?.length) return null
-            const v = payload[0].value as number
-            return (
-              <div className="rounded-lg border border-slate-700/50 bg-slate-900/80 px-2.5 py-1.5 text-xs font-medium tracking-wide text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] backdrop-blur-md">
-                {v >= 0 ? '+' : ''}{v}%p
-              </div>
-            )
-          }}
-          cursor={false}
-        />
-        <ReferenceLine y={0} stroke="#e2e8f0" strokeWidth={1} />
-        <Bar dataKey="delta" radius={1} minPointSize={2} isAnimationActive={false}>
-          {chartData.map((_, i) => (
-            <Cell key={i} fill={safe[i] >= 0 ? '#ef4444' : '#3b82f6'} />
-          ))}
-        </Bar>
-      </BarChart>
-    </div>
-  )
-}
-
 export function AssetDetailsTabs({
   etfTable,
   pensionTable,
@@ -58,6 +22,19 @@ export function AssetDetailsTabs({
   hideAmounts,
 }: AssetDetailsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('etf')
+  const [historyModal, setHistoryModal] = useState<{
+    open: boolean
+    name: string
+    kind: ProductHistoryKind
+  }>({ open: false, name: '', kind: 'ETF' })
+
+  const openHistory = (name: string, kind: ProductHistoryKind) => {
+    setHistoryModal({ open: true, name, kind })
+  }
+
+  const closeHistory = () => {
+    setHistoryModal((s) => ({ ...s, open: false }))
+  }
 
   const tabs: { id: TabId; label: string }[] = [
     { id: 'etf', label: 'ETF 현황' },
@@ -66,6 +43,13 @@ export function AssetDetailsTabs({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
+      <ProductHistoryModal
+        open={historyModal.open}
+        onClose={closeHistory}
+        productName={historyModal.name}
+        productType={historyModal.kind}
+      />
+
       {/* 상단 탭: 항상 고정 */}
       <div className="flex shrink-0 border-b border-slate-200">
         {tabs.map((tab) => {
@@ -112,17 +96,15 @@ export function AssetDetailsTabs({
               >
                 <table className="w-full table-fixed text-sm" style={{ minWidth: 0 }}>
                   <colgroup>
-                    <col style={{ width: '20%' }} />
-                    <col style={{ width: '30%' }} />
-                    <col style={{ width: '20%' }} />
-                    <col style={{ width: '30%' }} />
+                    <col style={{ width: '34%' }} />
+                    <col style={{ width: '33%' }} />
+                    <col style={{ width: '33%' }} />
                   </colgroup>
                   <thead>
                     <tr className="sticky top-0 z-10 border-b border-slate-200/50 bg-white/80 text-slate-500 shadow-sm backdrop-blur-md">
                       <th className="pb-2 pr-2 text-center font-medium">상품명</th>
                       <th className="pb-2 pr-2 text-center font-medium">원금/평가금</th>
-                      <th className="whitespace-nowrap pb-2 pr-2 text-center font-medium">수익률</th>
-                      <th className="pb-2 text-center font-medium">최근 6개월 추이</th>
+                      <th className="whitespace-nowrap pb-2 text-center font-medium">수익률</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -134,8 +116,14 @@ export function AssetDetailsTabs({
                         transition={{ duration: 0.3, delay: i * 0.05 }}
                         className="border-b border-slate-100 align-middle"
                       >
-                        <td className="py-2 pr-2 text-center text-slate-900">
-                          <span className="font-medium">{row.name}</span>
+                        <td className="py-2 pr-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => openHistory(row.name, 'ETF')}
+                            className="font-medium text-indigo-600 underline decoration-indigo-300/70 underline-offset-2 transition-colors hover:text-indigo-800 hover:decoration-indigo-500"
+                          >
+                            {row.name}
+                          </button>
                         </td>
                         <td className="py-2 pr-2 tabular-nums text-center text-slate-700">
                           <div className="flex flex-col gap-0.5 text-xs">
@@ -148,14 +136,11 @@ export function AssetDetailsTabs({
                           </div>
                         </td>
                         <td
-                          className={`whitespace-nowrap py-2 pr-2 tabular-nums text-xs font-medium text-center ${
+                          className={`whitespace-nowrap py-2 tabular-nums text-xs font-medium text-center ${
                             row.returnRate >= 0 ? 'text-red-600' : 'text-blue-600'
                           }`}
                         >
                           {row.returnRate >= 0 ? '▲' : '▼'} {Math.abs(row.returnRate).toFixed(2)}%
-                        </td>
-                        <td className="py-2 align-middle text-center">
-                          <BarSparkline data={row.monthlyDeltas} />
                         </td>
                       </motion.tr>
                     ))}
@@ -175,17 +160,15 @@ export function AssetDetailsTabs({
               >
                 <table className="w-full table-fixed text-sm" style={{ minWidth: 0 }}>
                   <colgroup>
-                    <col style={{ width: '20%' }} />
-                    <col style={{ width: '30%' }} />
-                    <col style={{ width: '20%' }} />
-                    <col style={{ width: '30%' }} />
+                    <col style={{ width: '34%' }} />
+                    <col style={{ width: '33%' }} />
+                    <col style={{ width: '33%' }} />
                   </colgroup>
                   <thead>
                     <tr className="sticky top-0 z-10 border-b border-slate-200/50 bg-white/80 text-slate-500 shadow-sm backdrop-blur-md">
                       <th className="pb-2 pr-2 text-center font-medium">상품명</th>
                       <th className="pb-2 pr-2 text-center font-medium">원금/평가금</th>
-                      <th className="whitespace-nowrap pb-2 pr-2 text-center font-medium">수익률</th>
-                      <th className="pb-2 text-center font-medium">최근 6개월 추이</th>
+                      <th className="whitespace-nowrap pb-2 text-center font-medium">수익률</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -197,8 +180,14 @@ export function AssetDetailsTabs({
                         transition={{ duration: 0.3, delay: i * 0.05 }}
                         className="border-b border-slate-100 align-middle"
                       >
-                        <td className="py-2 pr-2 text-center text-slate-900">
-                          <span className="font-medium">{row.name}</span>
+                        <td className="py-2 pr-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => openHistory(row.name, 'PENSION')}
+                            className="font-medium text-indigo-600 underline decoration-indigo-300/70 underline-offset-2 transition-colors hover:text-indigo-800 hover:decoration-indigo-500"
+                          >
+                            {row.name}
+                          </button>
                         </td>
                         <td className="py-2 pr-2 tabular-nums text-center text-slate-700">
                           <div className="flex flex-col gap-0.5 text-xs">
@@ -211,14 +200,11 @@ export function AssetDetailsTabs({
                           </div>
                         </td>
                         <td
-                          className={`whitespace-nowrap py-2 pr-2 tabular-nums text-xs font-medium text-center ${
+                          className={`whitespace-nowrap py-2 tabular-nums text-xs font-medium text-center ${
                             row.returnRate >= 0 ? 'text-red-600' : 'text-blue-600'
                           }`}
                         >
                           {row.returnRate >= 0 ? '▲' : '▼'} {Math.abs(row.returnRate).toFixed(2)}%
-                        </td>
-                        <td className="py-2 align-middle text-center">
-                          <BarSparkline data={row.monthlyDeltas} />
                         </td>
                       </motion.tr>
                     ))}
