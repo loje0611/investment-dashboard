@@ -121,7 +121,11 @@ export interface DashboardSheetResponse {
   portfolio?: PortfolioRow[];
   rebalancing?: RebalancingTable[];
   etf?: EtfSheetRow[];
+  /** ETF현황 시트 합계·소계 행(목록 제외) */
+  etfSummary?: SheetDataRow | null;
   pension?: PensionSheetRow[];
+  /** 연금현황 시트 합계·소계 행(목록 제외) */
+  pensionSummary?: SheetDataRow | null;
   els?: ElsRow[];
   /** 'ELS' 탭 고정 셀 합계 (B4, C4). 없으면 ELS(투자중) 행 합산으로 대체 */
   elsSheetTotals?: ElsSheetTotals | null;

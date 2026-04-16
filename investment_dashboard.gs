@@ -6,7 +6,7 @@
  * 스프레드시트 ID로 openById()를 사용해야 합니다.
  * 아래 SPREADSHEET_ID를 본인 스프레드시트 ID로 변경하세요.
  *
- * 반환 형식: { totalAssets, portfolio, rebalancing, etf, etfList, pension, pensionList, els, elsSheetTotals, elsCompleted, cashOther, elsListSheetData, summaryCards, pieData, sheetErrors }
+ * 반환 형식: { totalAssets, portfolio, rebalancing, etf, etfList, etfSummary, pension, pensionList, pensionSummary, els, elsSheetTotals, elsCompleted, cashOther, elsListSheetData, summaryCards, pieData, sheetErrors }
  */
 var SPREADSHEET_ID = '1MEr9roiooSY-BOG02gO_jJ-UNSaWOmnNmFLyLBKfdI4';
 
@@ -399,6 +399,8 @@ function getDashboardData(dataType) {
   try { ss = SpreadsheetApp.openById(SPREADSHEET_ID); } catch (e) { throw new Error('스프레드시트를 열 수 없습니다. SPREADSHEET_ID를 확인하세요.'); }
 
   var totalAssets = [], portfolio = [], rebalancing = [], etf = [], pension = [], els = [], elsCompleted = [], cashOther = [], elsListSheetData = [];
+  var etfSummary = null;
+  var pensionSummary = null;
   var elsSheetTotals = null;
   var summaryCards = [];
   var pieData = [];
@@ -414,8 +416,12 @@ function getDashboardData(dataType) {
   }
 
   if (dataType === 'assets' || dataType === 'summary' || dataType === 'all') {
-    etf = readDashboardEtfOrPensionObjects_(ss, ETF_DASHBOARD_SHEET_, sheetErrors);
-    pension = readDashboardEtfOrPensionObjects_(ss, PENSION_DASHBOARD_SHEET_, sheetErrors);
+    var etfPack = readEtfOrPensionStatusSheet_(ss, ETF_DASHBOARD_SHEET_, sheetErrors);
+    etf = etfPack.list;
+    etfSummary = etfPack.summary;
+    var penPack = readEtfOrPensionStatusSheet_(ss, PENSION_DASHBOARD_SHEET_, sheetErrors);
+    pension = penPack.list;
+    pensionSummary = penPack.summary;
     try { els = readSheetAsObjectsFirstNonEmpty_(ss, ['ELS(투자중)', 'ELS (투자중)', '투자중ELS'], 1); } catch (e) { els = []; }
     try { elsCompleted = readSheetAsObjectsFirstNonEmpty_(ss, ['ELS(완료)', 'ELS (완료)', 'ELS완료'], 1); } catch (e) { elsCompleted = []; }
     
@@ -454,11 +460,13 @@ function getDashboardData(dataType) {
       }
       summaryCards.push({ id: 'total', title: '총 자산 평가', amount: totalValuation || 0, rate: totalRate });
       
-      // 2) 연금 평가 — A열에서 '개인연금 합계' 행을 동적 스캔
+      // 2) 연금 평가 — 목록 또는 연금현황 summary(합계 행)에서 '개인연금 합계' 스캔
       var penValuation = null, penRate = null;
-      if (pension) {
-        for (var i = 0; i < pension.length; i++) {
-          var row = pension[i];
+      var penScan = pension ? pension.slice() : [];
+      if (pensionSummary) penScan.push(pensionSummary);
+      if (penScan.length > 0) {
+        for (var i = 0; i < penScan.length; i++) {
+          var row = penScan[i];
           var title = String(findRowValue_(row, ['상품명', '종목명', '이름', '항목']) || row[Object.keys(row)[0]] || '').trim();
           if (title.indexOf('개인연금 합계') !== -1) {
             penValuation = gasCoerceNumber_(findRowValue_(row, ['평가금액', '평가금']));
@@ -559,6 +567,9 @@ function getDashboardData(dataType) {
     rebalancing: rebalancing,
     etf: etf,
     pension: pension,
+    /** 합계·소계 행(목록 제외). 없으면 null */
+    etfSummary: etfSummary,
+    pensionSummary: pensionSummary,
     /** 프론트 별칭(etf / etfList 동일 데이터) */
     etfList: etf,
     pensionList: pension,
@@ -616,23 +627,149 @@ function readSheetAsObjects_(ss, sheetName, hi) {
   return convertValuesToObjects_(values, hi != null ? hi : 0);
 }
 
+/** ETF현황·연금현황 헤더 후보 행 점수 (숫자만 있는 행은 데이터로 간주) */
+function rowHeaderScoreForAssetStatus_(row) {
+  if (!row || !row.length) return 0;
+  var score = 0;
+  var seen = { p: 0, a: 0, v: 0, y: 0 };
+  for (var c = 0; c < row.length; c++) {
+    var nk = normalizeHeaderKey_(row[c]);
+    if (!nk || nk.length < 2) continue;
+    if (/^-?[\d.,%\s]+$/.test(nk)) continue;
+    if (!seen.p && /(상품명|종목명|종목|품목|이름|항목)/.test(nk)) { score += 2; seen.p = 1; }
+    if (!seen.a && /(투자원금|매수금액|매입금액|매입|^원금$)/.test(nk)) { score += 2; seen.a = 1; }
+    if (!seen.v && /(평가금액|평가금|평가액|현재평가)/.test(nk)) { score += 2; seen.v = 1; }
+    if (!seen.y && /(수익률|수익율|누적수익률)/.test(nk)) { score += 2; seen.y = 1; }
+  }
+  return score;
+}
+
 /**
- * 자산 상세용 ETF현황 / 연금현황 시트를 읽습니다.
- * - ss.getSheetByName 으로 존재 여부를 먼저 검사하고, 없으면 sheetErrors 에
- *   "시트를 찾을 수 없습니다: [시트명]" 을 넣고 빈 배열을 반환합니다.
- * - 헤더가 2행인 경우(hi=1)와 1행인 경우(hi=0)를 순서대로 시도합니다.
+ * 시트 상단 몇 행 중 헤더로 보이는 행 인덱스(0-based).
+ * 첫 데이터 행이 키로 쓰이는 오류를 막기 위해 점수가 충분할 때만 채택합니다.
  */
-function readDashboardEtfOrPensionObjects_(ss, sheetName, sheetErrors) {
+function findEtfPensionHeaderRowIndex_(values) {
+  if (!values || !values.length) return 0;
+  var maxR = Math.min(6, values.length);
+  var bestI = 0;
+  var bestScore = -1;
+  for (var r = 0; r < maxR; r++) {
+    var sc = rowHeaderScoreForAssetStatus_(values[r]);
+    if (sc > bestScore) {
+      bestScore = sc;
+      bestI = r;
+    }
+  }
+  if (bestScore >= 4) return bestI;
+  for (var r2 = 0; r2 < maxR; r2++) {
+    var row = values[r2];
+    if (!row) continue;
+    for (var c = 0; c < row.length; c++) {
+      var nk = normalizeHeaderKey_(row[c]);
+      if (nk.indexOf('상품') >= 0 || nk.indexOf('종목') >= 0 || nk.indexOf('수익률') >= 0 || nk.indexOf('평가금') >= 0) {
+        return r2;
+      }
+    }
+  }
+  return 0;
+}
+
+/**
+ * 시트 헤더 셀 문자열 → API 고정 키(상품명, 투자원금, 평가금액, 수익률).
+ * 매핑되지 않는 열은 trim 한 원본 헤더를 키로 유지(월별 수익률 등).
+ */
+function resolveCanonicalAssetStatusKey_(headerTrim) {
+  if (!headerTrim) return null;
+  var nk = normalizeHeaderKey_(headerTrim);
+  if (!nk) return null;
+  if (nk.indexOf('상품명') >= 0 || nk === '종목명' || nk === '종목' || nk === '품목' || nk === '이름' || nk === '항목') return '상품명';
+  if (nk.indexOf('투자원금') >= 0 || nk.indexOf('매수금액') >= 0 || nk.indexOf('매입금액') >= 0 || nk.indexOf('매입가') >= 0 || nk === '원금') return '투자원금';
+  if (nk.indexOf('평가금액') >= 0 || nk === '평가금' || nk.indexOf('평가액') >= 0 || nk.indexOf('현재평가') >= 0) return '평가금액';
+  if (nk.indexOf('수익률') >= 0 || nk.indexOf('수익율') >= 0 || nk.indexOf('누적수익률') >= 0) return '수익률';
+  return null;
+}
+
+function buildCanonicalAssetStatusRow_(headers, rowArr) {
+  if (!headers) headers = [];
+  if (!rowArr) rowArr = [];
+  var obj = { '상품명': null, '투자원금': null, '평가금액': null, '수익률': null };
+  var len = Math.max(headers.length, rowArr.length);
+  for (var j = 0; j < len; j++) {
+    var hk = j < headers.length ? headers[j] : '';
+    var val = rowArr && j < rowArr.length ? rowArr[j] : null;
+    var canon = hk ? resolveCanonicalAssetStatusKey_(hk) : null;
+    if (canon) {
+      if (obj[canon] === null || obj[canon] === '' || typeof obj[canon] === 'undefined') {
+        if (val === '') obj[canon] = null;
+        else if (typeof val === 'number' && !isNaN(val)) obj[canon] = val;
+        else if (val != null && val !== '') obj[canon] = val;
+        else obj[canon] = val === 0 ? 0 : null;
+      }
+    } else if (hk) {
+      if (typeof val === 'number' && !isNaN(val)) obj[hk] = val;
+      else if (val != null && val !== '') obj[hk] = val;
+      else obj[hk] = val === 0 ? 0 : null;
+    }
+  }
+  return obj;
+}
+
+function isAssetStatusRowEmpty_(obj) {
+  for (var k in obj) {
+    if (!obj.hasOwnProperty(k)) continue;
+    var v = obj[k];
+    if (v != null && v !== '' && !(typeof v === 'number' && !isNaN(v) && v === 0)) return false;
+  }
+  return true;
+}
+
+function isAssetStatusSummaryRow_(obj) {
+  var t = String(obj['상품명'] != null ? obj['상품명'] : '').trim();
+  return /합계|소계|^계$/.test(t);
+}
+
+/** 연금 시트 등에 있는 날짜 구분 행 — 목록에서 제외 */
+function isAssetStatusMetaRow_(obj) {
+  var t = String(obj['상품명'] != null ? obj['상품명'] : '').trim();
+  return /^날짜$/i.test(t);
+}
+
+/**
+ * ETF현황 / 연금현황: getValues() 2차원 배열에서 헤더 행을 찾고,
+ * headers = values[hi], data = values.slice(hi + 1) 로 분리 후
+ * 각 데이터 행을 { 상품명, 투자원금, 평가금액, 수익률, … } 고정 키로 매핑합니다.
+ * 합계·소계·계 행은 list 에서 제외하고 summary 에만 둡니다.
+ */
+function readEtfOrPensionStatusSheet_(ss, sheetName, sheetErrors) {
+  var result = { list: [], summary: null };
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
     sheetErrors.push('시트를 찾을 수 없습니다: ' + sheetName);
-    return [];
+    return result;
   }
-  var rowsHi1 = readSheetAsObjects_(ss, sheetName, 1);
-  if (rowsHi1 && rowsHi1.length > 0) return rowsHi1;
-  var rowsHi0 = readSheetAsObjects_(ss, sheetName, 0);
-  if (rowsHi0 && rowsHi0.length > 0) return rowsHi0;
-  return [];
+  var values = getSheetValuesCached_(ss, sheetName);
+  if (!values || values.length < 2) return result;
+
+  var hi = findEtfPensionHeaderRowIndex_(values);
+  var headerCells = values[hi];
+  var headers = headerCells.map(function (h) {
+    return h == null ? '' : String(h).replace(/\u3000|\t|\s+/g, ' ').trim();
+  });
+  var dataArrays = values.slice(hi + 1);
+  var summaryCandidates = [];
+
+  for (var r = 0; r < dataArrays.length; r++) {
+    var rowArr = dataArrays[r];
+    var obj = buildCanonicalAssetStatusRow_(headers, rowArr);
+    if (isAssetStatusRowEmpty_(obj)) continue;
+    if (isAssetStatusMetaRow_(obj)) continue;
+    if (isAssetStatusSummaryRow_(obj)) summaryCandidates.push(obj);
+    else result.list.push(obj);
+  }
+  if (summaryCandidates.length > 0) {
+    result.summary = summaryCandidates[summaryCandidates.length - 1];
+  }
+  return result;
 }
 
 function getRebalancingDataFromPortApi_(ss) {
