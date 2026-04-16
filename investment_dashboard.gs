@@ -113,14 +113,7 @@ function syncAllInvestmentData() {
   updatePensionHistory();
 }
 
-/** 총자산 히스토리(총자산 시트 등) 기록 — 필요 시 구현을 채웁니다. */
-function recordAssetHistory() {}
 
-/** ETF 시트 최신 이력 갱신 — 필요 시 구현을 채웁니다. */
-function updateEtfHistory() {}
-
-/** 연금 시트 최신 이력 갱신 — 필요 시 구현을 채웁니다. */
-function updatePensionHistory() {}
 
 function getElsSheetOrThrow_(ss) {
   var sheet = ss.getSheetByName(ELS_LIST_SHEET_NAME_);
@@ -415,7 +408,7 @@ function getDashboardData(dataType) {
     try { rebalancing = getRebalancingDataFromPortApi_(ss); } catch (e) { rebalancing = []; }
   }
 
-  if (dataType === 'assets' || dataType === 'all') {
+  if (dataType === 'assets' || dataType === 'summary' || dataType === 'all') {
     try { etf = readSheetAsObjects_(ss, 'ETF', 1); } catch (e) { etf = []; }
     try { pension = readSheetAsObjects_(ss, '연금', 1); } catch (e) { pension = []; }
     try { els = readSheetAsObjectsFirstNonEmpty_(ss, ['ELS(투자중)', 'ELS (투자중)', '투자중ELS'], 1); } catch (e) { els = []; }
@@ -446,7 +439,7 @@ function getDashboardData(dataType) {
       // 1) 총 자산 평가 — 최신 데이터는 헤더 바로 아래 첫 번째 행 (상단 삽입 구조)
       var totalValuation = 0, totalRate = null;
       if (totalAssets && totalAssets.length > 0) {
-        var latestRow = totalAssets[0];
+        var latestRow = totalAssets[totalAssets.length - 1]; // 하단 추가(오름차순) 구조이므로 마지막 행이 최신
         var v = gasCoerceNumber_(findRowValue_(latestRow, ['평가금 총액', '평가금총액', '평가금액']));
         var p = gasCoerceNumber_(findRowValue_(latestRow, ['원금 총액', '원금총액', '투자원금', '원금']));
         if (v != null) totalValuation = v;
@@ -655,4 +648,229 @@ function readElsListSheetWithRowIndex_(ss) {
   // add row_index properly since header=0 -> i(mapped)=0 array row map is 2 (values index + 2)
   rows.forEach(function(r, i) { r.row_index = i + 2; });
   return rows;
+}
+
+/**
+ * 자산 변동 내역 기록 스크립트 (오름차순/하단 추가 방식)
+ * - 14개 열 구조 반영 완료
+ */
+function recordAssetHistory() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("총자산");
+
+  if (!sheet) {
+    Browser.msgBox("오류: '총자산' 시트를 찾을 수 없습니다.");
+    return;
+  }
+
+  // 1. 이름 정의된 범위에서 데이터 가져오기
+  const getVal = (name) => {
+    try {
+      const range = ss.getRangeByName(name);
+      return range ? range.getValue() : 0;
+    } catch (e) {
+      return 0;
+    }
+  };
+
+  const p_pension = getVal("연금원금");
+  const p_els = getVal("ELS원금");
+  const p_etf = getVal("ETF원금");
+  const p_cash = getVal("기타원금");
+
+  const v_pension = getVal("연금평가금");
+  const v_els = getVal("ELS평가금");
+  const v_etf = getVal("ETF평가금");
+  const v_cash = getVal("기타평가금");
+
+  // 2. 현재 상태 계산
+  const today = new Date();
+  const totalPrincipal = p_pension + p_els + p_etf + p_cash; 
+  const totalValue = v_pension + v_els + v_etf + v_cash;     
+  
+  let yieldRate = 0; 
+  if (totalPrincipal > 0) {
+    yieldRate = (totalValue - totalPrincipal) / totalPrincipal;
+  }
+
+  // 3. 기록할 위치 찾기 (가장 아래 빈 행)
+  const lastRow = sheet.getLastRow();
+  const insertRow = lastRow + 1; 
+  const prevRow = lastRow; // 직전 기록은 현재의 마지막 행
+
+  // 4. 직전 기록과 비교 (증감액 계산)
+  let prevPrincipal = 0;
+  let prevValue = 0;
+
+  // 헤더가 아닌 데이터가 있는지 확인 (직전 기록 행이 1보다 커야 함)
+  if (prevRow >= 2) {
+    // 새로운 시트 구조에서 '원금 총액'은 10번째 열, '평가금 총액'은 11번째 열
+    const checkVal = sheet.getRange(prevRow, 10).getValue(); 
+    if (typeof checkVal === 'number') {
+      prevPrincipal = checkVal;
+      prevValue = sheet.getRange(prevRow, 11).getValue(); 
+    }
+  }
+
+  const deltaPrincipal = totalPrincipal - prevPrincipal; 
+  const deltaValue = totalValue - prevValue;             
+
+  // 5. 데이터 입력 (변경된 14개 열 순서에 맞춤)
+  const recordData = [[
+    today,           // 1. 평가일
+    p_pension,       // 2. 연금 원금
+    v_pension,       // 3. 연금 평가금
+    p_els,           // 4. ELS 원금
+    v_els,           // 5. ELS 평가금
+    p_etf,           // 6. ETF 원금
+    v_etf,           // 7. ETF 평가금
+    p_cash,          // 8. 현금 원금
+    v_cash,          // 9. 현금 평가금
+    totalPrincipal,  // 10. 원금 총액
+    totalValue,      // 11. 평가금 총액
+    yieldRate,       // 12. 수익률
+    deltaPrincipal,  // 13. 원금 증감액
+    deltaValue       // 14. 평가 증감액
+  ]];
+
+  // 14개 열에 데이터 쓰기
+  sheet.getRange(insertRow, 1, 1, 14).setValues(recordData);
+
+  // 6. 서식 복사 (디자인 유지 - 14개 열 복사)
+  try {
+    if (prevRow >= 2) { 
+      const styleSource = sheet.getRange(prevRow, 1, 1, 14);
+      styleSource.copyTo(
+        sheet.getRange(insertRow, 1, 1, 14), 
+        SpreadsheetApp.CopyPasteType.PASTE_FORMAT, 
+        false
+      );
+    }
+  } catch (e) {
+    // 서식 복사 실패 시 무시
+  }
+
+  SpreadsheetApp.flush(); 
+  ss.toast("자산 현황 하단 기록 완료!", "완료", 3);
+}
+
+/** 헬퍼함수: 텍스트로 행 위치 찾기 (기존 유지) */
+function findRowByText(sheet, text) {
+  const finder = sheet.createTextFinder(text);
+  const match = finder.findNext();
+  if (match) return match.getRow();
+  return -1;
+}
+
+/**
+ * ETF 현재 수익률을 'ETF기록' 시트에 스냅샷으로 저장
+ * - 'ETF' 시트의 A열(상품명)과 E열(현재 수익률)을 읽어옴
+ * - 오늘 날짜와 함께 'ETF_기록' 시트 하단에 추가
+ */
+function updateEtfHistory() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sourceSheet = ss.getSheetByName("ETF현황");
+  let targetSheet = ss.getSheetByName("ETF기록");
+
+  // 1. 대상 시트가 없으면 생성
+  if (!targetSheet) {
+    targetSheet = ss.insertSheet("ETF기록");
+    targetSheet.appendRow(["기록일자", "상품명", "수익률"]);
+  }
+
+  // 2. 소스 데이터 가져오기 (A열: 상품명, E열: 수익률)
+  const lastRow = sourceSheet.getLastRow();
+  const data = sourceSheet.getRange(2, 1, lastRow - 1, 5).getValues(); // 2행부터 E열(5열)까지
+  
+  const today = new Date();
+  const historyData = [];
+
+  // 3. 데이터 정제 (합계 제외 및 배열 생성)
+  for (let i = 0; i < data.length; i++) {
+    const productName = data[i][0]; // A열
+    const currentYield = data[i][4]; // E열 (인덱스 4)
+
+    // 상품명이 있고, '합계' 행이 아닌 경우만 기록
+    if (productName && productName !== "합계" && currentYield !== "") {
+      historyData.push([today, productName, currentYield]);
+    }
+  }
+
+  // 4. 'ETF_기록' 시트 하단에 데이터 추가
+  if (historyData.length > 0) {
+    targetSheet.getRange(targetSheet.getLastRow() + 1, 1, historyData.length, 3).setValues(historyData);
+    
+    // 서식 복사 (직전 행의 날짜/백분율 서식 유지)
+    const lastRowBeforeInsert = targetSheet.getLastRow() - historyData.length;
+    if (lastRowBeforeInsert >= 2) {
+      targetSheet.getRange(lastRowBeforeInsert, 1, 1, 3).copyTo(
+        targetSheet.getRange(lastRowBeforeInsert + 1, 1, historyData.length, 3),
+        SpreadsheetApp.CopyPasteType.PASTE_FORMAT,
+        false
+      );
+    }
+    
+    ss.toast("ETF 수익률 기록 완료!", "완료", 3);
+  } else {
+    ss.toast("기록할 데이터가 없습니다.", "알림", 3);
+  }
+}
+
+/**
+ * 연금 현재 수익률을 '연금기록' 시트에 스냅샷으로 저장
+ * - '연금' 시트의 상품명(A열)과 수익률(E열)을 읽어옴
+ * - '연금기록' 시트의 구조 [상품명, 평가일, 수익률]에 맞춰 저장
+ */
+function updatePensionHistory() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sourceSheet = ss.getSheetByName("연금현황");
+  let targetSheet = ss.getSheetByName("연금기록");
+
+  // 1. 대상 시트가 없으면 생성
+  if (!targetSheet) {
+    targetSheet = ss.insertSheet("연금기록");
+    targetSheet.appendRow(["상품명", "평가일", "수익률"]);
+  }
+
+  // 2. 소스 데이터 가져오기 (A열: 상품명, E열: 수익률)
+  // 데이터 시작 행(3행)부터 마지막 행까지
+  const startRow = 3;
+  const lastRow = sourceSheet.getLastRow();
+  if (lastRow < startRow) return; // 데이터가 없으면 종료
+
+  const data = sourceSheet.getRange(startRow, 1, lastRow - startRow + 1, 5).getValues();
+  
+  const today = new Date();
+  const historyData = [];
+
+  // 3. 데이터 정제 (합계 행 제외 및 배열 생성)
+  for (let i = 0; i < data.length; i++) {
+    const productName = data[i][0]; // A열
+    const currentYield = data[i][4]; // E열 (수익률)
+
+    // 상품명이 있고, '합계'가 포함된 행이 아닌 경우만 기록
+    if (productName && !productName.includes("합계") && currentYield !== "") {
+      // 순서: [상품명, 평가일, 수익률]
+      historyData.push([productName, today, currentYield]);
+    }
+  }
+
+  // 4. '연금기록' 시트 하단에 데이터 추가
+  if (historyData.length > 0) {
+    const targetLastRow = targetSheet.getLastRow();
+    targetSheet.getRange(targetLastRow + 1, 1, historyData.length, 3).setValues(historyData);
+    
+    // 서식 복사 (직전 행의 날짜/백분율 서식 유지)
+    if (targetLastRow >= 2) {
+      targetSheet.getRange(targetLastRow, 1, 1, 3).copyTo(
+        targetSheet.getRange(targetLastRow + 1, 1, historyData.length, 3),
+        SpreadsheetApp.CopyPasteType.PASTE_FORMAT,
+        false
+      );
+    }
+    
+    ss.toast("연금 수익률 기록 완료!", "완료", 3);
+  } else {
+    ss.toast("기록할 데이터가 없습니다.", "알림", 3);
+  }
 }
