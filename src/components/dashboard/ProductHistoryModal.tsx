@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import type { TooltipProps } from 'recharts'
 import { fetchProductHistory, type ProductHistoryKind } from '../../api/api'
 
 export interface ProductHistoryModalProps {
@@ -20,6 +21,23 @@ export interface ProductHistoryModalProps {
 }
 
 type ChartPoint = { date: string; rate: number }
+
+function HistoryTooltipContent({ active, payload, label }: TooltipProps<number, string>) {
+  if (!active || !payload?.length) return null
+  const raw = payload[0].value
+  const n = typeof raw === 'number' && !Number.isNaN(raw) ? raw : Number(raw)
+  if (Number.isNaN(n)) return null
+  return (
+    <div className="pointer-events-none min-w-[148px] rounded-xl border border-white/10 bg-slate-950/95 px-3.5 py-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-md ring-1 ring-cyan-500/10">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">평가일</p>
+      <p className="mt-0.5 text-sm font-semibold tabular-nums tracking-tight text-slate-50">{label ?? '—'}</p>
+      <div className="mt-2.5 border-t border-white/10 pt-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">수익률</p>
+        <p className="mt-0.5 text-lg font-bold tabular-nums text-cyan-300">{n.toFixed(2)}%</p>
+      </div>
+    </div>
+  )
+}
 
 export function ProductHistoryModal({
   open,
@@ -163,16 +181,17 @@ export function ProductHistoryModal({
                         domain={['auto', 'auto']}
                       />
                       <Tooltip
-                        contentStyle={{
-                          background: 'rgba(15,23,42,0.92)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '12px',
-                          boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
-                          backdropFilter: 'blur(12px)',
+                        animationDuration={180}
+                        animationEasing="ease-out"
+                        cursor={{
+                          stroke: 'rgba(165, 243, 252, 0.45)',
+                          strokeWidth: 1.25,
+                          strokeLinecap: 'round',
                         }}
-                        labelStyle={{ color: '#e2e8f0', fontSize: 12, fontWeight: 600 }}
-                        formatter={(value: number) => [`${value.toFixed(2)}%`, '수익률']}
-                        labelFormatter={(label) => `평가일 ${label}`}
+                        allowEscapeViewBox={{ x: true, y: true }}
+                        offset={12}
+                        wrapperStyle={{ outline: 'none', transition: 'opacity 0.12s ease-out' }}
+                        content={HistoryTooltipContent}
                       />
                       <Area
                         type="monotone"
@@ -180,8 +199,20 @@ export function ProductHistoryModal({
                         stroke="#22d3ee"
                         strokeWidth={2}
                         fill="url(#historyFill)"
-                        dot={{ r: 3, fill: '#0891b2', stroke: '#cffafe', strokeWidth: 1 }}
-                        activeDot={{ r: 5 }}
+                        dot={false}
+                        activeDot={{
+                          r: 6,
+                          strokeWidth: 2,
+                          stroke: '#f8fafc',
+                          fill: '#06b6d4',
+                          style: {
+                            filter: 'drop-shadow(0 0 8px rgba(34,211,238,0.55))',
+                            transition: 'r 0.2s ease-out, stroke-width 0.2s ease-out, opacity 0.2s ease-out',
+                          },
+                        }}
+                        isAnimationActive
+                        animationDuration={520}
+                        animationEasing="ease-in-out"
                       />
                     </AreaChart>
                   </ResponsiveContainer>
