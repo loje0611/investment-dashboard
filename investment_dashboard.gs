@@ -775,7 +775,7 @@ function updateEtfHistory() {
   // 1. 대상 시트가 없으면 생성
   if (!targetSheet) {
     targetSheet = ss.insertSheet("ETF기록");
-    targetSheet.appendRow(["기록일자", "상품명", "수익률"]);
+    targetSheet.appendRow(["상품명", "평가일", "수익률"]);
   }
 
   // 2. 소스 데이터 가져오기 (A열: 상품명, E열: 수익률)
@@ -792,7 +792,7 @@ function updateEtfHistory() {
 
     // 상품명이 있고, '합계' 행이 아닌 경우만 기록
     if (productName && productName !== "합계" && currentYield !== "") {
-      historyData.push([today, productName, currentYield]);
+      historyData.push([productName, today, currentYield]);
     }
   }
 
@@ -848,8 +848,8 @@ function updatePensionHistory() {
     const productName = data[i][0]; // A열
     const currentYield = data[i][4]; // E열 (수익률)
 
-    // 상품명이 있고, '합계'가 포함된 행이 아닌 경우만 기록
-    if (productName && !productName.includes("합계") && currentYield !== "") {
+    // 상품명이 있고, '합계'가 포함된 행이 아닌 경우만 기록 (시트 값이 숫자·빈칸 등일 때 대비)
+    if (productName && !String(productName).includes("합계") && currentYield !== "") {
       // 순서: [상품명, 평가일, 수익률]
       historyData.push([productName, today, currentYield]);
     }
