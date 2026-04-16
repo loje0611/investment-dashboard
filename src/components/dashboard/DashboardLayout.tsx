@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useStore } from '../../store/useStore'
 import { getWorstPerformer } from '../../utils/elsWorstPerformer'
@@ -31,6 +31,7 @@ import { ElsRedeemModal } from './ElsRedeemModal'
 import { AmountHideToggle } from './AmountHideToggle'
 import { LogoutButton } from '../LogoutButton'
 import { FileQuestion } from 'lucide-react'
+import { postSyncAllInvestment } from '../../api/api'
 
 const ELS_TRY_MAPPINGS_FOR_SHEET = [
   ELS_INVESTING_SHEET_MAPPING,
@@ -89,9 +90,37 @@ export function DashboardLayout() {
   const [mainTab, setMainTab] = useState<MainTabId>('home')
   const [isElsRegisterModalOpen, setIsElsRegisterModalOpen] = useState(false)
   const [redeemTarget, setRedeemTarget] = useState<ElsCardItem | null>(null)
+  const [isSyncingAll, setIsSyncingAll] = useState(false)
+  const [syncToast, setSyncToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(
+    null
+  )
 
   useEffect(() => {
     fetchData()
+  }, [fetchData])
+
+  useEffect(() => {
+    if (!syncToast) return
+    const t = window.setTimeout(() => setSyncToast(null), 3200)
+    return () => window.clearTimeout(t)
+  }, [syncToast])
+
+  const handleSyncAll = useCallback(async () => {
+    if (!window.confirm('현재 자산 현황을 시트에 기록하시겠습니까?')) return
+    setIsSyncingAll(true)
+    try {
+      await postSyncAllInvestment()
+      setSyncToast({
+        message: '모든 데이터가 성공적으로 기록되었습니다.',
+        tone: 'success',
+      })
+      await fetchData()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '동기화에 실패했습니다.'
+      setSyncToast({ message: msg, tone: 'error' })
+    } finally {
+      setIsSyncingAll(false)
+    }
   }, [fetchData])
 
   const elsListManageTab = useMemo((): ElsCardItem[] => {
@@ -352,7 +381,29 @@ export function DashboardLayout() {
         )}
       </div>
 
-      <BottomNav current={mainTab} onSelect={setMainTab} />
+      {syncToast != null && (
+        <div
+          className="fixed bottom-[4.75rem] left-1/2 z-[60] max-w-[min(420px,calc(100vw-2rem))] -translate-x-1/2 px-4"
+          role="status"
+        >
+          <div
+            className={`rounded-xl px-4 py-3 text-center text-sm font-medium shadow-lg backdrop-blur-sm ${
+              syncToast.tone === 'success'
+                ? 'border border-emerald-200/80 bg-emerald-50/95 text-emerald-900'
+                : 'border border-rose-200/80 bg-rose-50/95 text-rose-900'
+            }`}
+          >
+            {syncToast.message}
+          </div>
+        </div>
+      )}
+
+      <BottomNav
+        current={mainTab}
+        onSelect={setMainTab}
+        isSyncing={isSyncingAll}
+        onSyncAll={handleSyncAll}
+      />
     </div>
   )
 }

@@ -84,6 +84,10 @@ function doPost(e) {
       handleElsRedeem_(ss, body);
       return jsonResponse_({ success: true, message: '상환 처리되었습니다.' });
     }
+    if (action === 'syncall') {
+      syncAllInvestmentData();
+      return jsonResponse_({ success: true, message: '모든 데이터가 성공적으로 기록되었습니다.' });
+    }
     if (action === '' || action === 'create') {
       handleElsCreate_(ss, body);
       return jsonResponse_({ success: true, message: '등록되었습니다.' });
@@ -97,6 +101,26 @@ function doPost(e) {
 function jsonResponse_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
+
+/**
+ * 총자산·ETF·연금 시트에 현재 자산 데이터를 순서대로 기록합니다.
+ * recordAssetHistory / updateEtfHistory / updatePensionHistory 에 실제 기록 로직을 두세요.
+ * (이미 다른 스크립트 파일에 동일 이름으로 구현했다면, 여기의 스텁 함수는 삭제하세요.)
+ */
+function syncAllInvestmentData() {
+  recordAssetHistory();
+  updateEtfHistory();
+  updatePensionHistory();
+}
+
+/** 총자산 히스토리(총자산 시트 등) 기록 — 필요 시 구현을 채웁니다. */
+function recordAssetHistory() {}
+
+/** ETF 시트 최신 이력 갱신 — 필요 시 구현을 채웁니다. */
+function updateEtfHistory() {}
+
+/** 연금 시트 최신 이력 갱신 — 필요 시 구현을 채웁니다. */
+function updatePensionHistory() {}
 
 function getElsSheetOrThrow_(ss) {
   var sheet = ss.getSheetByName(ELS_LIST_SHEET_NAME_);

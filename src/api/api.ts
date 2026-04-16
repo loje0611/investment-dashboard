@@ -79,3 +79,50 @@ export async function fetchDashboardData(
 
   return data as DashboardSheetResponse;
 }
+
+export interface SyncAllInvestmentResponse {
+  success?: boolean;
+  error?: string;
+  message?: string;
+}
+
+/**
+ * 전체 자산 데이터 동기화: GAS doPost에 `action: "syncAll"` 전송.
+ * - text/plain + JSON 본문: ELS 등록 API와 동일하게 CORS preflight 회피
+ */
+export async function postSyncAllInvestment(
+  endpoint?: string
+): Promise<SyncAllInvestmentResponse> {
+  const baseUrl = endpoint ?? getDefaultWebAppUrl();
+  if (!baseUrl) throw new Error('VITE_WEB_APP_URL이 설정되지 않았습니다. .env 파일을 확인하세요.');
+  if (baseUrl.endsWith('/dev')) {
+    throw new Error(
+      '웹앱 URL이 /dev(테스트 배포)입니다. CORS 문제가 있을 수 있습니다. /exec 로 끝나는 주소를 사용하세요.'
+    );
+  }
+
+  const res = await fetch(baseUrl, {
+    method: 'POST',
+    mode: 'cors',
+    redirect: 'follow',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'text/plain;charset=utf-8',
+    },
+    body: JSON.stringify({ action: 'syncAll' }),
+  });
+
+  const text = await res.text();
+  let data: SyncAllInvestmentResponse;
+  try {
+    data = JSON.parse(text) as SyncAllInvestmentResponse;
+  } catch {
+    throw new Error('서버 응답을 JSON으로 읽을 수 없습니다.');
+  }
+
+  if (!data.success) {
+    throw new Error(data.error ?? '동기화에 실패했습니다.');
+  }
+
+  return data;
+}
