@@ -8,7 +8,7 @@
  *
  * 반환 형식: { totalAssets, portfolio, rebalancing, etf, pension, els, elsSheetTotals, elsCompleted, cashOther, elsListSheetData }
  */
-var SPREADSHEET_ID = '1g1VBYupYjmkiF-85CXgjFvu4qzzSjtKTLGgXYNIhKQM';
+var SPREADSHEET_ID = '1MEr9roiooSY-BOG02gO_jJ-UNSaWOmnNmFLyLBKfdI4';
 
 var ELS_LIST_SHEET_NAME_ = 'ELS목록';
 var ELS_PENDING_STATUS_ = '청약 중(대기)';

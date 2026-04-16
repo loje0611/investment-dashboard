@@ -1,4 +1,4 @@
-import { Home, PieChart, Scale, ClipboardPlus, RefreshCw, Loader2 } from 'lucide-react'
+import { Home, PieChart, Scale, ClipboardPlus, Calculator, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 export type MainTabId = 'home' | 'assets' | 'rebalancing' | 'elsRegister'
@@ -8,10 +8,10 @@ type SyncDef = { kind: 'sync' }
 
 const NAV_ITEMS: (TabDef | SyncDef)[] = [
   { kind: 'tab', id: 'home', label: '홈', Icon: Home },
-  { kind: 'sync' },
   { kind: 'tab', id: 'assets', label: '자산 상세', Icon: PieChart },
   { kind: 'tab', id: 'rebalancing', label: '리밸런싱', Icon: Scale },
   { kind: 'tab', id: 'elsRegister', label: 'ELS 관리', Icon: ClipboardPlus },
+  { kind: 'sync' },
 ]
 
 interface BottomNavProps {
@@ -33,9 +33,9 @@ export function BottomNav({ current, onSelect, isSyncing = false, onSyncAll }: B
           if (item.kind === 'sync') {
             return (
               <button
-                key="sync-all"
+                key="settlement-sync"
                 type="button"
-                aria-label="전체 자산 데이터 동기화"
+                aria-label="자산 정산 기록"
                 disabled={isSyncing || !onSyncAll}
                 onClick={() => onSyncAll?.()}
                 className="relative flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 text-slate-400 transition-colors hover:text-indigo-600 active:text-slate-600 disabled:pointer-events-none disabled:opacity-50"
@@ -44,10 +44,10 @@ export function BottomNav({ current, onSelect, isSyncing = false, onSyncAll }: B
                   {isSyncing ? (
                     <Loader2 className="h-5 w-5 shrink-0 animate-spin text-indigo-600" strokeWidth={2} aria-hidden />
                   ) : (
-                    <RefreshCw className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
+                    <Calculator className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
                   )}
                   <span className="text-[9px] font-semibold leading-tight tracking-tight text-slate-500 sm:text-[10px]">
-                    동기화
+                    정산
                   </span>
                 </span>
               </button>
