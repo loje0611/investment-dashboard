@@ -38,7 +38,10 @@ function normalizeHeaderKey(k: string): string {
 /** '수익률' 열 다음부터 최대 6개 키(월별 등). 없으면 레거시: 6~11번째 키 */
 function keysAfterYieldColumn(row: SheetDataRow, max: number): string[] {
   const keys = Object.keys(row);
-  const idx = keys.findIndex((k) => normalizeHeaderKey(k) === '수익률');
+  const idx = keys.findIndex((k) => {
+    const n = normalizeHeaderKey(k);
+    return n === '수익률' || n === '전체 수익률' || n === '누적 수익률';
+  });
   if (idx >= 0 && idx < keys.length - 1) {
     return keys.slice(idx + 1, idx + 1 + max);
   }
@@ -78,11 +81,6 @@ function isEtfSummaryOrEmptyRow(row: SheetDataRow): boolean {
  * 컬럼명: 상품명/종목명, 투자원금/원금, 평가금액/평가금, 수익률/전체 수익률 등
  */
 export function portfolioToEtfRows(rows: SheetDataRow[]): EtfRow[] {
-  if (import.meta.env.DEV && rows.length > 0) {
-    // 시트→JSON 키 순서 확인 (ETF현황/연금현황 헤더 변경 시 디버깅용)
-    console.log('[ETF현황] 첫 데이터 행 키:', Object.keys(rows[0]))
-  }
-
   return rows.filter((row) => !isEtfSummaryOrEmptyRow(row)).map((row, i) => {
     const name =
       toString(row.상품명) ||
@@ -92,12 +90,15 @@ export function portfolioToEtfRows(rows: SheetDataRow[]): EtfRow[] {
       '-';
     const principal =
       toNumber(row.투자원금) ||
+      toNumber(row['투자 원금']) ||
       toNumber(row.원금) ||
       toNumber(row.매입금액) ||
+      toNumber(row['매입 금액']) ||
       toNumber(row.매입가) * toNumber(row.수량) ||
       0;
     const valuation =
       toNumber(row.평가금액) ||
+      toNumber(row['평가 금액']) ||
       toNumber(row.평가금) ||
       toNumber(row.현재평가) ||
       toNumber(row.평가) ||
@@ -106,7 +107,10 @@ export function portfolioToEtfRows(rows: SheetDataRow[]): EtfRow[] {
     const returnRate =
       principal > 0 && valuation !== 0
         ? ((valuation - principal) / principal) * 100
-        : parseRate(row.수익률) || parseRate(row['전체 수익률']) || toNumber(row['수익률(%)']);
+        : parseRate(row.수익률) ||
+          parseRate(row['전체 수익률']) ||
+          parseRate(row['누적 수익률']) ||
+          toNumber(row['수익률(%)']);
     const sparklineData = parseSparkline(row, returnRate);
     // sparklineData가 소수(0.37=37%)이면 100 곱한 뒤 차이 구해 %p 단위로
     const monthlyDeltas =

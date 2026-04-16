@@ -46,6 +46,8 @@ export interface DashboardState {
   summaryCards: import('../data/dashboardDummy').SummaryCardItem[];
   /** 서버 연산 파이 차트 */
   pieData: import('../data/dashboardDummy').PieSegment[];
+  /** GAS가 반환한 시트 오류 안내(ETF현황·연금현황 등) */
+  sheetErrors: string[];
   /** 로딩 여부 (전체 또는 summary) */
   isLoading: boolean;
   /** 자산 상세(ELS/ETF/연금) 로딩 여부 */
@@ -83,6 +85,7 @@ const initialState: DashboardState = {
   elsListSheetData: [],
   summaryCards: [],
   pieData: [],
+  sheetErrors: [],
   isLoading: false,
   isLoadingAssets: false,
   isLoadingRebalancing: false,
@@ -101,8 +104,8 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
         totalAssets: data.totalAssets ?? [],
         portfolio: data.portfolio ?? [],
         rebalancing: data.rebalancing ?? [],
-        etf: data.etf ?? [],
-        pension: data.pension ?? [],
+        etf: data.etf ?? data.etfList ?? [],
+        pension: data.pension ?? data.pensionList ?? [],
         els: data.els ?? [],
         elsSheetTotals: data.elsSheetTotals ?? null,
         elsCompleted: data.elsCompleted ?? [],
@@ -110,6 +113,7 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
         elsListSheetData: data.elsListSheetData ?? [],
         summaryCards: data.summaryCards ?? [],
         pieData: data.pieData ?? [],
+        sheetErrors: data.sheetErrors ?? [],
         isLoading: false,
         isLoadingAssets: false,
         isLoadingRebalancing: false,
@@ -122,6 +126,7 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
         isLoadingAssets: false,
         isLoadingRebalancing: false,
         error: message,
+        sheetErrors: [],
       });
     }
   },
@@ -131,8 +136,8 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
     try {
       const data = await fetchDashboardData(endpoint, 'assets');
       set({
-        etf: data.etf ?? [],
-        pension: data.pension ?? [],
+        etf: data.etf ?? data.etfList ?? [],
+        pension: data.pension ?? data.pensionList ?? [],
         els: data.els ?? [],
         elsSheetTotals: data.elsSheetTotals ?? null,
         elsCompleted: data.elsCompleted ?? [],
@@ -140,10 +145,11 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
         elsListSheetData: data.elsListSheetData ?? [],
         summaryCards: data.summaryCards ?? [],
         pieData: data.pieData ?? [],
+        sheetErrors: data.sheetErrors ?? [],
         isLoadingAssets: false,
       });
     } catch (err) {
-      set({ isLoadingAssets: false });
+      set({ isLoadingAssets: false, sheetErrors: [] });
     }
   },
 

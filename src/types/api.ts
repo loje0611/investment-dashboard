@@ -134,4 +134,10 @@ export interface DashboardSheetResponse {
   summaryCards?: import('../data/dashboardDummy').SummaryCardItem[];
   /** 서버 연산 파이 차트 */
   pieData?: import('../data/dashboardDummy').PieSegment[];
+  /** ETF현황·연금현황 시트 없음 등 (예: 시트를 찾을 수 없습니다: ETF현황) */
+  sheetErrors?: string[];
+  /** etf 와 동일 (백엔드 별칭) */
+  etfList?: EtfSheetRow[];
+  /** pension 와 동일 (백엔드 별칭) */
+  pensionList?: PensionSheetRow[];
 }

@@ -36,7 +36,10 @@ function normalizeHeaderKey(k: string): string {
 
 function keysAfterYieldColumn(row: SheetDataRow, max: number): string[] {
   const keys = Object.keys(row)
-  const idx = keys.findIndex((k) => normalizeHeaderKey(k) === '수익률')
+  const idx = keys.findIndex((k) => {
+    const n = normalizeHeaderKey(k)
+    return n === '수익률' || n === '전체 수익률' || n === '누적 수익률'
+  })
   if (idx >= 0 && idx < keys.length - 1) {
     return keys.slice(idx + 1, idx + 1 + max)
   }
@@ -83,18 +86,20 @@ function parseSixValues(row: SheetDataRow, fallback: number): number[] {
  * 상품 행만 남기고(개인연금 합계·날짜·빈 행 제외) 시트 순서대로 상한까지 노출합니다.
  */
 export function pensionToRows(rows: SheetDataRow[]): PensionRow[] {
-  if (import.meta.env.DEV && rows.length > 0) {
-    console.log('[연금현황] 첫 데이터 행 키:', Object.keys(rows[0]))
-  }
-
   const detailRows = rows.filter(isPensionDetailProductRow).slice(0, PENSION_DETAIL_MAX_ROWS)
 
   return detailRows.map((row, i) => {
     const name = getPensionProductLabel(row) || '-';
     const principal =
-      toNumber(row.투자원금) || toNumber(row.원금) || toNumber(row.매입금액) || 0;
+      toNumber(row.투자원금) ||
+      toNumber(row['투자 원금']) ||
+      toNumber(row.원금) ||
+      toNumber(row.매입금액) ||
+      toNumber(row['매입 금액']) ||
+      0;
     const valuation =
       toNumber(row.평가금액) ||
+      toNumber(row['평가 금액']) ||
       toNumber(row.평가금) ||
       toNumber(row.현재평가) ||
       toNumber(row.평가) ||
@@ -102,7 +107,10 @@ export function pensionToRows(rows: SheetDataRow[]): PensionRow[] {
     const returnRate =
       principal > 0 && valuation !== 0
         ? ((valuation - principal) / principal) * 100
-        : parseRate(row.수익률) || parseRate(row['전체 수익률']) || 0;
+        : parseRate(row.수익률) ||
+          parseRate(row['전체 수익률']) ||
+          parseRate(row['누적 수익률']) ||
+          0;
 
     const sixValues = parseSixValues(row, returnRate / 100);
     const isDecimal = sixValues.every((x) => Math.abs(x) <= 2);

@@ -91,6 +91,7 @@ export function DashboardLayout() {
     fetchData,
     clearError,
     hideAmounts,
+    sheetErrors,
   } = useStore()
   const [mainTab, setMainTab] = useState<MainTabId>('home')
   const [isElsRegisterModalOpen, setIsElsRegisterModalOpen] = useState(false)
@@ -288,6 +289,7 @@ export function DashboardLayout() {
                 etfTable={etfTableForTab}
                 pensionTable={pensionTableForTab}
                 isLoading={isLoading || isLoadingAssets}
+                sheetErrors={sheetErrors}
                 hideAmounts={hideAmounts}
               />
             </div>

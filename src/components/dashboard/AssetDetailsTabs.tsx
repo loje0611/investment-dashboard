@@ -11,6 +11,8 @@ interface AssetDetailsTabsProps {
   pensionTable: PensionRow[]
   /** 상세 현황 데이터 로딩 중일 때 true */
   isLoading?: boolean
+  /** GAS에서 시트 미존재 등 안내 */
+  sheetErrors?: string[]
   hideAmounts: boolean
 }
 
@@ -55,6 +57,7 @@ export function AssetDetailsTabs({
   etfTable,
   pensionTable,
   isLoading = false,
+  sheetErrors = [],
   hideAmounts,
 }: AssetDetailsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('etf')
@@ -66,6 +69,16 @@ export function AssetDetailsTabs({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
+      {sheetErrors.length > 0 && (
+        <div
+          className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950"
+          role="alert"
+        >
+          {sheetErrors.map((msg) => (
+            <p key={msg}>{msg}</p>
+          ))}
+        </div>
+      )}
       {/* 상단 탭: 항상 고정 */}
       <div className="flex shrink-0 border-b border-slate-200">
         {tabs.map((tab) => {

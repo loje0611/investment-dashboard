@@ -6,9 +6,13 @@
  * 스프레드시트 ID로 openById()를 사용해야 합니다.
  * 아래 SPREADSHEET_ID를 본인 스프레드시트 ID로 변경하세요.
  *
- * 반환 형식: { totalAssets, portfolio, rebalancing, etf, pension, els, elsSheetTotals, elsCompleted, cashOther, elsListSheetData }
+ * 반환 형식: { totalAssets, portfolio, rebalancing, etf, etfList, pension, pensionList, els, elsSheetTotals, elsCompleted, cashOther, elsListSheetData, summaryCards, pieData, sheetErrors }
  */
 var SPREADSHEET_ID = '1MEr9roiooSY-BOG02gO_jJ-UNSaWOmnNmFLyLBKfdI4';
+
+/** 대시보드·자산 상세: 띄어쓰기 없이 시트 탭 이름과 정확히 일치해야 함 */
+var ETF_DASHBOARD_SHEET_ = 'ETF현황';
+var PENSION_DASHBOARD_SHEET_ = '연금현황';
 
 var ELS_LIST_SHEET_NAME_ = 'ELS목록';
 var ELS_PENDING_STATUS_ = '청약 중(대기)';
@@ -398,6 +402,7 @@ function getDashboardData(dataType) {
   var elsSheetTotals = null;
   var summaryCards = [];
   var pieData = [];
+  var sheetErrors = [];
 
   if (dataType === 'summary' || dataType === 'all') {
     try { totalAssets = readTotalAssetsSheet_(ss); } catch (e) { totalAssets = []; }
@@ -409,8 +414,8 @@ function getDashboardData(dataType) {
   }
 
   if (dataType === 'assets' || dataType === 'summary' || dataType === 'all') {
-    try { etf = readSheetAsObjects_(ss, 'ETF현황', 1); } catch (e) { etf = []; }
-    try { pension = readSheetAsObjects_(ss, '연금현황', 1); } catch (e) { pension = []; }
+    etf = readDashboardEtfOrPensionObjects_(ss, ETF_DASHBOARD_SHEET_, sheetErrors);
+    pension = readDashboardEtfOrPensionObjects_(ss, PENSION_DASHBOARD_SHEET_, sheetErrors);
     try { els = readSheetAsObjectsFirstNonEmpty_(ss, ['ELS(투자중)', 'ELS (투자중)', '투자중ELS'], 1); } catch (e) { els = []; }
     try { elsCompleted = readSheetAsObjectsFirstNonEmpty_(ss, ['ELS(완료)', 'ELS (완료)', 'ELS완료'], 1); } catch (e) { elsCompleted = []; }
     
@@ -554,13 +559,17 @@ function getDashboardData(dataType) {
     rebalancing: rebalancing,
     etf: etf,
     pension: pension,
+    /** 프론트 별칭(etf / etfList 동일 데이터) */
+    etfList: etf,
+    pensionList: pension,
     els: els,
     elsSheetTotals: elsSheetTotals,
     elsCompleted: elsCompleted,
     cashOther: cashOther,
     elsListSheetData: elsListSheetData,
     summaryCards: summaryCards,
-    pieData: pieData
+    pieData: pieData,
+    sheetErrors: sheetErrors
   };
 }
 
@@ -605,6 +614,25 @@ function convertValuesToObjects_(values, hi) {
 function readSheetAsObjects_(ss, sheetName, hi) {
   var values = getSheetValuesCached_(ss, sheetName);
   return convertValuesToObjects_(values, hi != null ? hi : 0);
+}
+
+/**
+ * 자산 상세용 ETF현황 / 연금현황 시트를 읽습니다.
+ * - ss.getSheetByName 으로 존재 여부를 먼저 검사하고, 없으면 sheetErrors 에
+ *   "시트를 찾을 수 없습니다: [시트명]" 을 넣고 빈 배열을 반환합니다.
+ * - 헤더가 2행인 경우(hi=1)와 1행인 경우(hi=0)를 순서대로 시도합니다.
+ */
+function readDashboardEtfOrPensionObjects_(ss, sheetName, sheetErrors) {
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheetErrors.push('시트를 찾을 수 없습니다: ' + sheetName);
+    return [];
+  }
+  var rowsHi1 = readSheetAsObjects_(ss, sheetName, 1);
+  if (rowsHi1 && rowsHi1.length > 0) return rowsHi1;
+  var rowsHi0 = readSheetAsObjects_(ss, sheetName, 0);
+  if (rowsHi0 && rowsHi0.length > 0) return rowsHi0;
+  return [];
 }
 
 function getRebalancingDataFromPortApi_(ss) {

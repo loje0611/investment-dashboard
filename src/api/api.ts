@@ -77,6 +77,9 @@ export async function fetchDashboardData(
     throw new Error('응답이 객체가 아닙니다.');
   }
 
+  // 일시 디버깅: 자산 상세(etf/pension) 응답 구조 확인 (F12 콘솔)
+  console.log('Fetched Data:', data);
+
   return data as DashboardSheetResponse;
 }
 
