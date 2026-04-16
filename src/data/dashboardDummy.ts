@@ -1,65 +1,22 @@
-/** 요약 카드 1개 (금액 + 수익률) */
-export interface SummaryCardItem {
-  id: string
-  title: string
-  amount?: number
-  rate?: number
-}
+export type {
+  SummaryCardItem,
+  PieSegment,
+  TrendPoint,
+  ElsCardItem,
+  EtfRow,
+  PensionRow,
+  RebalancingHolding,
+  RebalancingAccount,
+} from '../types/dashboard'
 
-/** 자산 배분 파이용 */
-export interface PieSegment {
-  name: string
-  value: number
-  color: string
-}
-
-/** 자산 변동 추이 한 점 */
-export interface TrendPoint {
-  month: string
-  pension: number
-  els: number
-  etf: number
-}
-
-/** ELS 카드 한 건 */
-export interface ElsCardItem {
-  id: string
-  productName: string
-  nextRedemptionDate: string
-  currentLevel: number
-  kiBarrier: number
-  redemptionBarrier: number
-  /** ELS목록 시트 행(1-based). 상환 API용 */
-  rowIndex?: number
-  /** 시트 가입금액(원) — 상환 금액 기본값 힌트 */
-  joinAmount?: number
-  /** 이미 상환완료면 카드 탭 비활성 */
-  isRedeemed?: boolean
-}
-
-/** ETF 테이블 행 */
-export interface EtfRow {
-  id: string
-  name: string
-  principal: number
-  valuation: number
-  returnRate: number
-  /** 최근 6개월 수익률 추이 (%) */
-  sparklineData: number[]
-  /** 최근 6개월 월별 수익률 증감분(%p). 양수=상승, 음수=하락 */
-  monthlyDeltas: number[]
-}
-
-/** 연금 테이블 행 */
-export interface PensionRow {
-  id: string
-  name: string
-  principal: number
-  valuation: number
-  returnRate: number
-  /** 최근 6개월 월별 수익률 증감분(%p). 양수=상승, 음수=하락 */
-  monthlyDeltas: number[]
-}
+import type {
+  SummaryCardItem,
+  PieSegment,
+  TrendPoint,
+  EtfRow,
+  PensionRow,
+  RebalancingAccount,
+} from '../types/dashboard'
 
 export const SUMMARY_CARDS: SummaryCardItem[] = [
   { id: 'total', title: '총 자산 평가', amount: 245_158_004, rate: 18.4 },
@@ -70,9 +27,9 @@ export const SUMMARY_CARDS: SummaryCardItem[] = [
 ]
 
 export const PIE_DATA: PieSegment[] = [
-  { name: 'ETF', value: 63.3, color: '#6366f1' }, // indigo
-  { name: 'ELS', value: 17.9, color: '#f59e0b' }, // amber
-  { name: '연금', value: 14.4, color: '#10b981' }, // emerald
+  { name: 'ETF', value: 63.3, color: '#6366f1' },
+  { name: 'ELS', value: 17.9, color: '#f59e0b' },
+  { name: '연금', value: 14.4, color: '#10b981' },
 ]
 
 export const TREND_DATA: TrendPoint[] = [
@@ -94,23 +51,6 @@ export const PENSION_TABLE: PensionRow[] = [
   { id: '1', name: '연금저축펀드 가입금', principal: 18_000_000, valuation: 22_000_000, returnRate: 22.22, monthlyDeltas: [0.8, 1.2, -0.3, 1.5, 0.6, 0.4] },
   { id: '2', name: 'IRP', principal: 10_500_000, valuation: 13_214_403, returnRate: 25.85, monthlyDeltas: [1.1, 0.5, 1.8, -0.2, 0.9, 0.7] },
 ]
-
-/** 리밸런싱: 계좌별 종목 (종목명, 현재가, 보유수량, 현재 평가금액, 현재 비중, 목표 비중) */
-export interface RebalancingHolding {
-  id: string
-  name: string
-  currentPrice: number
-  quantity: number
-  currentValue: number
-  currentWeight: number
-  targetWeight: number
-}
-
-export interface RebalancingAccount {
-  id: string
-  label: string
-  holdings: RebalancingHolding[]
-}
 
 export const REBALANCING_ACCOUNTS: RebalancingAccount[] = [
   {

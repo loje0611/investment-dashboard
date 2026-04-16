@@ -43,7 +43,7 @@ export function ElsRiskProgressBar({
       : 'bg-amber-500';
 
   return (
-    <div className="w-full">
+    <div className="w-full" role="img" aria-label={`현재 ${level.toFixed(1)}%, 낙인(KI) ${kiBarrier}%, 조기상환 ${redemptionBarrier}%`}>
       <div
         className={`relative w-full ${barHeight} overflow-visible rounded-full bg-gray-200`}
       >

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useShallow } from 'zustand/react/shallow'
 import { useStore } from '../../store/useStore'
 import { getWorstPerformer } from '../../utils/elsWorstPerformer'
 import { portfolioToEtfRows } from '../../utils/portfolioToEtf'
@@ -7,8 +8,9 @@ import { pensionToRows } from '../../utils/pensionToRows'
 import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAccounts'
 import { totalAssetsToPrincipalValuationTrend } from '../../utils/totalAssetsToPrincipalValuation'
 import {
-  buildPieSegmentsFromLatestTotalAssets,
-  buildSummaryCardsFromLatestTotalAssets,
+  getLatestTotalAssetSnapshot,
+  buildSummaryCardsFromSnapshot,
+  buildPieSegmentsFromSnapshot,
   mergeSummaryWithElsProfitCard,
 } from '../../utils/homeFromTotalAssets'
 import { getCurrentLevelFromRow, parseBarrierPercent } from '../../utils/elsRiskCounts'
@@ -26,16 +28,17 @@ import type { ElsCardItem, EtfRow, PensionRow } from '../../data/dashboardDummy'
 import type { ElsRow } from '../../types/api'
 import { ElsRiskProgressBar } from '../ElsRiskProgressBar'
 import { SummaryCardsCarousel } from './SummaryCardsCarousel'
-import { GlobalOverview } from './GlobalOverview'
-import { AssetDetailsTabs } from './AssetDetailsTabs'
-import { RebalancingActionCenter } from './RebalancingActionCenter'
 import { BottomNav, type MainTabId } from './BottomNav'
-import { ElsRegisterModal } from './ElsRegisterModal'
-import { ElsRedeemModal } from './ElsRedeemModal'
 import { AmountHideToggle } from './AmountHideToggle'
 import { LogoutButton } from '../LogoutButton'
 import { FileQuestion } from 'lucide-react'
 import { postSyncAllInvestment } from '../../api/api'
+
+const GlobalOverview = lazy(() => import('./GlobalOverview').then(m => ({ default: m.GlobalOverview })))
+const AssetDetailsTabs = lazy(() => import('./AssetDetailsTabs').then(m => ({ default: m.AssetDetailsTabs })))
+const RebalancingActionCenter = lazy(() => import('./RebalancingActionCenter').then(m => ({ default: m.RebalancingActionCenter })))
+const ElsRegisterModal = lazy(() => import('./ElsRegisterModal').then(m => ({ default: m.ElsRegisterModal })))
+const ElsRedeemModal = lazy(() => import('./ElsRedeemModal').then(m => ({ default: m.ElsRedeemModal })))
 
 const ELS_TRY_MAPPINGS_FOR_SHEET = [
   ELS_INVESTING_SHEET_MAPPING,
@@ -73,6 +76,19 @@ function HomeLoadingScreen() {
   )
 }
 
+/** lazy 탭/섹션 전용 — 전역 Suspense와 분리해 형제 UI(다른 탭·헤더)가 치환되지 않도록 함 */
+function LazyChunkFallback({ label = '로딩 중…' }: { label?: string }) {
+  return (
+    <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 py-12 text-slate-500">
+      <div
+        className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600"
+        aria-hidden
+      />
+      <p className="text-sm font-medium">{label}</p>
+    </div>
+  )
+}
+
 export function DashboardLayout() {
   const {
     etfList,
@@ -85,10 +101,24 @@ export function DashboardLayout() {
     isLoadingAssets,
     isLoadingRebalancing,
     error,
-    fetchData,
-    clearError,
     hideAmounts,
-  } = useStore()
+  } = useStore(
+    useShallow((s) => ({
+      etfList: s.etfList,
+      pensionList: s.pensionList,
+      rebalancing: s.rebalancing,
+      totalAssets: s.totalAssets,
+      elsListSheetData: s.elsListSheetData,
+      summaryCards: s.summaryCards,
+      isLoading: s.isLoading,
+      isLoadingAssets: s.isLoadingAssets,
+      isLoadingRebalancing: s.isLoadingRebalancing,
+      error: s.error,
+      hideAmounts: s.hideAmounts,
+    }))
+  )
+  const fetchData = useStore((s) => s.fetchData)
+  const clearError = useStore((s) => s.clearError)
   const [mainTab, setMainTab] = useState<MainTabId>('home')
   const [isElsRegisterModalOpen, setIsElsRegisterModalOpen] = useState(false)
   const [redeemTarget, setRedeemTarget] = useState<ElsCardItem | null>(null)
@@ -132,8 +162,9 @@ export function DashboardLayout() {
     )
     if (!notRedeemed.length) return []
     const sorted = [...notRedeemed].sort(compareElsListRowsByNextEval)
+    const products = elsRowsToElsProductsWithMappings(sorted, ELS_TRY_MAPPINGS_FOR_SHEET)
     return sorted.map((row, i) => {
-      const [product] = elsRowsToElsProductsWithMappings([row], ELS_TRY_MAPPINGS_FOR_SHEET)
+      const product = products[i] ?? null
       const worst = product != null ? getWorstPerformer(product) : null
       const levelFromWorst = worst != null ? 100 + worst.percentage : 0
       const currentLevel = getCurrentLevelFromRow(row, levelFromWorst)
@@ -169,19 +200,23 @@ export function DashboardLayout() {
     [totalAssets]
   )
 
-  /** 총자산 14열 최신 행 기준(헤더 정확 매칭). 없으면 API summaryCards 사용 */
+  const latestSnapshot = useMemo(
+    () => getLatestTotalAssetSnapshot(totalAssets),
+    [totalAssets]
+  )
+
   const homeSummaryCards = useMemo(
     () =>
       mergeSummaryWithElsProfitCard(
-        buildSummaryCardsFromLatestTotalAssets(totalAssets),
+        buildSummaryCardsFromSnapshot(latestSnapshot),
         summaryCards
       ),
-    [totalAssets, summaryCards]
+    [latestSnapshot, summaryCards]
   )
 
   const homePieData = useMemo(
-    () => buildPieSegmentsFromLatestTotalAssets(totalAssets),
-    [totalAssets]
+    () => buildPieSegmentsFromSnapshot(latestSnapshot),
+    [latestSnapshot]
   )
 
   const rebalancingAccounts = useMemo(() => {
@@ -196,14 +231,8 @@ export function DashboardLayout() {
     <div className="min-h-screen bg-slate-50">
       <div className="relative mx-auto min-h-screen max-w-[480px] bg-slate-50 pb-20 shadow-[0_0_0_1px_rgba(0,0,0,0.06)]">
         <div className="relative min-h-[calc(100vh-3.5rem)]">
-          <div
-            className="absolute inset-0 overflow-y-auto overflow-x-hidden scrollbar-hide transition-opacity duration-300 ease-out"
-            style={{
-              opacity: mainTab === 'home' ? 1 : 0,
-              pointerEvents: mainTab === 'home' ? 'auto' : 'none',
-              zIndex: mainTab === 'home' ? 1 : 0,
-            }}
-          >
+          {mainTab === 'home' && (
+          <div className="absolute inset-0 overflow-y-auto overflow-x-hidden scrollbar-hide">
             <div className="flex flex-col pb-6">
               <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
                 <h1 className="text-xl font-bold text-slate-900">종합 자산</h1>
@@ -251,27 +280,28 @@ export function DashboardLayout() {
                     </div>
                     <div className="space-y-6">
                       <h2 className="text-sm font-semibold text-slate-700">전체 현황</h2>
-                      <GlobalOverview
-                        pieData={homePieData}
-                        principalValuationTrend={principalValuationTrend}
-                        totalAssetsRowCount={totalAssets.length}
-                        hideAmounts={hideAmounts}
-                      />
+                      <Suspense
+                        fallback={
+                          <LazyChunkFallback label="차트 영역을 불러오는 중…" />
+                        }
+                      >
+                        <GlobalOverview
+                          pieData={homePieData}
+                          principalValuationTrend={principalValuationTrend}
+                          totalAssetsRowCount={totalAssets.length}
+                          hideAmounts={hideAmounts}
+                        />
+                      </Suspense>
                     </div>
                   </>
                 )}
               </div>
             </div>
           </div>
+          )}
 
-          <div
-            className="absolute inset-0 flex flex-col overflow-hidden transition-opacity duration-300 ease-out"
-            style={{
-              opacity: mainTab === 'assets' ? 1 : 0,
-              pointerEvents: mainTab === 'assets' ? 'auto' : 'none',
-              zIndex: mainTab === 'assets' ? 1 : 0,
-            }}
-          >
+          {mainTab === 'assets' && (
+          <div className="absolute inset-0 flex flex-col overflow-hidden">
             <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
               <h1 className="text-xl font-bold text-slate-900">자산 상세</h1>
               <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
@@ -280,39 +310,33 @@ export function DashboardLayout() {
               </div>
             </div>
             <div className="flex min-h-0 flex-1 flex-col px-4 pb-4">
-              <AssetDetailsTabs
-                etfTable={etfTableForTab}
-                pensionTable={pensionTableForTab}
-                isLoading={isLoading || isLoadingAssets}
-                hideAmounts={hideAmounts}
-              />
+              <Suspense fallback={<LazyChunkFallback label="자산 상세를 불러오는 중…" />}>
+                <AssetDetailsTabs
+                  etfTable={etfTableForTab}
+                  pensionTable={pensionTableForTab}
+                  isLoading={isLoading || isLoadingAssets}
+                  hideAmounts={hideAmounts}
+                />
+              </Suspense>
             </div>
           </div>
+          )}
 
-          <div
-            className="absolute inset-0 flex flex-col overflow-hidden transition-opacity duration-300 ease-out"
-            style={{
-              opacity: mainTab === 'rebalancing' ? 1 : 0,
-              pointerEvents: mainTab === 'rebalancing' ? 'auto' : 'none',
-              zIndex: mainTab === 'rebalancing' ? 1 : 0,
-            }}
-          >
-            <RebalancingActionCenter
-              accounts={rebalancingAccounts}
-              isLoading={isLoading || isLoadingRebalancing}
-              compact
-              hideAmounts={hideAmounts}
-            />
+          {mainTab === 'rebalancing' && (
+          <div className="absolute inset-0 flex flex-col overflow-hidden">
+            <Suspense fallback={<LazyChunkFallback label="리밸런싱을 불러오는 중…" />}>
+              <RebalancingActionCenter
+                accounts={rebalancingAccounts}
+                isLoading={isLoading || isLoadingRebalancing}
+                compact
+                hideAmounts={hideAmounts}
+              />
+            </Suspense>
           </div>
+          )}
 
-          <div
-            className="absolute inset-0 flex flex-col overflow-hidden bg-slate-50 transition-opacity duration-300 ease-out"
-            style={{
-              opacity: mainTab === 'elsRegister' ? 1 : 0,
-              pointerEvents: mainTab === 'elsRegister' ? 'auto' : 'none',
-              zIndex: mainTab === 'elsRegister' ? 1 : 0,
-            }}
-          >
+          {mainTab === 'elsRegister' && (
+          <div className="absolute inset-0 flex flex-col overflow-hidden bg-slate-50">
             <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-6 pb-3">
               <h1 className="text-xl font-bold text-slate-900">ELS 관리</h1>
               <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
@@ -377,23 +401,34 @@ export function DashboardLayout() {
               )}
             </div>
           </div>
+          )}
         </div>
 
         {isElsRegisterModalOpen && (
-          <ElsRegisterModal open onClose={() => setIsElsRegisterModalOpen(false)} />
+          <Suspense fallback={null}>
+            <ElsRegisterModal
+              open
+              onClose={() => setIsElsRegisterModalOpen(false)}
+              onSuccess={() => {
+                void fetchData()
+              }}
+            />
+          </Suspense>
         )}
 
         {redeemTarget != null && redeemTarget.rowIndex != null && (
-          <ElsRedeemModal
-            open
-            onClose={() => setRedeemTarget(null)}
-            rowIndex={redeemTarget.rowIndex}
-            productName={redeemTarget.productName}
-            defaultRedeemAmount={redeemTarget.joinAmount}
-            onSuccess={() => {
-              void fetchData()
-            }}
-          />
+          <Suspense fallback={null}>
+            <ElsRedeemModal
+              open
+              onClose={() => setRedeemTarget(null)}
+              rowIndex={redeemTarget.rowIndex}
+              productName={redeemTarget.productName}
+              defaultRedeemAmount={redeemTarget.joinAmount}
+              onSuccess={() => {
+                void fetchData()
+              }}
+            />
+          </Suspense>
         )}
       </div>
 

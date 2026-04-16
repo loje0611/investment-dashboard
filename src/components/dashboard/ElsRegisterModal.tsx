@@ -1,5 +1,6 @@
-import { useCallback, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { X, Loader2 } from 'lucide-react'
+import { useFocusTrap } from '../../utils/useFocusTrap'
 import {
   ELS_REGISTER_BROKERAGES,
   registerElsProduct,
@@ -27,9 +28,11 @@ function parsePositiveAmount(s: string): number | null {
 interface ElsRegisterModalProps {
   open: boolean
   onClose: () => void
+  onSuccess?: () => void
 }
 
-export function ElsRegisterModal({ open, onClose }: ElsRegisterModalProps) {
+export function ElsRegisterModal({ open, onClose, onSuccess }: ElsRegisterModalProps) {
+  const trapRef = useFocusTrap<HTMLDivElement>(open)
   const [brokerage, setBrokerage] = useState<ElsRegisterBrokerage>(ELS_REGISTER_BROKERAGES[0])
   const [productRound, setProductRound] = useState('')
   const [amount, setAmount] = useState('')
@@ -50,6 +53,13 @@ export function ElsRegisterModal({ open, onClose }: ElsRegisterModalProps) {
     resetForm()
     onClose()
   }, [loading, onClose, resetForm])
+
+  useEffect(() => {
+    if (!open) return
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
+    document.addEventListener('keydown', onEsc)
+    return () => document.removeEventListener('keydown', onEsc)
+  }, [open, handleClose])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -79,7 +89,7 @@ export function ElsRegisterModal({ open, onClose }: ElsRegisterModalProps) {
       })
       resetForm()
       onClose()
-      window.alert('성공적으로 등록되었습니다')
+      onSuccess?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : '등록에 실패했습니다.')
     } finally {
@@ -96,6 +106,7 @@ export function ElsRegisterModal({ open, onClose }: ElsRegisterModalProps) {
 
   return (
     <div
+      ref={trapRef}
       className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"

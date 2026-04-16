@@ -120,21 +120,18 @@ function segmentRate(principal: number, valuation: number): number | null {
   return null
 }
 
-/** 홈 요약 카드 4개(총·연금·ETF·ELS). ELS 누적 수익금 카드는 API와 병합 */
-export function buildSummaryCardsFromLatestTotalAssets(
-  rows: TotalAssetRow[]
+/** 스냅샷을 직접 받아 요약 카드 4개를 생성 (중복 파싱 방지) */
+export function buildSummaryCardsFromSnapshot(
+  snap: LatestTotalAssetSnapshot | null
 ): SummaryCardItem[] {
-  const snap = getLatestTotalAssetSnapshot(rows)
   if (!snap) return []
-
-  const totalRate = snap.totalYieldPercent
 
   return [
     {
       id: 'total',
       title: '총 자산 평가',
       amount: snap.totalValuation,
-      rate: totalRate ?? undefined,
+      rate: snap.totalYieldPercent ?? undefined,
     },
     {
       id: 'pension',
@@ -157,6 +154,13 @@ export function buildSummaryCardsFromLatestTotalAssets(
   ]
 }
 
+/** @deprecated buildSummaryCardsFromSnapshot 사용 권장 */
+export function buildSummaryCardsFromLatestTotalAssets(
+  rows: TotalAssetRow[]
+): SummaryCardItem[] {
+  return buildSummaryCardsFromSnapshot(getLatestTotalAssetSnapshot(rows))
+}
+
 const PIE_COLORS: Record<string, string> = {
   ETF: '#6366f1',
   ELS: '#f59e0b',
@@ -164,9 +168,8 @@ const PIE_COLORS: Record<string, string> = {
   기타: '#64748b',
 }
 
-/** 최신 총자산 행의 세부 평가금 4종으로 파이 비중(%) 계산 */
-export function buildPieSegmentsFromLatestTotalAssets(rows: TotalAssetRow[]): PieSegment[] {
-  const snap = getLatestTotalAssetSnapshot(rows)
+/** 스냅샷을 직접 받아 파이 비중(%) 계산 (중복 파싱 방지) */
+export function buildPieSegmentsFromSnapshot(snap: LatestTotalAssetSnapshot | null): PieSegment[] {
   if (!snap) return []
 
   const parts: { name: keyof typeof PIE_COLORS; value: number }[] = []
@@ -183,6 +186,11 @@ export function buildPieSegmentsFromLatestTotalAssets(rows: TotalAssetRow[]): Pi
     value: Math.round((p.value / sum) * 1000 + Number.EPSILON) / 10,
     color: PIE_COLORS[p.name],
   }))
+}
+
+/** @deprecated buildPieSegmentsFromSnapshot 사용 권장 */
+export function buildPieSegmentsFromLatestTotalAssets(rows: TotalAssetRow[]): PieSegment[] {
+  return buildPieSegmentsFromSnapshot(getLatestTotalAssetSnapshot(rows))
 }
 
 /** API `els-profit` 카드를 유지해 5장 구성으로 병합 */

@@ -91,7 +91,7 @@ export function AssetDetailsTabs({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: 0.25 }}
                 className="overflow-x-hidden overflow-y-visible"
               >
                 <table className="w-full table-fixed text-sm" style={{ minWidth: 0 }}>
@@ -108,12 +108,9 @@ export function AssetDetailsTabs({
                     </tr>
                   </thead>
                   <tbody>
-                    {etfTable.map((row, i) => (
-                      <motion.tr
+                    {etfTable.map((row) => (
+                      <tr
                         key={row.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.3, delay: i * 0.05 }}
                         className="border-b border-slate-100 align-middle"
                       >
                         <td className="py-2 pr-2 text-center">
@@ -142,7 +139,7 @@ export function AssetDetailsTabs({
                         >
                           {row.returnRate >= 0 ? '▲' : '▼'} {Math.abs(row.returnRate).toFixed(2)}%
                         </td>
-                      </motion.tr>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
@@ -155,7 +152,7 @@ export function AssetDetailsTabs({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: 0.25 }}
                 className="overflow-x-hidden overflow-y-visible"
               >
                 <table className="w-full table-fixed text-sm" style={{ minWidth: 0 }}>
@@ -172,12 +169,9 @@ export function AssetDetailsTabs({
                     </tr>
                   </thead>
                   <tbody>
-                    {pensionTable.map((row, i) => (
-                      <motion.tr
+                    {pensionTable.map((row) => (
+                      <tr
                         key={row.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.3, delay: i * 0.05 }}
                         className="border-b border-slate-100 align-middle"
                       >
                         <td className="py-2 pr-2 text-center">
@@ -206,7 +200,7 @@ export function AssetDetailsTabs({
                         >
                           {row.returnRate >= 0 ? '▲' : '▼'} {Math.abs(row.returnRate).toFixed(2)}%
                         </td>
-                      </motion.tr>
+                      </tr>
                     ))}
                   </tbody>
                 </table>

@@ -7,6 +7,16 @@ import { isGasErrorResponse } from '../types/api';
 const getDefaultWebAppUrl = (): string =>
   import.meta.env.VITE_WEB_APP_URL ?? '';
 
+/** localStorage에서 인증 이메일을 꺼내 POST body에 첨부 */
+function getAuthEmail(): string {
+  try {
+    const raw = localStorage.getItem('investment-dashboard-auth-v1');
+    if (!raw) return '';
+    const parsed = JSON.parse(raw) as { email?: string };
+    return parsed?.email?.trim().toLowerCase() ?? '';
+  } catch { return ''; }
+}
+
 /**
  * Google Apps Script 웹앱에 GET 요청을 보내고, JSON 배열 데이터를
  * 지정한 타입의 배열로 반환하는 비동기 함수입니다.
@@ -109,8 +119,12 @@ export async function postSyncAllInvestment(
       Accept: 'application/json',
       'Content-Type': 'text/plain;charset=utf-8',
     },
-    body: JSON.stringify({ action: 'syncAll' }),
+    body: JSON.stringify({ action: 'syncAll', authEmail: getAuthEmail() }),
   });
+
+  if (!res.ok) {
+    throw new Error(`서버 오류 (HTTP ${res.status})`);
+  }
 
   const text = await res.text();
   let data: SyncAllInvestmentResponse;
@@ -165,8 +179,13 @@ export async function fetchProductHistory(
       action: 'getHistory',
       productName: productName.trim(),
       type,
+      authEmail: getAuthEmail(),
     }),
   });
+
+  if (!res.ok) {
+    throw new Error(`서버 오류 (HTTP ${res.status})`);
+  }
 
   const text = await res.text();
   let data: ProductHistoryGasResponse;

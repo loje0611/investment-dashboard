@@ -126,37 +126,48 @@ function parseDateValue(v: unknown): Date | null {
   return null
 }
 
-function getByNormalizedKeys(row: TotalAssetRow, candidates: readonly string[]): unknown {
+/** 행의 키를 정규화된 형태로 한 번만 빌드 (같은 행에서 여러 조회 시 재사용) */
+function buildNormalizedKeyMap(row: TotalAssetRow): Map<string, string> {
   const map = new Map<string, string>()
   for (const raw of Object.keys(row)) {
-    map.set(normalizeKey(raw), raw)
+    const nk = normalizeKey(raw)
+    if (!map.has(nk)) map.set(nk, raw)
   }
+  return map
+}
+
+function getByNormalizedKeysWithMap(
+  row: TotalAssetRow,
+  nkMap: Map<string, string>,
+  candidates: readonly string[]
+): unknown {
   for (const c of candidates) {
-    const raw = map.get(normalizeKey(c))
+    const raw = nkMap.get(normalizeKey(c))
     if (raw != null) return row[raw]
   }
   return undefined
 }
 
-/** 헤더 문자열 패턴으로 열 값 찾기 */
-function findCellByHeaderPattern(
+function findCellByHeaderPatternWithMap(
   row: TotalAssetRow,
+  nkMap: Map<string, string>,
   predicate: (normalizedHeader: string) => boolean
 ): unknown {
-  for (const raw of Object.keys(row)) {
-    if (predicate(normalizeKey(raw))) return row[raw]
+  for (const [nk, raw] of nkMap) {
+    if (predicate(nk)) return row[raw]
   }
   return undefined
 }
 
-function getDateFromRow(row: TotalAssetRow): Date | null {
+function getDateFromRow(row: TotalAssetRow, nkMap: Map<string, string>): Date | null {
   for (const k of DATE_KEYS) {
-    const v = getByNormalizedKeys(row, [k])
+    const v = getByNormalizedKeysWithMap(row, nkMap, [k])
     const d = parseDateValue(v)
     if (d) return d
   }
-  const fuzzy = findCellByHeaderPattern(
+  const fuzzy = findCellByHeaderPatternWithMap(
     row,
+    nkMap,
     (h) =>
       h === '평가일' ||
       h === '일자' ||
@@ -170,7 +181,6 @@ function getDateFromRow(row: TotalAssetRow): Date | null {
   const fromFuzzy = parseDateValue(fuzzy)
   if (fromFuzzy) return fromFuzzy
 
-  // 헤더 매칭 실패 시: GAS가 넣은 키 순서(열 순)대로 첫 날짜 형태 값 사용
   for (const k of Object.keys(row)) {
     const d = parseDateValue(row[k])
     if (d) return d
@@ -178,13 +188,14 @@ function getDateFromRow(row: TotalAssetRow): Date | null {
   return null
 }
 
-function getPrincipalFromRow(row: TotalAssetRow): number | null {
+function getPrincipalFromRow(row: TotalAssetRow, nkMap: Map<string, string>): number | null {
   for (const k of PRINCIPAL_KEYS) {
-    const n = coerceNumber(getByNormalizedKeys(row, [k]))
+    const n = coerceNumber(getByNormalizedKeysWithMap(row, nkMap, [k]))
     if (n != null) return n
   }
-  const v = findCellByHeaderPattern(
+  const v = findCellByHeaderPatternWithMap(
     row,
+    nkMap,
     (h) =>
       !isDirtyPrincipalHeader(h) &&
       !isDirtyValuationHeader(h) &&
@@ -219,14 +230,15 @@ function isDirtyPrincipalHeader(h: string): boolean {
   )
 }
 
-function getValuationFromRow(row: TotalAssetRow): number | null {
+function getValuationFromRow(row: TotalAssetRow, nkMap: Map<string, string>): number | null {
   for (const k of VALUATION_KEYS) {
-    const raw = getByNormalizedKeys(row, [k])
+    const raw = getByNormalizedKeysWithMap(row, nkMap, [k])
     const n = coerceNumber(raw)
     if (n != null) return n
   }
-  const v = findCellByHeaderPattern(
+  const v = findCellByHeaderPatternWithMap(
     row,
+    nkMap,
     (h) =>
       !isDirtyValuationHeader(h) &&
       !h.includes('원금') &&
@@ -238,25 +250,27 @@ function getValuationFromRow(row: TotalAssetRow): number | null {
   const fromFuzzy = coerceNumber(v)
   if (fromFuzzy != null) return fromFuzzy
   return coerceNumber(
-    findCellByHeaderPattern(
+    findCellByHeaderPatternWithMap(
       row,
+      nkMap,
       (h) => !isDirtyValuationHeader(h) && (h === '총자산' || h.endsWith('총자산'))
     )
   )
 }
 
-function getMomFromRow(row: TotalAssetRow): { principal: number | null; valuation: number | null } {
+function getMomFromRow(row: TotalAssetRow, nkMap: Map<string, string>): { principal: number | null; valuation: number | null } {
   let principal: number | null = null
   for (const k of MOM_PRINCIPAL_KEYS) {
-    const n = coerceNumber(getByNormalizedKeys(row, [k]))
+    const n = coerceNumber(getByNormalizedKeysWithMap(row, nkMap, [k]))
     if (n != null) {
       principal = n
       break
     }
   }
   if (principal == null) {
-    const v = findCellByHeaderPattern(
+    const v = findCellByHeaderPatternWithMap(
       row,
+      nkMap,
       (h) => h.includes('원금') && (h.includes('증감') || h.includes('증가'))
     )
     principal = coerceNumber(v)
@@ -264,15 +278,16 @@ function getMomFromRow(row: TotalAssetRow): { principal: number | null; valuatio
 
   let valuation: number | null = null
   for (const k of MOM_VALUATION_KEYS) {
-    const n = coerceNumber(getByNormalizedKeys(row, [k]))
+    const n = coerceNumber(getByNormalizedKeysWithMap(row, nkMap, [k]))
     if (n != null) {
       valuation = n
       break
     }
   }
   if (valuation == null) {
-    const v = findCellByHeaderPattern(
+    const v = findCellByHeaderPatternWithMap(
       row,
+      nkMap,
       (h) =>
         (h.includes('평가') && (h.includes('증감') || h.includes('증가'))) ||
         (h.includes('평가금') && h.includes('차'))
@@ -299,9 +314,10 @@ export interface ParsedTotalAssetHistoryRow {
 export function parseTotalAssetHistoryRows(rows: TotalAssetRow[]): ParsedTotalAssetHistoryRow[] {
   const parsed: ParsedTotalAssetHistoryRow[] = []
   for (const row of rows) {
-    const date = getDateFromRow(row)
-    const principal = getPrincipalFromRow(row)
-    const valuation = getValuationFromRow(row)
+    const nkMap = buildNormalizedKeyMap(row)
+    const date = getDateFromRow(row, nkMap)
+    const principal = getPrincipalFromRow(row, nkMap)
+    const valuation = getValuationFromRow(row, nkMap)
     if (!date || principal == null || valuation == null) continue
     parsed.push({ date, principal, valuation, row })
   }
@@ -331,7 +347,8 @@ export function totalAssetsToPrincipalValuationTrend(
   const latest = parsed[parsed.length - 1]
   const prev = parsed.length >= 2 ? parsed[parsed.length - 2] : null
 
-  const sheetMom = getMomFromRow(latest.row)
+  const latestNkMap = buildNormalizedKeyMap(latest.row)
+  const sheetMom = getMomFromRow(latest.row, latestNkMap)
   let momPrincipal = sheetMom.principal
   let momValuation = sheetMom.valuation
 

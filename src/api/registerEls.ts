@@ -1,5 +1,14 @@
 const getDefaultWebAppUrl = (): string => import.meta.env.VITE_WEB_APP_URL ?? ''
 
+function getAuthEmail(): string {
+  try {
+    const raw = localStorage.getItem('investment-dashboard-auth-v1')
+    if (!raw) return ''
+    const parsed = JSON.parse(raw) as { email?: string }
+    return parsed?.email?.trim().toLowerCase() ?? ''
+  } catch { return '' }
+}
+
 export const ELS_REGISTER_BROKERAGES = [
   '삼성증권',
   '키움증권',
@@ -52,7 +61,7 @@ export async function registerElsProduct(
       Accept: 'application/json',
       'Content-Type': 'text/plain;charset=utf-8',
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, authEmail: getAuthEmail() }),
   })
 
   const text = await res.text()

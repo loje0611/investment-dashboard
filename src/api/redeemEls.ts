@@ -1,5 +1,14 @@
 const getDefaultWebAppUrl = (): string => import.meta.env.VITE_WEB_APP_URL ?? ''
 
+function getAuthEmail(): string {
+  try {
+    const raw = localStorage.getItem('investment-dashboard-auth-v1')
+    if (!raw) return ''
+    const parsed = JSON.parse(raw) as { email?: string }
+    return parsed?.email?.trim().toLowerCase() ?? ''
+  } catch { return '' }
+}
+
 export interface ElsRedeemPayload {
   action: 'redeem'
   row_index: number
@@ -35,7 +44,7 @@ export async function redeemElsProduct(
       Accept: 'application/json',
       'Content-Type': 'text/plain;charset=utf-8',
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, authEmail: getAuthEmail() }),
   })
 
   const text = await res.text()

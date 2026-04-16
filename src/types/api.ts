@@ -118,7 +118,7 @@ export interface ElsSheetTotals {
 /** 대시보드용 GAS 응답 (최소 키만) */
 export interface DashboardSheetResponse {
   totalAssets?: TotalAssetRow[];
-  summaryCards?: import('../data/dashboardDummy').SummaryCardItem[];
+  summaryCards?: import('./dashboard').SummaryCardItem[];
   etfList?: EtfSheetRow[];
   pensionList?: PensionSheetRow[];
   elsListSheetData?: ElsRow[];

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { X, Loader2 } from 'lucide-react'
 import { redeemElsProduct } from '../../api/redeemEls'
+import { useFocusTrap } from '../../utils/useFocusTrap'
 
 function digitsOnly(value: string): string {
   return value.replace(/\D/g, '')
@@ -31,6 +32,7 @@ export function ElsRedeemModal({
   defaultRedeemAmount,
   onSuccess,
 }: ElsRedeemModalProps) {
+  const trapRef = useFocusTrap<HTMLDivElement>(open)
   const [redeemDate, setRedeemDate] = useState('')
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
@@ -62,6 +64,13 @@ export function ElsRedeemModal({
     resetForm()
     onClose()
   }, [loading, onClose, resetForm])
+
+  useEffect(() => {
+    if (!open) return
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
+    document.addEventListener('keydown', onEsc)
+    return () => document.removeEventListener('keydown', onEsc)
+  }, [open, handleClose])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -103,6 +112,7 @@ export function ElsRedeemModal({
 
   return (
     <div
+      ref={trapRef}
       className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
