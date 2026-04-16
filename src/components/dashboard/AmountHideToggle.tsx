@@ -16,8 +16,8 @@ export function AmountHideToggle({ className = '' }: { className?: string }) {
       onClick={() => setHideAmounts(!hideAmounts)}
       className={`relative flex shrink-0 items-center justify-center gap-1.5 overflow-hidden rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-all ${
         hideAmounts
-          ? 'border-indigo-200 bg-indigo-50/80 text-indigo-700 hover:bg-indigo-100/80'
-          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+          ? 'border-accent/30 bg-accent-muted text-accent hover:bg-accent/20'
+          : 'border-stroke-strong bg-surface-elevated text-content-secondary hover:bg-surface-hover'
       } ${className}`}
     >
       <AnimatePresence mode="popLayout" initial={false}>

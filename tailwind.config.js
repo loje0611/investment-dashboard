@@ -10,38 +10,40 @@ export default {
         sans: ['Pretendard Variable', 'Pretendard', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       colors: {
-        // Premium Deep Navy overriding default indigo
-        indigo: {
-          50: '#f4f6f8',
-          100: '#e4ebf3',
-          200: '#c8d6e3',
-          300: '#a3bed3',
-          400: '#7a9fbb',
-          500: '#5a82a0',
-          600: '#41637f', // Base primary
-          700: '#355068',
-          800: '#2e4458',
-          900: '#293a4c',
-          950: '#1a2634',
+        surface: {
+          primary: 'var(--color-bg-primary)',
+          card: 'var(--color-bg-card)',
+          elevated: 'var(--color-bg-elevated)',
+          hover: 'var(--color-bg-hover)',
         },
-        rose: {
-          50: '#fff1f2',
-          100: '#ffe4e6',
-          200: '#fecdd3',
-          300: '#fda4af',
-          400: '#fb7185',
-          500: '#f43f5e',
-          600: '#e11d48',
-          700: '#be123c',
-          800: '#9f1239',
-          900: '#881337',
-          950: '#4c0519',
-        }
+        content: {
+          primary: 'var(--color-text-primary)',
+          secondary: 'var(--color-text-secondary)',
+          tertiary: 'var(--color-text-tertiary)',
+          inverse: 'var(--color-text-inverse)',
+        },
+        accent: {
+          DEFAULT: 'var(--color-accent)',
+          hover: 'var(--color-accent-hover)',
+          muted: 'var(--color-accent-muted)',
+        },
+        profit: {
+          DEFAULT: 'var(--color-profit)',
+          bg: 'var(--color-profit-bg)',
+        },
+        loss: {
+          DEFAULT: 'var(--color-loss)',
+          bg: 'var(--color-loss-bg)',
+        },
+        stroke: {
+          DEFAULT: 'var(--color-border)',
+          strong: 'var(--color-border-strong)',
+        },
       },
       boxShadow: {
-        'glass-sm': '0 4px 12px 0 rgba(0, 0, 0, 0.05)',
-        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.04)',
-        'glass-lg': '0 12px 48px 0 rgba(0, 0, 0, 0.06)',
+        'glass-sm': '0 4px 16px 0 rgba(0, 0, 0, 0.2)',
+        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.25)',
+        'glass-lg': '0 12px 48px 0 rgba(0, 0, 0, 0.3)',
       }
     },
   },

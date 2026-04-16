@@ -1,57 +1,76 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { EtfRow, PensionRow } from '../../data/dashboardDummy'
+import type { EtfRow, PensionRow, ElsCardItem } from '../../data/dashboardDummy'
 import { formatWonDigits } from '../../utils/maskSensitiveAmount'
 import { ProductHistoryModal } from './ProductHistoryModal'
 import type { ProductHistoryKind } from '../../api/api'
+import { ElsRiskProgressBar } from '../ElsRiskProgressBar'
 
-type TabId = 'etf' | 'pension'
+type TabId = 'etf' | 'pension' | 'els'
 
 interface AssetDetailsTabsProps {
   etfTable: EtfRow[]
   pensionTable: PensionRow[]
-  /** 상세 현황 데이터 로딩 중일 때 true */
+  elsItems: ElsCardItem[]
   isLoading?: boolean
   hideAmounts: boolean
+  onElsRegister?: () => void
+  onElsRedeem?: (item: ElsCardItem) => void
+}
+
+function AssetRow({ name, principal, valuation, returnRate, hideAmounts, onTap }: {
+  name: string; principal: number; valuation: number; returnRate: number; hideAmounts: boolean; onTap: () => void
+}) {
+  const isProfit = returnRate >= 0
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      className="flex w-full items-center gap-3 border-b border-stroke px-1 py-3.5 text-left transition-colors hover:bg-surface-hover"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-accent">{name}</p>
+        <p className="mt-0.5 text-xs tabular-nums text-content-tertiary">
+          ₩{formatWonDigits(hideAmounts, principal)} → ₩{formatWonDigits(hideAmounts, valuation)}
+        </p>
+      </div>
+      <span className={`shrink-0 text-xs font-semibold tabular-nums ${isProfit ? 'text-profit' : 'text-loss'}`}>
+        {isProfit ? '▲' : '▼'} {Math.abs(returnRate).toFixed(2)}%
+      </span>
+    </button>
+  )
 }
 
 export function AssetDetailsTabs({
   etfTable,
   pensionTable,
+  elsItems,
   isLoading = false,
   hideAmounts,
+  onElsRegister,
+  onElsRedeem,
 }: AssetDetailsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('etf')
   const [historyModal, setHistoryModal] = useState<{
-    open: boolean
-    name: string
-    kind: ProductHistoryKind
+    open: boolean; name: string; kind: ProductHistoryKind
   }>({ open: false, name: '', kind: 'ETF' })
 
-  const openHistory = (name: string, kind: ProductHistoryKind) => {
-    setHistoryModal({ open: true, name, kind })
-  }
-
-  const closeHistory = () => {
-    setHistoryModal((s) => ({ ...s, open: false }))
-  }
-
-  const tabs: { id: TabId; label: string }[] = [
-    { id: 'etf', label: 'ETF 현황' },
-    { id: 'pension', label: '연금 현황' },
+  const tabs: { id: TabId; label: string; count: number }[] = [
+    { id: 'etf', label: 'ETF', count: etfTable.length },
+    { id: 'pension', label: '연금', count: pensionTable.length },
+    { id: 'els', label: 'ELS', count: elsItems.length },
   ]
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-stroke bg-surface-card">
       <ProductHistoryModal
         open={historyModal.open}
-        onClose={closeHistory}
+        onClose={() => setHistoryModal((s) => ({ ...s, open: false }))}
         productName={historyModal.name}
         productType={historyModal.kind}
       />
 
-      {/* 상단 탭: 항상 고정 */}
-      <div className="flex shrink-0 border-b border-slate-200">
+      <div className="flex shrink-0 border-b border-stroke">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id
           return (
@@ -59,151 +78,95 @@ export function AssetDetailsTabs({
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`relative flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                isActive ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'
+              className={`relative flex-1 px-3 py-3 text-sm font-medium transition-colors ${
+                isActive ? 'text-content-primary' : 'text-content-tertiary hover:text-content-secondary'
               }`}
             >
               {isActive && (
                 <motion.div
                   layoutId="asset-tab-indicator"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent"
                   transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
                 />
               )}
               {tab.label}
+              {tab.count > 0 && (
+                <span className={`ml-1.5 text-[10px] tabular-nums ${isActive ? 'text-accent' : 'text-content-tertiary'}`}>
+                  {tab.count}
+                </span>
+              )}
             </button>
           )
         })}
       </div>
 
-      {/* 상품 목록만 스크롤, 스크롤바 숨김(마우스/터치 스크롤 유지) */}
       <div className="min-h-0 flex-1 overflow-auto scrollbar-hide p-4">
         {isLoading ? (
-          <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 py-12 text-slate-500">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" aria-hidden />
-            <p className="text-sm font-medium">로딩 중...</p>
+          <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 py-12">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-content-tertiary border-t-accent" aria-hidden />
+            <p className="text-sm font-medium text-content-tertiary">로딩 중...</p>
           </div>
         ) : (
           <AnimatePresence mode="wait">
             {activeTab === 'etf' && (
-              <motion.div
-                key="etf"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.25 }}
-                className="overflow-x-hidden overflow-y-visible"
-              >
-                <table className="w-full table-fixed text-sm" style={{ minWidth: 0 }}>
-                  <colgroup>
-                    <col style={{ width: '34%' }} />
-                    <col style={{ width: '33%' }} />
-                    <col style={{ width: '33%' }} />
-                  </colgroup>
-                  <thead>
-                    <tr className="sticky top-0 z-10 border-b border-slate-200/50 bg-white/80 text-slate-500 shadow-sm backdrop-blur-md">
-                      <th className="pb-2 pr-2 text-center font-medium">상품명</th>
-                      <th className="pb-2 pr-2 text-center font-medium">원금/평가금</th>
-                      <th className="whitespace-nowrap pb-2 text-center font-medium">수익률</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {etfTable.map((row) => (
-                      <tr
-                        key={row.id}
-                        className="border-b border-slate-100 align-middle"
-                      >
-                        <td className="py-2 pr-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => openHistory(row.name, 'ETF')}
-                            className="font-medium text-indigo-600 underline decoration-indigo-300/70 underline-offset-2 transition-colors hover:text-indigo-800 hover:decoration-indigo-500"
-                          >
-                            {row.name}
-                          </button>
-                        </td>
-                        <td className="py-2 pr-2 tabular-nums text-center text-slate-700">
-                          <div className="flex flex-col gap-0.5 text-xs">
-                            <span className="whitespace-nowrap">
-                              ₩{formatWonDigits(hideAmounts, row.principal)}
-                            </span>
-                            <span className="whitespace-nowrap">
-                              ₩{formatWonDigits(hideAmounts, row.valuation)}
-                            </span>
-                          </div>
-                        </td>
-                        <td
-                          className={`whitespace-nowrap py-2 tabular-nums text-xs font-medium text-center ${
-                            row.returnRate >= 0 ? 'text-red-600' : 'text-blue-600'
-                          }`}
-                        >
-                          {row.returnRate >= 0 ? '▲' : '▼'} {Math.abs(row.returnRate).toFixed(2)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <motion.div key="etf" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+                {etfTable.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-content-tertiary">ETF 데이터가 없습니다.</p>
+                ) : (
+                  etfTable.map((row) => (
+                    <AssetRow key={row.id} name={row.name} principal={row.principal} valuation={row.valuation} returnRate={row.returnRate} hideAmounts={hideAmounts} onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'ETF' })} />
+                  ))
+                )}
               </motion.div>
             )}
 
             {activeTab === 'pension' && (
-              <motion.div
-                key="pension"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.25 }}
-                className="overflow-x-hidden overflow-y-visible"
-              >
-                <table className="w-full table-fixed text-sm" style={{ minWidth: 0 }}>
-                  <colgroup>
-                    <col style={{ width: '34%' }} />
-                    <col style={{ width: '33%' }} />
-                    <col style={{ width: '33%' }} />
-                  </colgroup>
-                  <thead>
-                    <tr className="sticky top-0 z-10 border-b border-slate-200/50 bg-white/80 text-slate-500 shadow-sm backdrop-blur-md">
-                      <th className="pb-2 pr-2 text-center font-medium">상품명</th>
-                      <th className="pb-2 pr-2 text-center font-medium">원금/평가금</th>
-                      <th className="whitespace-nowrap pb-2 text-center font-medium">수익률</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pensionTable.map((row) => (
-                      <tr
-                        key={row.id}
-                        className="border-b border-slate-100 align-middle"
-                      >
-                        <td className="py-2 pr-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => openHistory(row.name, 'PENSION')}
-                            className="font-medium text-indigo-600 underline decoration-indigo-300/70 underline-offset-2 transition-colors hover:text-indigo-800 hover:decoration-indigo-500"
-                          >
-                            {row.name}
-                          </button>
-                        </td>
-                        <td className="py-2 pr-2 tabular-nums text-center text-slate-700">
-                          <div className="flex flex-col gap-0.5 text-xs">
-                            <span className="whitespace-nowrap">
-                              ₩{formatWonDigits(hideAmounts, row.principal)}
-                            </span>
-                            <span className="whitespace-nowrap">
-                              ₩{formatWonDigits(hideAmounts, row.valuation)}
-                            </span>
-                          </div>
-                        </td>
-                        <td
-                          className={`whitespace-nowrap py-2 tabular-nums text-xs font-medium text-center ${
-                            row.returnRate >= 0 ? 'text-red-600' : 'text-blue-600'
-                          }`}
+              <motion.div key="pension" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+                {pensionTable.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-content-tertiary">연금 데이터가 없습니다.</p>
+                ) : (
+                  pensionTable.map((row) => (
+                    <AssetRow key={row.id} name={row.name} principal={row.principal} valuation={row.valuation} returnRate={row.returnRate} hideAmounts={hideAmounts} onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'PENSION' })} />
+                  ))
+                )}
+              </motion.div>
+            )}
+
+            {activeTab === 'els' && (
+              <motion.div key="els" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+                {onElsRegister && (
+                  <button
+                    type="button"
+                    onClick={onElsRegister}
+                    className="mb-3 w-full rounded-xl border border-dashed border-accent/30 bg-accent-muted py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/20"
+                  >
+                    + 상품 추가
+                  </button>
+                )}
+                {elsItems.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-content-tertiary">등록된 ELS 상품이 없습니다.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {elsItems.map((item, i) => (
+                      <motion.div key={item.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: i * 0.04 }}>
+                        <button
+                          type="button"
+                          disabled={item.rowIndex == null}
+                          onClick={() => { if (item.rowIndex != null) onElsRedeem?.(item) }}
+                          className="w-full rounded-xl border border-stroke bg-surface-elevated p-4 text-left transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {row.returnRate >= 0 ? '▲' : '▼'} {Math.abs(row.returnRate).toFixed(2)}%
-                        </td>
-                      </tr>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="font-medium text-content-primary">{item.productName}</p>
+                            <p className="shrink-0 text-sm tabular-nums text-content-tertiary">{item.nextRedemptionDate}</p>
+                          </div>
+                          <div className="mt-3">
+                            <ElsRiskProgressBar currentLevel={item.currentLevel} kiBarrier={item.kiBarrier} redemptionBarrier={item.redemptionBarrier} barHeight="h-3" />
+                          </div>
+                        </button>
+                      </motion.div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

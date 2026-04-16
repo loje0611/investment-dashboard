@@ -8,7 +8,7 @@ export function LogoutButton({ className = '' }: { className?: string }) {
     <button
       type="button"
       onClick={() => logout()}
-      className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 ${className}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-stroke-strong bg-surface-elevated px-2.5 py-1.5 text-xs font-medium text-content-secondary transition-colors hover:bg-surface-hover ${className}`}
       aria-label="로그아웃"
     >
       <LogOut className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
