@@ -31,7 +31,7 @@ import { SummaryCardsCarousel } from './SummaryCardsCarousel'
 import { BottomNav, type MainTabId } from './BottomNav'
 import { PageHeader } from '../ui/PageHeader'
 import { EmptyState } from '../ui/EmptyState'
-import { SkeletonCard } from '../ui/SkeletonCard'
+import { HomeSkeleton } from '../ui/SkeletonCard'
 import { Toast, type ToastData } from '../ui/Toast'
 import { postSyncAllInvestment } from '../../api/api'
 
@@ -158,14 +158,7 @@ export function DashboardLayout() {
                 <PageHeader title="종합 자산" />
                 <div className="px-4">
                   {isLoading ? (
-                    <div className="space-y-3">
-                      <SkeletonCard lines={2} />
-                      <div className="flex gap-3">
-                        <SkeletonCard lines={1} className="flex-1" />
-                        <SkeletonCard lines={1} className="flex-1" />
-                      </div>
-                      <SkeletonCard lines={4} />
-                    </div>
+                    <HomeSkeleton />
                   ) : error ? (
                     <div className="rounded-2xl border border-loss/20 bg-loss-bg px-4 py-6 text-sm text-loss">
                       <p className="font-medium">데이터를 불러오지 못했습니다</p>

@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { PieChart as PieChartIcon } from 'lucide-react'
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
@@ -31,6 +32,44 @@ function formatPiePercent(value: number): string {
 }
 
 type TrendStackPoint = PrincipalValuationPoint & { 평가증분: number }
+
+const PERIOD_OPTIONS = [
+  { id: '3m', label: '3개월', months: 3 },
+  { id: '6m', label: '6개월', months: 6 },
+  { id: '1y', label: '1년', months: 12 },
+  { id: 'all', label: '전체', months: Infinity },
+] as const
+
+type PeriodId = typeof PERIOD_OPTIONS[number]['id']
+
+function PeriodPills({ selected, onSelect }: { selected: PeriodId; onSelect: (id: PeriodId) => void }) {
+  return (
+    <div className="flex gap-1.5">
+      {PERIOD_OPTIONS.map((opt) => {
+        const isActive = selected === opt.id
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => onSelect(opt.id)}
+            className={`relative rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              isActive ? 'text-content-primary' : 'text-content-tertiary hover:text-content-secondary'
+            }`}
+          >
+            {isActive && (
+              <motion.div
+                layoutId="period-pill"
+                className="absolute inset-0 rounded-full bg-accent-muted"
+                transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
+              />
+            )}
+            <span className="relative z-10">{opt.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 function TrendTooltip({ active, payload, label, hideAmounts }: {
   active?: boolean; payload?: any[]; label?: string; hideAmounts: boolean
@@ -79,16 +118,24 @@ function MomDeltaPill({ title, delta, hideAmounts }: { title: string; delta: num
 }
 
 export function GlobalOverview({ pieData, principalValuationTrend, totalAssetsRowCount = 0, hideAmounts }: GlobalOverviewProps) {
+  const [period, setPeriod] = useState<PeriodId>('all')
   const showTrend = principalValuationTrend != null && principalValuationTrend.points.length > 0
   const showPie = pieData.length > 0
 
-  const trendStackData: TrendStackPoint[] = useMemo(() => {
+  const allStackData: TrendStackPoint[] = useMemo(() => {
     if (!principalValuationTrend?.points.length) return []
     return principalValuationTrend.points.map((p) => ({ ...p, 평가증분: p.평가금총액 - p.원금총액 }))
   }, [principalValuationTrend])
 
+  const trendStackData = useMemo(() => {
+    const opt = PERIOD_OPTIONS.find((o) => o.id === period)
+    if (!opt || opt.months === Infinity) return allStackData
+    return allStackData.slice(-opt.months)
+  }, [allStackData, period])
+
   return (
     <div className="flex flex-col gap-4">
+      {/* 자산 배분 — Donut */}
       <div className="rounded-2xl border border-stroke bg-surface-card p-4 shadow-glass-sm">
         <h3 className="mb-4 text-sm font-semibold text-content-primary">자산 배분</h3>
         {showPie ? (
@@ -129,9 +176,13 @@ export function GlobalOverview({ pieData, principalValuationTrend, totalAssetsRo
         )}
       </div>
 
+      {/* 자산 변동 추이 — Area + Period Pill */}
       <div className="rounded-2xl border border-stroke bg-surface-card p-4 shadow-glass-sm">
-        <div className="mb-3 flex flex-col gap-1">
-          <h3 className="text-sm font-semibold text-content-primary">자산 변동 추이</h3>
+        <div className="mb-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-content-primary">자산 변동 추이</h3>
+            {showTrend && <PeriodPills selected={period} onSelect={setPeriod} />}
+          </div>
           {showTrend && principalValuationTrend != null && (
             <p className="text-xs text-content-tertiary">
               최근 기준{' '}
