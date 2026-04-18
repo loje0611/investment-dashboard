@@ -206,6 +206,20 @@ function gasCoerceNumber_(v) {
 }
 
 /**
+ * 시트에서 읽은 수익률(Yield)을 API용 백분율(%) 숫자로 통일합니다.
+ * 셀 서식이 백분율이면 원본이 0.438처럼 비율로 저장되는 경우가 많으므로,
+ * |값| ≤ 1 이면 100을 곱해 43.8(%)로 환산합니다. 이미 43.8처럼 백분율이면 그대로 둡니다.
+ * @param {*} v 셀 원본 값
+ * @returns {number|null} 소수 둘째 자리까지 반올림한 백분율, 파싱 불가 시 null
+ */
+function normalizeSheetYieldPercent_(v) {
+  var n = gasCoerceNumber_(v);
+  if (n === null || isNaN(n)) return null;
+  var pct = Math.abs(n) <= 1 ? n * 100 : n;
+  return Math.round(pct * 100) / 100;
+}
+
+/**
  * 객체(row)에서 여러 후보 키를 순서대로 시도하여 첫 번째로 값이 있는 것을 반환.
  * 공백 유무 차이(예: '평가금 총액' vs '평가금총액')에 모두 대응하기 위해
  * 각 후보를 있는 그대로 + 공백 제거 버전 양쪽으로 비교합니다.
@@ -494,9 +508,9 @@ function getDashboardData(dataType) {
           var title = String(findRowValue_(row, ['상품명', '종목명', '이름', '항목']) || row[Object.keys(row)[0]] || '').trim();
           if (title.indexOf('개인연금 합계') !== -1) {
             penValuation = gasCoerceNumber_(findRowValue_(row, ['평가금액', '평가금']));
-            var rPen = gasCoerceNumber_(findRowValue_(row, ['수익률']));
+            var rPen = normalizeSheetYieldPercent_(findRowValue_(row, ['수익률']));
             if (rPen != null) {
-              penRate = Math.abs(rPen) < 1.5 ? rPen * 100 : rPen;
+              penRate = rPen;
             }
             break;
           }
@@ -533,9 +547,9 @@ function getDashboardData(dataType) {
           var titleEls = String(findRowValue_(rowEls, ['상품명', '이름', '항목']) || rowEls[Object.keys(rowEls)[0]] || '').trim();
           if (titleEls.indexOf('합계') !== -1) {
             elsValuation = gasCoerceNumber_(findRowValue_(rowEls, ['평가금액', '평가금']));
-            var rEls = gasCoerceNumber_(findRowValue_(rowEls, ['수익률']));
+            var rEls = normalizeSheetYieldPercent_(findRowValue_(rowEls, ['수익률']));
             if (rEls != null) {
-              elsInvRate = Math.abs(rEls) < 1.5 ? rEls * 100 : rEls;
+              elsInvRate = rEls;
             }
             break;
           }
@@ -550,7 +564,7 @@ function getDashboardData(dataType) {
           var rowLs = elsListSheetData[m];
           var pf = gasCoerceNumber_(rowLs['수익']);
           if (pf != null) elsProfitSum += pf;
-          var cr = gasCoerceNumber_(rowLs['연수익률']);
+          var cr = normalizeSheetYieldPercent_(rowLs['연수익률']);
           if (cr != null) {
             elsCompleteRateSum += cr;
             elsCompleteCount++;
@@ -558,7 +572,7 @@ function getDashboardData(dataType) {
         }
       }
       var rawCompleteRate = elsCompleteCount > 0 ? (elsCompleteRateSum / elsCompleteCount) : null;
-      var elsCompleteRate = rawCompleteRate != null ? (Math.abs(rawCompleteRate) < 1.5 ? rawCompleteRate * 100 : rawCompleteRate) : null;
+      var elsCompleteRate = rawCompleteRate != null ? Math.round(rawCompleteRate * 100) / 100 : null;
       summaryCards.push({ id: 'els-profit', title: 'ELS 누적 수익금', amount: elsProfitSum, rate: elsCompleteRate });
     } catch (e3) { Logger.log('summaryCards 생성 중 오류: ' + (e3 && e3.message ? e3.message : String(e3))); }
   }
@@ -690,10 +704,24 @@ function buildCanonicalAssetStatusRow_(headers, rowArr) {
     var canon = hk ? resolveCanonicalAssetStatusKey_(hk) : null;
     if (canon) {
       if (obj[canon] === null || obj[canon] === '' || typeof obj[canon] === 'undefined') {
-        if (val === '') obj[canon] = null;
-        else if (typeof val === 'number' && !isNaN(val)) obj[canon] = val;
-        else if (val != null && val !== '') obj[canon] = val;
-        else obj[canon] = val === 0 ? 0 : null;
+        if (val === '') {
+          obj[canon] = null;
+        } else if (canon === '수익률') {
+          var ny = normalizeSheetYieldPercent_(val);
+          if (ny !== null) {
+            obj[canon] = ny;
+          } else if (val === 0) {
+            obj[canon] = 0;
+          } else {
+            obj[canon] = null;
+          }
+        } else if (typeof val === 'number' && !isNaN(val)) {
+          obj[canon] = val;
+        } else if (val != null && val !== '') {
+          obj[canon] = val;
+        } else {
+          obj[canon] = val === 0 ? 0 : null;
+        }
       }
     } else if (hk) {
       if (typeof val === 'number' && !isNaN(val)) obj[hk] = val;
@@ -904,6 +932,7 @@ function findRowByText(sheet, text) {
 /**
  * ETF기록 또는 연금기록 시트에서 상품명이 일치하는 모든 행을 찾아
  * [날짜(yyyy-MM-dd), 수익률(%)] 배열로 반환합니다. 날짜 기준 오름차순 정렬.
+ * 수익률 열은 normalizeSheetYieldPercent_ 로 비율(0.438)→백분율(43.8) 환산 및 소수 둘째 자리 반올림을 적용합니다.
  *
  * @param {string} productName 시트 A열 상품명과 trim 후 정확히 일치
  * @param {string} type 'ETF' → ETF기록, 'PENSION' → 연금기록
@@ -946,10 +975,7 @@ function getProductHistory(productName, type) {
     }
 
     var rateCell = row[2];
-    var rate = gasCoerceNumber_(rateCell);
-    if (rate === null && typeof rateCell === 'number' && !isNaN(rateCell)) {
-      rate = rateCell;
-    }
+    var rate = normalizeSheetYieldPercent_(rateCell);
     if (rate === null) {
       continue;
     }
@@ -997,7 +1023,10 @@ function updateEtfHistory(ssOpt) {
     const currentYield = values[i][4];
 
     if (productName && productName !== "합계" && currentYield !== "") {
-      historyData.push([productName, today, currentYield]);
+      var yEtf = normalizeSheetYieldPercent_(currentYield);
+      if (yEtf !== null) {
+        historyData.push([productName, today, yEtf]);
+      }
     }
   }
 
@@ -1048,7 +1077,10 @@ function updatePensionHistory(ssOpt) {
     const currentYield = values[i][4];
 
     if (productName && !String(productName).includes("합계") && currentYield !== "") {
-      historyData.push([productName, today, currentYield]);
+      var yPen = normalizeSheetYieldPercent_(currentYield);
+      if (yPen !== null) {
+        historyData.push([productName, today, yPen]);
+      }
     }
   }
 
