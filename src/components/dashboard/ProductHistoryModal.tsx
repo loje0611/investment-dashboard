@@ -22,13 +22,24 @@ export interface ProductHistoryModalProps {
 
 type ChartPoint = { date: string; rate: number }
 
-function HistoryTooltipContent({ active, payload, label }: TooltipProps<number, string>) {
+const TOOLTIP_APPROX_W = 180
+const TOOLTIP_OFFSET = 12
+
+function HistoryTooltipContent({ active, payload, label, coordinate, viewBox }: TooltipProps<number, string>) {
   if (!active || !payload?.length) return null
   const raw = payload[0].value
   const n = typeof raw === 'number' && !Number.isNaN(raw) ? raw : Number(raw)
   if (Number.isNaN(n)) return null
+
+  const vb = viewBox as { x?: number; width?: number } | undefined
+  const chartRight = (vb?.x ?? 0) + (vb?.width ?? Infinity)
+  const flip = (coordinate?.x ?? 0) + TOOLTIP_APPROX_W + TOOLTIP_OFFSET * 2 > chartRight
+
   return (
-    <div className="pointer-events-none min-w-[148px] rounded-xl border border-white/10 bg-slate-950/95 px-3.5 py-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-md ring-1 ring-cyan-500/10">
+    <div
+      className="pointer-events-none min-w-[148px] rounded-xl border border-white/10 bg-slate-950/95 px-3.5 py-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-md ring-1 ring-cyan-500/10"
+      style={flip ? { transform: `translateX(calc(-100% - ${TOOLTIP_OFFSET * 2}px))` } : undefined}
+    >
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">평가일</p>
       <p className="mt-0.5 text-sm font-semibold tabular-nums tracking-tight text-slate-50">{label ?? '—'}</p>
       <div className="mt-2.5 border-t border-white/10 pt-2">
@@ -188,9 +199,8 @@ export function ProductHistoryModal({
                           strokeWidth: 1.25,
                           strokeLinecap: 'round',
                         }}
-                        allowEscapeViewBox={{ x: true, y: true }}
-                        offset={12}
-                        wrapperStyle={{ outline: 'none', transition: 'opacity 0.12s ease-out' }}
+                        offset={TOOLTIP_OFFSET}
+                        wrapperStyle={{ outline: 'none', transition: 'opacity 0.12s ease-out', zIndex: 20 }}
                         content={HistoryTooltipContent}
                       />
                       <Area
