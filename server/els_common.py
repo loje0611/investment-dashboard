@@ -14,7 +14,7 @@ import os
 import re
 import sys
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timezone, timedelta
 from typing import Any, Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
@@ -147,8 +147,16 @@ def parse_korean_date(text: str) -> Optional[date]:
     return None
 
 
+_KST = timezone(timedelta(hours=9))
+
+
 def parse_sheet_issue_date(value: Any) -> Optional[date]:
-    """시트/API에서 내려온 발행일 값 → date."""
+    """시트/API에서 내려온 발행일 값 → date (KST 기준).
+
+    GAS ``JSON.stringify``는 Date 객체를 UTC ISO 문자열로 직렬화한다.
+    예: 시트 2026-04-24 (KST) → ``"2026-04-23T15:00:00.000Z"`` (UTC).
+    단순히 앞 10자를 자르면 하루 밀리므로 KST로 변환 후 date를 추출한다.
+    """
     if value is None:
         return None
     if isinstance(value, (int, float)):
@@ -156,6 +164,13 @@ def parse_sheet_issue_date(value: Any) -> Optional[date]:
     s = str(value).strip()
     if not s:
         return None
+    # ISO 8601 datetime with 'T' (e.g. "2026-04-23T15:00:00.000Z")
+    if "T" in s:
+        try:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+            return dt.astimezone(_KST).date()
+        except ValueError:
+            pass
     if len(s) >= 10 and s[4] == "-" and s[7] == "-":
         try:
             return date.fromisoformat(s[:10])
@@ -281,7 +296,10 @@ def post_update(
     logger: Optional[logging.Logger] = None,
 ) -> None:
     """시트 행 업데이트 POST."""
-    body = {"action": "update", "row_index": row_index, **payload}
+    auth_email = (os.getenv("SCRAPER_AUTH_EMAIL") or "").strip()
+    if not auth_email:
+        raise RuntimeError("SCRAPER_AUTH_EMAIL 환경변수가 설정되지 않았습니다.")
+    body = {"action": "update", "row_index": row_index, "authEmail": auth_email, **payload}
     raw = json.dumps(body, ensure_ascii=False)
     r = request_with_retry(
         "POST", api_base,

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 import sys
+import time
 from typing import Any, Optional
 
 import requests
@@ -67,7 +68,7 @@ def scrape_kiwoom_els_detail(product_round: str) -> dict[str, Any]:
         "User-Agent": _KIWOOM_UA,
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         "X-Requested-With": "XMLHttpRequest",
-        "Referer": "https://www1.kiwoom.com/wm/edl/es020/endElsMain",
+        "Referer": "https://www.kiwoom.com/wm/edl/es010/edlElsView",
     })
 
     search_url = "https://www1.kiwoom.com/wm/edl/es020/getEndElsMainJson"
@@ -82,7 +83,14 @@ def scrape_kiwoom_els_detail(product_round: str) -> dict[str, Any]:
         resp = session.post(search_url, data=payload, timeout=20)
         resp.raise_for_status()
     except requests.RequestException as e:
+        body_snippet = ""
+        try:
+            body_snippet = e.response.text[:500] if e.response is not None else ""
+        except Exception:
+            pass
         data["_error"] = f"검색 API 요청 실패: {e}"
+        if body_snippet:
+            data["_error"] += f" | 응답 본문: {body_snippet}"
         return data
 
     try:
@@ -246,11 +254,14 @@ def main() -> int:
         log.info("조건에 맞는 상품이 없습니다. (상태「청약 중(대기)」, 키움증권, 시트「발행일」≤오늘, 「수익률」비어 있음)")
         return 0
 
-    for row in targets:
+    for i, row in enumerate(targets):
         row_index = row.get("row_index")
         product_round = row.get("상품회차")
         if row_index is None or product_round is None:
             continue
+
+        if i > 0:
+            time.sleep(1.5)
 
         log.info("처리 중: row_index=%s, 상품회차=%s", row_index, product_round)
         try:
