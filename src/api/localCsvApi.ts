@@ -14,7 +14,7 @@ import historyCsvText from '../data/history.csv?raw';
 import portfolioCsvText from '../data/portfolio.csv?raw';
 
 /**
- * 콤마(,) 및 큰따옴표("")로 감싸진 CSV 텍스트를 파싱하는 경량 파서
+ * 콤마(,) 및 큰따옴표("")로 감싸진 CSV 텍스트를 파싱하는 경량 파서 (RFC 4180 준수)
  */
 function parseCsv(text: string): string[][] {
   const lines = text.trim().split(/\r?\n/);
@@ -59,10 +59,6 @@ function parseNumber(val: string | undefined): number {
 
 /**
  * 수익률 문자열을 퍼센트 단위 숫자로 변환합니다.
- * - "-1.2%" → -1.2
- * - "16.0%" → 16.0
- * - "0.3457" (소수형, 0~1 사이) → 34.57
- * - "53.57%" → 53.57
  */
 function parseReturnRate(val: string | undefined): number {
   if (!val) return 0;
@@ -70,11 +66,8 @@ function parseReturnRate(val: string | undefined): number {
   const cleaned = val.replace(/,/g, '').replace(/%/g, '').replace(/원/g, '').trim();
   const num = parseFloat(cleaned);
   if (isNaN(num)) return 0;
-  // 이미 % 기호가 있었으면 그대로 퍼센트 값 (e.g., "53.57%" → 53.57)
   if (hasPercent) return num;
-  // % 기호가 없고 절대값이 1 미만이면 소수형 (e.g., 0.3457 → 34.57%)
   if (Math.abs(num) < 1) return num * 100;
-  // 그 외는 이미 퍼센트 값으로 간주
   return num;
 }
 
@@ -104,8 +97,6 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
         '현금 평가금': parseNumber(r[8]),
         '원금 총액': parseNumber(r[9]),
         '평가금 총액': parseNumber(r[10]),
-        // 수익률은 설정하지 않음 → homeFromTotalAssets.ts가
-        // 원금 총액/평가금 총액에서 직접 정확히 계산 (normalizePercentYield 오판 방지)
         '원금 증감액': parseNumber(r[12]),
         '평가 증감액': parseNumber(r[13]),
         일자: dateStr,
@@ -121,6 +112,7 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
   const pensionList: PensionSheetRow[] = [];
   const elsListSheetData: ElsRow[] = [];
   const cashOther: SheetDataRow[] = [];
+  const rebalancingAccountMap: Record<string, RebalancingTableRow[]> = {};
 
   if (portfolioRows.length > 1) {
     for (let i = 1; i < portfolioRows.length; i++) {
@@ -135,6 +127,9 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
       const returnRateStr = r[5] ?? '0%';
       const status = r[6] ?? '운용 중';
       const notes = r[7] ?? '';
+      const quantity = parseNumber(r[8]);
+      const currentPrice = parseNumber(r[9]);
+      const targetWeightStr = r[10] ?? '';
 
       // Skip summary header rows
       if (name.includes('합계') || name.includes('총액')) continue;
@@ -152,7 +147,7 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
           상품명: name,
           투자원금: principal,
           평가금액: valuation,
-          수익률: parseNumber(returnRateStr),
+          수익률: parseReturnRate(returnRateStr),
         });
       } else if (category === 'ELS') {
         elsListSheetData.push({
@@ -171,6 +166,20 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
           상품명: name,
           투자원금: principal,
           평가금액: valuation,
+        });
+      } else if (category.startsWith('보유종목_')) {
+        const accName = category.replace('보유종목_', '');
+        if (!rebalancingAccountMap[accName]) {
+          rebalancingAccountMap[accName] = [];
+        }
+        rebalancingAccountMap[accName].push({
+          계좌명: accName,
+          종목명: name,
+          현재가: currentPrice > 0 ? currentPrice : valuation,
+          보유수량: quantity > 0 ? quantity : 1,
+          평가금액: valuation,
+          현재비중: parseReturnRate(returnRateStr) / 100,
+          목표비중: parseReturnRate(targetWeightStr) / 100,
         });
       }
     }
@@ -203,54 +212,16 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
     },
   ];
 
-  // 4. 리밸런싱 표 생성 (etfList & pensionList 기반)
+  // 4. 리밸런싱 표 생성 (rebalancingAccountMap 기반)
   const rebalancing: RebalancingTable[] = [];
 
-  // 4.1 ETF / 자문사 포트폴리오 테이블
-  if (etfList.length > 0) {
-    const totalEtf = etfList.reduce((sum, item) => sum + (item.평가금액 || 0), 0);
-    const etfRows: RebalancingTableRow[] = etfList.map((item, idx) => {
-      const val = item.평가금액 || 0;
-      const weight = totalEtf > 0 ? parseFloat(((val / totalEtf) * 100).toFixed(1)) : 0;
-      return {
-        종목명: item.상품명 || `ETF ${idx + 1}`,
-        현재가격: val,
-        보유수량: 1,
-        평가금액: val,
-        현재비중: weight,
-        목표비중: parseFloat((100 / etfList.length).toFixed(1)), // 균등 목표 비중
-      };
-    });
-
+  Object.keys(rebalancingAccountMap).forEach((accName) => {
     rebalancing.push({
-      accountLabel: 'ETF & 자문사 계좌',
-      sheet: '포트폴리오',
-      rows: etfRows,
+      accountLabel: accName,
+      sheet: '포트_API',
+      rows: rebalancingAccountMap[accName],
     });
-  }
-
-  // 4.2 연금 포트폴리오 테이블
-  if (pensionList.length > 0) {
-    const totalPension = pensionList.reduce((sum, item) => sum + (item.평가금액 || 0), 0);
-    const pensionRows: RebalancingTableRow[] = pensionList.map((item, idx) => {
-      const val = item.평가금액 || 0;
-      const weight = totalPension > 0 ? parseFloat(((val / totalPension) * 100).toFixed(1)) : 0;
-      return {
-        종목명: item.상품명 || `연금 ${idx + 1}`,
-        현재가격: val,
-        보유수량: 1,
-        평가금액: val,
-        현재비중: weight,
-        목표비중: parseFloat((100 / pensionList.length).toFixed(1)), // 균등 목표 비중
-      };
-    });
-
-    rebalancing.push({
-      accountLabel: '연금 자산 계좌',
-      sheet: '연금',
-      rows: pensionRows,
-    });
-  }
+  });
 
   return {
     totalAssets,
