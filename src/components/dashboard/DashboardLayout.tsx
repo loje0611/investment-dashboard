@@ -187,13 +187,11 @@ export function DashboardLayout() {
 
       if (key && realTimeAccountValuationMap[key]) {
         const { totalValuation } = realTimeAccountValuationMap[key]
-        const principal = (row.valuation > 0 && row.returnRate !== -100)
-          ? (row.valuation / (1 + row.returnRate / 100))
-          : row.valuation
+        const principal = row.principal
         const returnRate = principal > 0
           ? Math.round(((totalValuation - principal) / principal) * 100)
           : row.returnRate
-        return { ...row, valuation: totalValuation, returnRate }
+        return { ...row, principal, valuation: totalValuation, returnRate }
       }
       return row
     })
@@ -211,13 +209,11 @@ export function DashboardLayout() {
 
       if (key && realTimeAccountValuationMap[key]) {
         const { totalValuation } = realTimeAccountValuationMap[key]
-        const principal = (row.valuation > 0 && row.returnRate !== -100)
-          ? (row.valuation / (1 + row.returnRate / 100))
-          : row.valuation
+        const principal = row.principal
         const returnRate = principal > 0
           ? Math.round(((totalValuation - principal) / principal) * 100)
           : row.returnRate
-        return { ...row, valuation: totalValuation, returnRate }
+        return { ...row, principal, valuation: totalValuation, returnRate }
       }
       return row
     })

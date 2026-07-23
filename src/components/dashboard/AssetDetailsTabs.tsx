@@ -164,20 +164,15 @@ export function AssetDetailsTabs({
                   <p className="py-16 text-center text-sm text-content-tertiary">ETF 데이터가 없습니다.</p>
                 ) : (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {etfTable.map((row, i) => {
-                      const calculatedPrincipal = (row.valuation > 0 && row.returnRate !== -100)
-                        ? Math.round(row.valuation / (1 + row.returnRate / 100))
-                        : row.valuation;
-                      return (
-                        <AssetCard
-                          key={row.id} name={row.name} index={i}
-                          valuation={row.valuation} returnRate={row.returnRate}
-                          hideAmounts={hideAmounts}
-                          onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'ETF' })}
-                          onEdit={() => setEditModal({ open: true, name: row.name, principal: calculatedPrincipal })}
-                        />
-                      );
-                    })}
+                    {etfTable.map((row, i) => (
+                      <AssetCard
+                        key={row.id} name={row.name} index={i}
+                        valuation={row.valuation} returnRate={row.returnRate}
+                        hideAmounts={hideAmounts}
+                        onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'ETF' })}
+                        onEdit={() => setEditModal({ open: true, name: row.name, principal: row.principal })}
+                      />
+                    ))}
                   </div>
                 )}
               </motion.div>
@@ -189,20 +184,15 @@ export function AssetDetailsTabs({
                   <p className="py-16 text-center text-sm text-content-tertiary">연금 데이터가 없습니다.</p>
                 ) : (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {pensionTable.map((row, i) => {
-                      const calculatedPrincipal = (row.valuation > 0 && row.returnRate !== -100)
-                        ? Math.round(row.valuation / (1 + row.returnRate / 100))
-                        : row.valuation;
-                      return (
-                        <AssetCard
-                          key={row.id} name={row.name} index={i}
-                          valuation={row.valuation} returnRate={row.returnRate}
-                          hideAmounts={hideAmounts}
-                          onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'PENSION' })}
-                          onEdit={() => setEditModal({ open: true, name: row.name, principal: calculatedPrincipal })}
-                        />
-                      );
-                    })}
+                    {pensionTable.map((row, i) => (
+                      <AssetCard
+                        key={row.id} name={row.name} index={i}
+                        valuation={row.valuation} returnRate={row.returnRate}
+                        hideAmounts={hideAmounts}
+                        onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'PENSION' })}
+                        onEdit={() => setEditModal({ open: true, name: row.name, principal: row.principal })}
+                      />
+                    ))}
                   </div>
                 )}
               </motion.div>
