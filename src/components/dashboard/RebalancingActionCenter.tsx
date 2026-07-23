@@ -498,9 +498,17 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
                         </div>
 
                         <div className="text-right font-semibold">
-                          {isBuy && `+${formatWonDigits(hideAmounts, act.amount)}`}
-                          {isSell && `-${formatWonDigits(hideAmounts, act.amount)}`}
-                          {!isBuy && !isSell && '변동 없음'}
+                          {isBuy && (
+                            <span className="text-emerald-600 dark:text-emerald-400">
+                              +{act.shares > 0 ? `${act.shares.toLocaleString()}주 (` : ''}{formatWonDigits(hideAmounts, act.amount)}{act.shares > 0 ? ')' : ''}
+                            </span>
+                          )}
+                          {isSell && (
+                            <span className="text-rose-600 dark:text-rose-400">
+                              -{act.shares > 0 ? `${act.shares.toLocaleString()}주 (` : ''}{formatWonDigits(hideAmounts, act.amount)}{act.shares > 0 ? ')' : ''}
+                            </span>
+                          )}
+                          {!isBuy && !isSell && <span className="text-content-tertiary">변동 없음</span>}
                         </div>
                       </div>
 

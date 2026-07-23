@@ -141,7 +141,22 @@ function runBuiltInFinancialAiEngine(
   let summary = `${accountName} 계좌의 최적 리밸런싱 안을 제안합니다.`;
   let adviceNote = '포트폴리오 변동성을 줄이고 가치가 저평가된 항목 위주로 균형을 재조정합니다.';
 
-  if (isUsMigrateMode) {
+  // 사용자 프롬프트에서 'X만원 추가', 'X원 추가', '추가 매수' 금액 파싱
+  let addCash = 0;
+  const match10k = userPrompt.match(/(\d+)\s*만\s*원?/);
+  const matchWon = userPrompt.match(/(\d{4,})\s*원?/);
+  if (match10k) {
+    addCash = parseInt(match10k[1], 10) * 10000;
+  } else if (matchWon) {
+    addCash = parseInt(matchWon[1], 10);
+  }
+
+  const isAddCashMode = addCash > 0 || (promptLower.includes('추가') && promptLower.includes('매수'));
+
+  if (isAddCashMode && addCash > 0) {
+    summary = `💰 ${addCash.toLocaleString()}원 신규 추가 매수 리밸런싱 계획`;
+    adviceNote = `추가 입금액 ${addCash.toLocaleString()}원을 기존 자산 비중과 목표 비중에 맞춰 가장 효율적으로 분배 매수합니다.`;
+  } else if (isUsMigrateMode) {
     summary = `🇺🇸 미국 이주 대비 PFIC 세금 리스크 최소화 및 달러 자산 전환 리밸런싱`;
     adviceNote = `미국 이주 후 한국 상장 ETF/ELS 보유 시 PFIC 최고 세율(37%+)이 부과될 수 있으므로, 출국 전 국내 ETF 정리 및 달러 직투 자산 배치를 우선 추진합니다.`;
   } else if (isDividendMode) {
@@ -160,10 +175,27 @@ function runBuiltInFinancialAiEngine(
 
   const actions: RebalancingActionItem[] = holdings.map((item, idx) => {
     let action: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
-    let targetWeight = item.currentWeight;
+    let targetWeight = item.targetWeight ?? item.currentWeight;
     let reason = '현재 비중 유지';
+    let deltaValue = 0;
 
-    if (isDividendMode) {
+    if (isAddCashMode && addCash > 0) {
+      // 추가 매수 금액이 입력된 경우: 목표 비중에 맞추어 신규 입금액 배분
+      const newTotal = totalValuation + addCash;
+      const targetVal = (targetWeight / 100) * newTotal;
+      deltaValue = targetVal - item.currentValue;
+
+      if (deltaValue > 1000) {
+        action = 'BUY';
+        reason = `신규 자금 분배 매수 (목표비중 ${targetWeight}%)`;
+      } else if (deltaValue < -1000) {
+        action = 'SELL';
+        reason = `비중 초과분 일부 매도`;
+      } else {
+        action = 'HOLD';
+        reason = `현재 비중 적정`;
+      }
+    } else if (isDividendMode) {
       if (item.name.includes('배당') || item.name.includes('SCHD') || item.name.includes('ISA')) {
         action = 'BUY';
         targetWeight = Math.min(100, item.currentWeight + 15);
@@ -173,6 +205,8 @@ function runBuiltInFinancialAiEngine(
         targetWeight = Math.max(5, item.currentWeight - 15);
         reason = '고비중 성장 자산 축소를 통한 배당 재원 확보';
       }
+      const targetValue = (targetWeight / 100) * totalValuation;
+      deltaValue = targetValue - item.currentValue;
     } else if (isUsMigrateMode) {
       if (item.name.includes('해외') || item.name.includes('미국') || item.name.includes('ISA')) {
         action = 'BUY';
@@ -183,6 +217,8 @@ function runBuiltInFinancialAiEngine(
         targetWeight = Math.max(0, item.currentWeight - 10);
         reason = '미국 이주 시 PFIC 과세 리스크 종목 이익 실현';
       }
+      const targetValue = (targetWeight / 100) * totalValuation;
+      deltaValue = targetValue - item.currentValue;
     } else if (isSafetyMode) {
       if (item.name.includes('단기채') || item.name.includes('현금') || item.name.includes('CMA')) {
         action = 'BUY';
@@ -193,32 +229,33 @@ function runBuiltInFinancialAiEngine(
         targetWeight = Math.max(10, item.currentWeight - 15);
         reason = '변동성 자산 일부 비중 축소';
       }
+      const targetValue = (targetWeight / 100) * totalValuation;
+      deltaValue = targetValue - item.currentValue;
     } else {
       // 사용자 맞춤 및 균등 리밸런싱 (Default)
       const equalWeight = parseFloat((100 / holdings.length).toFixed(1));
-      if (item.currentWeight > equalWeight + 2) {
-        action = 'SELL';
-        targetWeight = equalWeight;
-        reason = `사용자 요청 기준 차익 실현 (목표 ${equalWeight}%)`;
-      } else if (item.currentWeight < equalWeight - 2) {
+      targetWeight = item.targetWeight ?? equalWeight;
+      const targetValue = (targetWeight / 100) * totalValuation;
+      deltaValue = targetValue - item.currentValue;
+
+      if (deltaValue > 5000) {
         action = 'BUY';
-        targetWeight = equalWeight;
-        reason = `사용자 요청 기준 매수 확대 (목표 ${equalWeight}%)`;
+        reason = `목표 비중(${targetWeight}%) 미달 매수`;
+      } else if (deltaValue < -5000) {
+        action = 'SELL';
+        reason = `목표 비중(${targetWeight}%) 초과 매도`;
       }
     }
 
-    const targetValue = (targetWeight / 100) * totalValuation;
-    const deltaValue = targetValue - item.currentValue;
-    // quantity=1이고 currentPrice≒currentValue이면 계좌 단위 총액이므로
-    // 주 수 계산 대신 금액 기반으로 표시
+    const price = item.currentPrice > 0 ? item.currentPrice : item.currentValue || 100000;
     const isAccountLevel = item.quantity === 1 && Math.abs(item.currentPrice - item.currentValue) < 1;
-    const shares = isAccountLevel ? 0 : Math.round(deltaValue / (item.currentPrice > 0 ? item.currentPrice : 100000));
+    const shares = isAccountLevel ? 0 : Math.round(Math.abs(deltaValue) / price);
 
     return {
       stockName: item.name,
       action,
       shares,
-      amount: Math.abs(deltaValue),
+      amount: Math.round(Math.abs(deltaValue)),
       currentWeight: item.currentWeight,
       targetWeight,
       reason,
