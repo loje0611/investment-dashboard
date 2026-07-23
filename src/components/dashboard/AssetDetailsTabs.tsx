@@ -19,24 +19,46 @@ interface AssetDetailsTabsProps {
   onElsRedeem?: (item: ElsCardItem) => void
 }
 
-function AssetCard({ name, valuation, returnRate, hideAmounts, onTap, index }: {
+import { Edit3 } from 'lucide-react'
+import { HoldingEditModal } from './HoldingEditModal'
+
+function AssetCard({ name, valuation, returnRate, hideAmounts, onTap, onEdit, index }: {
   name: string; valuation: number; returnRate: number
-  hideAmounts: boolean; onTap: () => void; index: number
+  hideAmounts: boolean; onTap: () => void; onEdit?: () => void; index: number
 }) {
   const isProfit = returnRate >= 0
 
   return (
-    <motion.button
-      type="button"
-      onClick={onTap}
-      aria-label={`${name} — 평가금 ${valuation.toLocaleString('ko-KR')}원, 수익률 ${returnRate.toFixed(2)}%`}
+    <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
-      className="w-full rounded-2xl border border-stroke bg-surface-card p-4 text-left transition-colors hover:bg-surface-hover active:scale-[0.98]"
+      className="group relative w-full rounded-2xl border border-stroke bg-surface-card p-4 text-left transition-colors hover:bg-surface-hover"
     >
-      <p className="truncate text-sm font-semibold text-accent">{name}</p>
-      <div className="mt-2 flex items-end justify-between gap-3">
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onTap}
+          className="truncate text-sm font-semibold text-accent hover:underline"
+        >
+          {name}
+        </button>
+        {onEdit && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onEdit()
+            }}
+            className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-secondary text-content-tertiary transition-colors hover:bg-accent hover:text-white"
+            title="원금 및 수량 수정"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      <div className="mt-2 flex items-end justify-between gap-3 cursor-pointer" onClick={onTap}>
         <p className="text-xl font-bold tabular-nums leading-snug text-content-primary">
           ₩{formatWonDigits(hideAmounts, valuation)}
         </p>
@@ -46,7 +68,7 @@ function AssetCard({ name, valuation, returnRate, hideAmounts, onTap, index }: {
           {isProfit ? '+' : ''}{Math.round(returnRate)}%
         </span>
       </div>
-    </motion.button>
+    </motion.div>
   )
 }
 
@@ -58,6 +80,10 @@ export function AssetDetailsTabs({
   const [historyModal, setHistoryModal] = useState<{
     open: boolean; name: string; kind: ProductHistoryKind
   }>({ open: false, name: '', kind: 'ETF' })
+
+  const [editModal, setEditModal] = useState<{
+    open: boolean; name: string; valuation: number
+  }>({ open: false, name: '', valuation: 0 })
 
   const tabs: { id: TabId; label: string; count: number }[] = [
     { id: 'etf', label: 'ETF', count: etfTable.length },
@@ -72,6 +98,15 @@ export function AssetDetailsTabs({
         onClose={() => setHistoryModal((s) => ({ ...s, open: false }))}
         productName={historyModal.name}
         productType={historyModal.kind}
+      />
+
+      <HoldingEditModal
+        open={editModal.open}
+        onClose={() => setEditModal((s) => ({ ...s, open: false }))}
+        accountLabel={editModal.name}
+        stockName={editModal.name}
+        initialQuantity={1}
+        initialPrice={editModal.valuation}
       />
 
       {/* Tab Pills */}
@@ -136,6 +171,7 @@ export function AssetDetailsTabs({
                         valuation={row.valuation} returnRate={row.returnRate}
                         hideAmounts={hideAmounts}
                         onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'ETF' })}
+                        onEdit={() => setEditModal({ open: true, name: row.name, valuation: row.valuation })}
                       />
                     ))}
                   </div>
@@ -155,6 +191,7 @@ export function AssetDetailsTabs({
                         valuation={row.valuation} returnRate={row.returnRate}
                         hideAmounts={hideAmounts}
                         onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'PENSION' })}
+                        onEdit={() => setEditModal({ open: true, name: row.name, valuation: row.valuation })}
                       />
                     ))}
                   </div>

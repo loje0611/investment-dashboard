@@ -94,7 +94,7 @@ export function HoldingEditModal({
                 value={quantity === 0 ? '' : quantity}
                 onChange={(e) => setQuantity(parseFloat(e.target.value) || 0)}
                 placeholder="예: 100"
-                className="w-full rounded-xl border border-stroke bg-surface-secondary p-3 text-sm font-bold text-content-primary placeholder:text-content-tertiary focus:border-accent focus:outline-none"
+                className="w-full rounded-xl border border-stroke-strong bg-surface-primary px-4 py-3 text-sm font-bold text-content-primary placeholder:text-content-tertiary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </div>
 
@@ -107,7 +107,7 @@ export function HoldingEditModal({
                 value={price === 0 ? '' : price}
                 onChange={(e) => setPrice(parseFloat(e.target.value) || 0)}
                 placeholder="예: 25000"
-                className="w-full rounded-xl border border-stroke bg-surface-secondary p-3 text-sm font-bold text-content-primary placeholder:text-content-tertiary focus:border-accent focus:outline-none"
+                className="w-full rounded-xl border border-stroke-strong bg-surface-primary px-4 py-3 text-sm font-bold text-content-primary placeholder:text-content-tertiary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </div>
 
