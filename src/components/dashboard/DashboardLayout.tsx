@@ -6,7 +6,6 @@ import { useStore } from '../../store/useStore'
 import { getWorstPerformer } from '../../utils/elsWorstPerformer'
 import { portfolioToEtfRows } from '../../utils/portfolioToEtf'
 import { pensionToRows } from '../../utils/pensionToRows'
-import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAccounts'
 import { totalAssetsToPrincipalValuationTrend } from '../../utils/totalAssetsToPrincipalValuation'
 import {
   getLatestTotalAssetSnapshot,
@@ -78,14 +77,14 @@ function LazyChunkFallback({ label = '로딩 중…' }: { label?: string }) {
 
 export function DashboardLayout() {
   const {
-    etfList, pensionList, rebalancing, totalAssets, elsListSheetData, summaryCards,
-    isLoading, isLoadingAssets, isLoadingRebalancing, error, hideAmounts,
+    etfList, pensionList, totalAssets, elsListSheetData, summaryCards,
+    isLoading, isLoadingAssets, error, hideAmounts,
   } = useStore(
     useShallow((s) => ({
-      etfList: s.etfList, pensionList: s.pensionList, rebalancing: s.rebalancing,
+      etfList: s.etfList, pensionList: s.pensionList,
       totalAssets: s.totalAssets, elsListSheetData: s.elsListSheetData, summaryCards: s.summaryCards,
       isLoading: s.isLoading, isLoadingAssets: s.isLoadingAssets,
-      isLoadingRebalancing: s.isLoadingRebalancing, error: s.error, hideAmounts: s.hideAmounts,
+      error: s.error, hideAmounts: s.hideAmounts,
     }))
   )
   const fetchData = useStore((s) => s.fetchData)
@@ -149,13 +148,7 @@ export function DashboardLayout() {
   const latestSnapshot = useMemo(() => getLatestTotalAssetSnapshot(totalAssets), [totalAssets])
   const homeSummaryCards = useMemo(() => mergeSummaryWithElsProfitCard(buildSummaryCardsFromSnapshot(latestSnapshot), summaryCards), [latestSnapshot, summaryCards])
   const homePieData = useMemo(() => buildPieSegmentsFromSnapshot(latestSnapshot), [latestSnapshot])
-  const rebalancingAccounts = useMemo(() => {
-    if (rebalancing?.length) {
-      const fromTables = rebalancingTablesToAccounts(rebalancing)
-      if (fromTables.length > 0) return fromTables
-    }
-    return []
-  }, [rebalancing])
+
   const insightText = useMemo(() => generateInsightText(principalValuationTrend), [principalValuationTrend])
 
   return (
@@ -266,9 +259,6 @@ export function DashboardLayout() {
             <div className="absolute inset-0 flex flex-col overflow-hidden">
               <Suspense fallback={<LazyChunkFallback label="리밸런싱을 불러오는 중…" />}>
                 <RebalancingActionCenter
-                  accounts={rebalancingAccounts}
-                  isLoading={isLoading || isLoadingRebalancing}
-                  compact
                   hideAmounts={hideAmounts}
                 />
               </Suspense>

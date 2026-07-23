@@ -203,10 +203,12 @@ function runBuiltInFinancialAiEngine(
       }
     }
 
-    const price = item.currentPrice > 0 ? item.currentPrice : item.currentValue || 100000;
     const targetValue = (targetWeight / 100) * totalValuation;
     const deltaValue = targetValue - item.currentValue;
-    const shares = Math.round(deltaValue / price);
+    // quantity=1이고 currentPrice≒currentValue이면 계좌 단위 총액이므로
+    // 주 수 계산 대신 금액 기반으로 표시
+    const isAccountLevel = item.quantity === 1 && Math.abs(item.currentPrice - item.currentValue) < 1;
+    const shares = isAccountLevel ? 0 : Math.round(deltaValue / (item.currentPrice > 0 ? item.currentPrice : 100000));
 
     return {
       stockName: item.name,
