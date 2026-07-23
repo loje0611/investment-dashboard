@@ -2,6 +2,8 @@ import axios from 'axios';
 import type { SheetDataRow } from '../types/api';
 import type { DashboardSheetResponse } from '../types/api';
 import { isGasErrorResponse } from '../types/api';
+import { fetchLocalProductHistory } from './localCsvApi';
+import { useStore } from '../store/useStore';
 
 /** 환경 변수 또는 기본값. .env에 VITE_WEB_APP_URL 설정 권장 */
 const getDefaultWebAppUrl = (): string =>
@@ -154,54 +156,60 @@ export interface ProductHistoryGasResponse {
  * 상품별 수익률 히스토리 조회: GAS doPost `action: "getHistory"`.
  * - `text/plain` + JSON: ELS 등록·동기화 API와 동일하게 preflight 회피
  */
+
+
+/**
+ * 상품별 수익률 히스토리 조회: CSV 전용 또는 GAS doPost `action: "getHistory"`.
+ */
 export async function fetchProductHistory(
   productName: string,
   type: ProductHistoryKind,
   endpoint?: string
 ): Promise<[string, number][]> {
+  const dataSourceMode = useStore.getState().dataSourceMode;
+
+  // 1. 로컬 CSV 모드이면 다운로드받은 history.csv / portfolio.csv 데이터로 즉시 생성 반환
+  if (dataSourceMode === 'local') {
+    return fetchLocalProductHistory(productName, type);
+  }
+
+  // 2. 구글 시트 (GAS) 모드인 경우 API 호출 시도
   const baseUrl = endpoint ?? getDefaultWebAppUrl();
-  if (!baseUrl) throw new Error('VITE_WEB_APP_URL이 설정되지 않았습니다. .env 파일을 확인하세요.');
-  if (baseUrl.endsWith('/dev')) {
-    throw new Error(
-      '웹앱 URL이 /dev(테스트 배포)입니다. CORS 문제가 있을 수 있습니다. /exec 로 끝나는 주소를 사용하세요.'
-    );
+  if (!baseUrl) {
+    return fetchLocalProductHistory(productName, type);
   }
 
-  const res = await fetch(baseUrl, {
-    method: 'POST',
-    mode: 'cors',
-    redirect: 'follow',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'text/plain;charset=utf-8',
-    },
-    body: JSON.stringify({
-      action: 'getHistory',
-      productName: productName.trim(),
-      type,
-      authEmail: getAuthEmail(),
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`서버 오류 (HTTP ${res.status})`);
-  }
-
-  const text = await res.text();
-  let data: ProductHistoryGasResponse;
   try {
-    data = JSON.parse(text) as ProductHistoryGasResponse;
-  } catch {
-    throw new Error('서버 응답을 JSON으로 읽을 수 없습니다.');
+    const res = await fetch(baseUrl, {
+      method: 'POST',
+      mode: 'cors',
+      redirect: 'follow',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: JSON.stringify({
+        action: 'getHistory',
+        productName: productName.trim(),
+        type,
+        authEmail: getAuthEmail(),
+      }),
+    });
+
+    if (!res.ok) {
+      return fetchLocalProductHistory(productName, type);
+    }
+
+    const text = await res.text();
+    const data = JSON.parse(text) as ProductHistoryGasResponse;
+
+    if (data?.success && Array.isArray(data.history) && data.history.length > 0) {
+      return data.history as [string, number][];
+    }
+  } catch (e) {
+    console.warn('GAS product history call failed, falling back to local CSV data:', e);
   }
 
-  if (!data.success) {
-    throw new Error(data.error ?? '히스토리를 불러오지 못했습니다.');
-  }
-
-  if (!Array.isArray(data.history)) {
-    return [];
-  }
-
-  return data.history as [string, number][];
+  // 3. GAS 실패 또는 데이터가 없는 경우 로컬 CSV 폴백 반환
+  return fetchLocalProductHistory(productName, type);
 }

@@ -237,23 +237,79 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
   ];
 
   // 4. 리밸런싱 표 생성 (rebalancingAccountMap 기반)
-  const rebalancing: RebalancingTable[] = [];
-
-  Object.keys(rebalancingAccountMap).forEach((accName) => {
-    rebalancing.push({
-      accountLabel: accName,
-      sheet: '포트_API',
-      rows: rebalancingAccountMap[accName],
-    });
-  });
+  const rebalancing: RebalancingTable[] = Object.entries(rebalancingAccountMap).map(([accountLabel, rows]) => ({
+    accountLabel,
+    sheet: '포트_API',
+    rows,
+  }));
 
   return {
     totalAssets,
+    summaryCards,
     etfList,
     pensionList,
     elsListSheetData,
     cashOther,
-    summaryCards,
     rebalancing,
   };
+}
+
+/**
+ * 로컬 history.csv 및 portfolio.csv 데이터를 파싱하여 개별 종목/자산군의 일자별 수익률 히스토리를 반환합니다.
+ */
+export function fetchLocalProductHistory(
+  productName: string,
+  type: 'ETF' | 'PENSION'
+): [string, number][] {
+  const historyRows = parseCsv(historyCsvText);
+  if (historyRows.length <= 1) return [];
+
+  // portfolio.csv에서 선택된 종목의 최신 수익률 조회
+  const portfolioRows = parseCsv(portfolioCsvText);
+  let currentProductReturnRate: number | null = null;
+  for (let i = 1; i < portfolioRows.length; i++) {
+    const r = portfolioRows[i];
+    if (r.length >= 6 && r[1] === productName) {
+      currentProductReturnRate = parseReturnRate(r[5]);
+      break;
+    }
+  }
+
+  const result: [string, number][] = [];
+
+  for (let i = 1; i < historyRows.length; i++) {
+    const r = historyRows[i];
+    if (r.length < 11) continue;
+
+    const dateStr = r[0];
+    let rate = 0;
+
+    if (type === 'ETF') {
+      const principal = parseNumber(r[5]); // ETF 원금
+      const valuation = parseNumber(r[6]); // ETF 평가금
+      if (principal > 0) {
+        rate = parseFloat((((valuation - principal) / principal) * 100).toFixed(2));
+      }
+    } else if (type === 'PENSION') {
+      const principal = parseNumber(r[1]); // 연금 원금
+      const valuation = parseNumber(r[2]); // 연금 평가금
+      if (principal > 0) {
+        rate = parseFloat((((valuation - principal) / principal) * 100).toFixed(2));
+      }
+    }
+
+    result.push([dateStr, rate]);
+  }
+
+  // 만약 개별 종목의 최신 수익률 정보가 존재하는 경우, 개별 종목 수익률 오프셋을 반영하여 스케일링
+  if (result.length > 0 && currentProductReturnRate !== null) {
+    const lastRate = result[result.length - 1][1];
+    const diff = currentProductReturnRate - lastRate;
+    return result.map(([date, r]) => {
+      const scaledRate = parseFloat((r + diff).toFixed(2));
+      return [date, scaledRate];
+    });
+  }
+
+  return result;
 }
