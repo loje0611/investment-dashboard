@@ -43,7 +43,7 @@ function AssetCard({ name, valuation, returnRate, hideAmounts, onTap, index }: {
         <span className={`shrink-0 rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums ${
           isProfit ? 'bg-profit-bg text-profit' : 'bg-loss-bg text-loss'
         }`}>
-          {isProfit ? '+' : ''}{returnRate.toFixed(2)}%
+          {isProfit ? '+' : ''}{Math.round(returnRate)}%
         </span>
       </div>
     </motion.button>

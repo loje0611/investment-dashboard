@@ -160,7 +160,7 @@ export function GlobalOverview({
                           : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
                       }`}
                     >
-                      {isProfit ? '+' : ''}{card.rate}%
+                      {isProfit ? '+' : ''}{Math.round(card.rate!)}%
                     </span>
                   )}
                 </div>

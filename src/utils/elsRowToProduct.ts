@@ -67,7 +67,18 @@ export function elsRowToElsProduct(
   row: ElsRow,
   mapping: AssetColumnMapping = DEFAULT_ELS_ASSET_MAPPING
 ): ElsProduct {
-  const productName = row.상품명 != null ? String(row.상품명).trim() : undefined;
+  const rawName = String(row.상품명 || row.증권사_회차 || '').trim();
+  const broker = String(row.증권사 || '').trim();
+  const round = String(row.상품회차 || row.회차 || '').trim();
+  let productName = rawName;
+  if (rawName) {
+    if (!/회$/.test(rawName) && /\d+$/.test(rawName)) productName = `${rawName}회`;
+  } else if (broker && round) {
+    productName = `${broker} ${round.replace(/회/g, '')}회`;
+  } else if (broker) {
+    productName = `${broker} ELS`;
+  }
+
   const assets = extractAssets(row, mapping);
   return {
     productName: productName || undefined,

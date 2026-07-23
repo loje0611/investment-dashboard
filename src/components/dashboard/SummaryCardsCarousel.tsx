@@ -41,7 +41,7 @@ function HeroCard({ item, hideAmounts }: { item: SummaryCardItem; hideAmounts: b
       {item.rate != null && (
         <div className={`mt-2.5 flex items-center gap-1.5 text-sm font-semibold tabular-nums ${isProfit ? 'text-profit' : 'text-loss'}`}>
           <Icon className="h-4 w-4" strokeWidth={2.5} />
-          <span>{isProfit ? '+' : ''}{item.rate.toFixed(2)}%</span>
+          <span>{isProfit ? '+' : ''}{Math.round(item.rate)}%</span>
           <span className="ml-1 text-xs font-normal text-content-tertiary">투자원금 대비</span>
         </div>
       )}
@@ -59,17 +59,15 @@ function BentoCard({ item, hideAmounts, index }: { item: SummaryCardItem; hideAm
       transition={{ duration: 0.35, delay: 0.08 * (index + 1) }}
       className="flex flex-col justify-between rounded-2xl border border-stroke bg-surface-card p-4"
     >
-      <p className="text-[11px] font-medium uppercase tracking-wide text-content-tertiary">{item.title}</p>
-      <div className="mt-2">
-        <p className="text-lg font-bold tabular-nums leading-snug text-content-primary">
-          {item.amount != null ? `₩${hideAmounts ? MASK : formatWon(item.amount)}` : '-'}
-        </p>
-        {item.rate != null && (
-          <p className={`mt-1 text-xs font-semibold tabular-nums ${isProfit ? 'text-profit' : 'text-loss'}`}>
-            {isProfit ? '+' : ''}{item.rate.toFixed(2)}%
-          </p>
-        )}
-      </div>
+      <p className="text-sm font-medium text-content-secondary">{item.title}</p>
+      <p className="my-1.5 text-xl font-bold tracking-tight tabular-nums text-content-primary">
+        ₩{item.amount != null ? <HeroAmount amount={item.amount} hide={hideAmounts} /> : '-'}
+      </p>
+      {item.rate != null && (
+        <span className={`text-sm font-semibold tabular-nums ${isProfit ? 'text-profit' : 'text-loss'}`}>
+          {isProfit ? '+' : ''}{Math.round(item.rate)}%
+        </span>
+      )}
     </motion.div>
   )
 }

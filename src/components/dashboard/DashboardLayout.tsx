@@ -124,10 +124,20 @@ export function DashboardLayout() {
       const currentLevel = getCurrentLevelFromRow(row, levelFromWorst)
       const kiBarrier = parseBarrierPercent(row.낙인배리어 ?? row.KI) || 70
       const redemptionBarrier = parseBarrierPercent(row.상환배리어 ?? row['다음 배리어']) || 90
-      const productName = row.상품명 != null ? String(row.상품명).trim() :
-        (row.증권사 ? `${row.증권사} ELS ${row.상품회차 || ''}회`.trim() : '')
+      const rawName = String(row.상품명 || row.증권사_회차 || '').trim()
+      const broker = String(row.증권사 || '').trim()
+      const round = String(row.상품회차 || row.회차 || '').trim()
+      let productName = rawName
+      if (rawName) {
+        if (!/회$/.test(rawName) && /\d+$/.test(rawName)) productName = `${rawName}회`
+      } else if (broker && round) {
+        productName = `${broker} ${round.replace(/회/g, '')}회`
+      } else if (broker) {
+        productName = `${broker} ELS`
+      }
+
       return {
-        id: `els-manage-${i}`, productName: productName || '-',
+        id: `els-manage-${i}`, productName: productName || 'ELS 상품',
         nextRedemptionDate: formatNextEarlyRedemptionWithCountdown(row),
         currentLevel, kiBarrier, redemptionBarrier,
         rowIndex: sheetRowIndexFromRow(row), joinAmount: parseJoinAmountFromElsRow(row),
