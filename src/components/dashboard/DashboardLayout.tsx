@@ -186,8 +186,13 @@ export function DashboardLayout() {
       else if (name.includes('해외투자') || name.includes('해외')) key = '해외투자'
 
       if (key && realTimeAccountValuationMap[key]) {
-        const { totalValuation, totalPrincipal } = realTimeAccountValuationMap[key]
-        const returnRate = totalPrincipal > 0 ? Math.round(((totalValuation - totalPrincipal) / totalPrincipal) * 100) : row.returnRate
+        const { totalValuation } = realTimeAccountValuationMap[key]
+        const principal = (row.valuation > 0 && row.returnRate !== -100)
+          ? (row.valuation / (1 + row.returnRate / 100))
+          : row.valuation
+        const returnRate = principal > 0
+          ? Math.round(((totalValuation - principal) / principal) * 100)
+          : row.returnRate
         return { ...row, valuation: totalValuation, returnRate }
       }
       return row
@@ -205,8 +210,13 @@ export function DashboardLayout() {
       else if (name.includes('개인연금') || name.includes('IRP_개인') || name.includes('IRP (개인)')) key = 'IRP_개인'
 
       if (key && realTimeAccountValuationMap[key]) {
-        const { totalValuation, totalPrincipal } = realTimeAccountValuationMap[key]
-        const returnRate = totalPrincipal > 0 ? Math.round(((totalValuation - totalPrincipal) / totalPrincipal) * 100) : row.returnRate
+        const { totalValuation } = realTimeAccountValuationMap[key]
+        const principal = (row.valuation > 0 && row.returnRate !== -100)
+          ? (row.valuation / (1 + row.returnRate / 100))
+          : row.valuation
+        const returnRate = principal > 0
+          ? Math.round(((totalValuation - principal) / principal) * 100)
+          : row.returnRate
         return { ...row, valuation: totalValuation, returnRate }
       }
       return row
