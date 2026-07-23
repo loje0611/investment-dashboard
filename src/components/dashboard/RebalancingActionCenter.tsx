@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store/useStore';
-import { PageHeader } from '../ui/PageHeader';
 import { formatWonDigits } from '../../utils/maskSensitiveAmount';
 import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAccounts';
 import {
@@ -37,8 +36,6 @@ const TARGET_ACCOUNTS = [
 ] as const;
 
 type TargetAccountName = (typeof TARGET_ACCOUNTS)[number];
-
-
 
 /** 계좌명 매핑 함수 (Fuzzy 매칭) */
 function mapNameToTargetAccount(rawName: string): TargetAccountName | null {
@@ -112,13 +109,12 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
       }
     });
 
-    // 2. etfList (로컬 CSV 또는 GAS ETF 목록) 매핑 - 해당 계좌에 세부 종목이 없는 경우에만 요약 항목 추가
+    // 2. etfList 매핑 - 해당 계좌에 세부 종목이 없는 경우에만 요약 항목 추가
     etfList.forEach((item) => {
       const name = String(item.상품명 || '').trim();
       const targetAcc = mapNameToTargetAccount(name);
       if (!targetAcc) return;
 
-      // 이미 세부 종목들이 존재하는 계좌라면 총액 요약 항목 추가 금지 (이중 표시 방지)
       if (map[targetAcc].length > 0) return;
 
       const valuation = item.평가금액 || 0;
@@ -140,7 +136,6 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
       const targetAcc = mapNameToTargetAccount(name);
       if (!targetAcc) return;
 
-      // 이미 세부 종목들이 존재하는 계좌라면 총액 요약 항목 추가 금지 (이중 표시 방지)
       if (map[targetAcc].length > 0) return;
 
       const valuation = item.평가금액 || 0;
@@ -214,305 +209,306 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
   };
 
   return (
-    <section className="flex h-full flex-col overflow-hidden">
-      <PageHeader title="AI 지능형 리밸런싱" />
-
-      <div className="flex-1 space-y-6 overflow-y-auto px-4 pb-10 scrollbar-hide">
-        {/* 1. 계좌 선택 바 */}
-        <div>
-          <label className="mb-2 flex items-center justify-between text-xs font-semibold text-content-tertiary">
-            <span className="flex items-center gap-1.5">
-              <Briefcase className="h-3.5 w-3.5 text-accent" />
-              리밸런싱 대상 계좌 선택
-            </span>
-            <span className="text-[11px] text-content-tertiary">
-              (8개 계좌 지원)
-            </span>
-          </label>
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {TARGET_ACCOUNTS.map((accName) => {
-              const isActive = selectedAccount === accName;
-              const accHoldings = accountHoldingsMap[accName];
-              const count = accHoldings.length;
-              return (
-                <button
-                  key={accName}
-                  type="button"
-                  onClick={() => {
-                    setSelectedAccount(accName);
-                    setAiResult(null);
-                  }}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-medium transition-all ${
+    <section className="flex flex-col gap-6">
+      {/* 1. 계좌 선택 바 */}
+      <div>
+        <label className="mb-2 flex items-center justify-between text-xs font-semibold text-content-tertiary">
+          <span className="flex items-center gap-1.5">
+            <Briefcase className="h-3.5 w-3.5 text-accent" />
+            리밸런싱 대상 계좌 선택
+          </span>
+          <span className="text-[11px] text-content-tertiary">
+            (8개 핵심 계좌)
+          </span>
+        </label>
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {TARGET_ACCOUNTS.map((accName) => {
+            const isActive = selectedAccount === accName;
+            const accHoldings = accountHoldingsMap[accName];
+            const count = accHoldings.length;
+            return (
+              <button
+                key={accName}
+                type="button"
+                onClick={() => {
+                  setSelectedAccount(accName);
+                  setAiResult(null);
+                }}
+                className={`flex shrink-0 items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-medium transition-all ${
+                  isActive
+                    ? 'bg-accent text-content-inverse shadow-md shadow-accent/20 font-bold scale-[1.02]'
+                    : count === 0
+                    ? 'border border-stroke/50 bg-surface-card/50 text-content-tertiary hover:bg-surface-secondary'
+                    : 'border border-stroke bg-surface-card text-content-secondary hover:bg-surface-secondary'
+                }`}
+              >
+                <span>{accName}</span>
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
                     isActive
-                      ? 'bg-accent text-content-inverse shadow-md shadow-accent/20 font-semibold scale-[1.02]'
-                      : count === 0
-                      ? 'border border-stroke/50 bg-surface-card/50 text-content-tertiary hover:bg-surface-secondary'
-                      : 'border border-stroke bg-surface-card text-content-secondary hover:bg-surface-secondary'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-surface-tertiary text-content-tertiary'
                   }`}
                 >
-                  <span>{accName}</span>
-                  <span
-                    className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                      isActive
-                        ? 'bg-white/20 text-white'
-                        : 'bg-surface-tertiary text-content-tertiary'
-                    }`}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
+      </div>
 
-        {/* 2. 선택된 계좌의 현재 포트폴리오 요약 */}
-        <div className="rounded-2xl border border-stroke bg-surface-card p-4 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-stroke pb-3">
-            <div>
-              <span className="text-xs font-semibold text-accent flex items-center gap-1">
-                <PieChart className="h-3.5 w-3.5" /> 계좌 보유 포트폴리오
-              </span>
-              <h3 className="text-base font-bold text-content-primary">{selectedAccount}</h3>
+      {/* 2. Desktop 2-Column Grid (Span 5: Portfolio / Span 7: AI Console) */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* Left Column: Account Portfolio Summary (Span 5) */}
+        <div className="rounded-2xl border border-stroke bg-surface-card p-5 shadow-glass-sm space-y-4 lg:col-span-5 flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-stroke pb-3">
+              <div>
+                <span className="text-xs font-semibold text-accent flex items-center gap-1">
+                  <PieChart className="h-3.5 w-3.5" /> 계좌 보유 포트폴리오
+                </span>
+                <h3 className="text-lg font-bold text-content-primary">{selectedAccount}</h3>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-content-tertiary">총 평가금액</span>
+                <p className="text-lg font-extrabold text-content-primary">
+                  {hasHoldings ? formatWonDigits(hideAmounts, accountTotalValuation) : '0원'}
+                </p>
+              </div>
             </div>
-            <div className="text-right">
-              <span className="text-xs text-content-tertiary">총 평가금액</span>
-              <p className="text-base font-extrabold text-content-primary">
-                {hasHoldings ? formatWonDigits(hideAmounts, accountTotalValuation) : '0원'}
-              </p>
-            </div>
-          </div>
 
-          {/* 자산 비중 프로그레스 바 시각화 */}
-          {hasHoldings && (
-            <div className="space-y-1.5">
-              <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-tertiary">
+            {/* 자산 비중 프로그레스 바 시각화 */}
+            {hasHoldings && (
+              <div className="space-y-1.5">
+                <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface-tertiary">
+                  {currentHoldings.map((h, i) => {
+                    const colors = [
+                      'bg-indigo-500',
+                      'bg-emerald-500',
+                      'bg-amber-500',
+                      'bg-sky-500',
+                      'bg-rose-500',
+                      'bg-violet-500',
+                    ];
+                    return (
+                      <div
+                        key={i}
+                        style={{ width: `${Math.max(h.currentWeight, 2)}%` }}
+                        className={`${colors[i % colors.length]} transition-all duration-500`}
+                        title={`${h.name}: 현재 ${h.currentWeight}% / 목표 ${h.targetWeight ?? 0}%`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 보유 종목 상세 목록 */}
+            {hasHoldings ? (
+              <div className="space-y-2.5 pt-1">
                 {currentHoldings.map((h, i) => {
-                  const colors = [
-                    'bg-indigo-500',
-                    'bg-emerald-500',
-                    'bg-amber-500',
-                    'bg-sky-500',
-                    'bg-rose-500',
-                    'bg-violet-500',
-                  ];
+                  const targetW = h.targetWeight ?? 0;
+                  const diff = parseFloat((h.currentWeight - targetW).toFixed(1));
+                  const isOver = diff > 0;
+                  const isMatch = Math.abs(diff) < 0.1;
+
                   return (
                     <div
                       key={i}
-                      style={{ width: `${Math.max(h.currentWeight, 2)}%` }}
-                      className={`${colors[i % colors.length]} transition-all duration-500`}
-                      title={`${h.name}: 현재 ${h.currentWeight}% / 목표 ${h.targetWeight ?? 0}%`}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* 보유 종목 상세 목록 */}
-          {hasHoldings ? (
-            <div className="space-y-2 pt-1">
-              {currentHoldings.map((h, i) => {
-                const targetW = h.targetWeight ?? 0;
-                const diff = parseFloat((h.currentWeight - targetW).toFixed(1));
-                const isOver = diff > 0;
-                const isMatch = Math.abs(diff) < 0.1;
-
-                return (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between rounded-xl border border-stroke/50 bg-surface-secondary/40 p-2.5 text-xs transition-colors hover:bg-surface-secondary"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-2 w-2 rounded-full bg-accent" />
-                      <div>
-                        <p className="font-bold text-content-primary">{h.name}</p>
-                        {h.quantity > 1 && (
-                          <p className="text-[10px] text-content-tertiary">
-                            {h.quantity.toLocaleString()}주 보유 · 현재가 {formatWonDigits(hideAmounts, h.currentPrice)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <p className="font-bold text-content-primary">
-                        {formatWonDigits(hideAmounts, h.currentValue)}
-                      </p>
-
-                      <div className="mt-0.5 flex items-center justify-end gap-1.5 text-[11px]">
-                        <span className="font-semibold text-content-secondary">
-                          현재 <strong className="text-accent">{h.currentWeight}%</strong>
-                        </span>
-                        <span className="text-content-tertiary">/</span>
-                        <span className="text-content-tertiary">
-                          목표 {targetW}%
-                        </span>
-
-                        {isMatch ? (
-                          <span className="rounded bg-gray-500/10 px-1.5 py-0.2 text-[10px] font-bold text-gray-500">
-                            부합
-                          </span>
-                        ) : (
-                          <span
-                            className={`rounded px-1.5 py-0.2 text-[10px] font-bold ${
-                              isOver
-                                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                                : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                            }`}
-                          >
-                            {isOver ? `+${diff}%p 초과` : `${diff}%p 부족`}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2 py-6 text-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10">
-                <Info className="h-5 w-5 text-amber-500" />
-              </div>
-              <p className="text-sm font-semibold text-content-secondary">등록된 종목이 없습니다</p>
-              <p className="text-xs text-content-tertiary leading-relaxed">
-                현재 [{selectedAccount}] 계좌에 등록된 데이터가 없습니다.<br />
-                portfolio.csv에 항목을 추가하거나 다른 계좌를 선택해 주세요.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* 3. AI 채팅 프롬프트 콘솔 */}
-        <div className={`rounded-2xl border border-accent/20 bg-gradient-to-b from-accent/5 to-transparent p-4 shadow-sm ${!hasHoldings ? 'opacity-50 pointer-events-none' : ''}`}>
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/10 text-accent">
-                <Bot className="h-4 w-4" />
-              </div>
-              <h4 className="text-sm font-semibold text-content-primary">
-                AI 자산관리 프롬프트 채팅
-              </h4>
-            </div>
-            <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-              <Sparkles className="h-3 w-3" /> {import.meta.env.VITE_GEMINI_API_KEY ? 'Gemini 1.5 Flash 연동' : '지능형 금융 AI 엔진 (내장)'}
-            </span>
-          </div>
-
-
-
-          {/* 프롬프트 입력 바 */}
-          <div className="relative flex items-center">
-            <textarea
-              value={userPrompt}
-              onChange={(e) => setUserPrompt(e.target.value)}
-              placeholder={`예: "${selectedAccount} 계좌의 배당 비중을 60%로 늘리고 기술주는 일부 이익 실현해 줘"`}
-              rows={2}
-              className="w-full resize-none rounded-xl border border-stroke bg-surface-card p-3 pr-12 text-xs text-content-primary placeholder:text-content-tertiary focus:border-accent focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={() => handleRunAiRebalancing()}
-              disabled={isGenerating || !hasHoldings}
-              className="absolute right-2 bottom-2 flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-content-inverse shadow-sm hover:opacity-90 disabled:opacity-50"
-              title="AI 리밸런싱 실행"
-            >
-              {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </button>
-          </div>
-        </div>
-
-        {/* 4. AI 리밸런싱 결과 보고서 */}
-        <AnimatePresence>
-          {aiResult && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              className="space-y-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4"
-            >
-              {/* AI 총평 */}
-              <div className="border-b border-emerald-500/20 pb-3">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                  <Sparkles className="h-4 w-4" /> AI 자문전략 리포트
-                </div>
-                <p className="mt-1 text-xs font-semibold text-content-primary">{aiResult.summary}</p>
-                <p className="mt-1 text-[11px] text-content-secondary leading-relaxed">{aiResult.adviceNote}</p>
-              </div>
-
-              {/* 종목별 매수/매도 액션 리스트 */}
-              <div className="space-y-2.5">
-                <h5 className="text-xs font-bold text-content-secondary">종목별 AI 매수/매도 실행 가이드</h5>
-                {aiResult.actions.map((act, idx) => {
-                  const isBuy = act.action === 'BUY';
-                  const isSell = act.action === 'SELL';
-                  return (
-                    <div
-                      key={idx}
-                      className={`rounded-xl border p-3 text-xs transition-all ${
-                        isBuy
-                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                          : isSell
-                          ? 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300'
-                          : 'border-stroke bg-surface-card text-content-secondary'
-                      }`}
+                      className="flex items-center justify-between rounded-xl border border-stroke/50 bg-surface-secondary/40 p-3 text-xs transition-colors hover:bg-surface-secondary"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                              isBuy
-                                ? 'bg-emerald-600 text-white'
-                                : isSell
-                                ? 'bg-rose-600 text-white'
-                                : 'bg-gray-500 text-white'
-                            }`}
-                          >
-                            {isBuy && <TrendingUp className="h-3 w-3" />}
-                            {isSell && <TrendingDown className="h-3 w-3" />}
-                            {!isBuy && !isSell && <Minus className="h-3 w-3" />}
-                            {isBuy ? '매수' : isSell ? '매도' : '유지'}
-                          </span>
-                          <span className="font-bold text-content-primary">{act.stockName}</span>
-                        </div>
-
-                        <div className="text-right font-semibold">
-                          {isBuy && (
-                            <span className="text-emerald-600 dark:text-emerald-400">
-                              +{act.shares > 0 ? `${act.shares.toLocaleString()}주 (` : ''}{formatWonDigits(hideAmounts, act.amount)}{act.shares > 0 ? ')' : ''}
-                            </span>
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-2.5 w-2.5 rounded-full bg-accent" />
+                        <div>
+                          <p className="font-bold text-content-primary">{h.name}</p>
+                          {h.quantity > 1 && (
+                            <p className="text-[10px] text-content-tertiary">
+                              {h.quantity.toLocaleString()}주 보유 · 현재가 {formatWonDigits(hideAmounts, h.currentPrice)}
+                            </p>
                           )}
-                          {isSell && (
-                            <span className="text-rose-600 dark:text-rose-400">
-                              -{act.shares > 0 ? `${act.shares.toLocaleString()}주 (` : ''}{formatWonDigits(hideAmounts, act.amount)}{act.shares > 0 ? ')' : ''}
-                            </span>
-                          )}
-                          {!isBuy && !isSell && <span className="text-content-tertiary">변동 없음</span>}
                         </div>
                       </div>
 
-                      <div className="mt-2 flex items-center justify-between text-[11px] text-content-tertiary border-t border-stroke/40 pt-1.5">
-                        <span>비중 변화: {act.currentWeight}% ➔ <strong className="text-content-primary">{act.targetWeight}%</strong></span>
-                        <span className="truncate max-w-[200px]">{act.reason}</span>
+                      <div className="text-right">
+                        <p className="font-bold text-content-primary">
+                          {formatWonDigits(hideAmounts, h.currentValue)}
+                        </p>
+
+                        <div className="mt-0.5 flex items-center justify-end gap-1.5 text-[11px]">
+                          <span className="font-semibold text-content-secondary">
+                            현재 <strong className="text-accent">{h.currentWeight}%</strong>
+                          </span>
+                          <span className="text-content-tertiary">/</span>
+                          <span className="text-content-tertiary">
+                            목표 {targetW}%
+                          </span>
+
+                          {isMatch ? (
+                            <span className="rounded bg-gray-500/10 px-1.5 py-0.2 text-[10px] font-bold text-gray-500">
+                              부합
+                            </span>
+                          ) : (
+                            <span
+                              className={`rounded px-1.5 py-0.2 text-[10px] font-bold ${
+                                isOver
+                                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                                  : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                              }`}
+                            >
+                              {isOver ? `+${diff}%p 초과` : `${diff}%p 부족`}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 py-10 text-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10">
+                  <Info className="h-5 w-5 text-amber-500" />
+                </div>
+                <p className="text-sm font-semibold text-content-secondary">등록된 종목이 없습니다</p>
+                <p className="text-xs text-content-tertiary leading-relaxed">
+                  현재 [{selectedAccount}] 계좌에 등록된 데이터가 없습니다.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
 
-              {/* 원클릭 적용 버튼 */}
+        {/* Right Column: AI Prompt Console & Result Report (Span 7) */}
+        <div className="space-y-6 lg:col-span-7">
+          {/* 3. AI 채팅 프롬프트 콘솔 */}
+          <div className={`rounded-2xl border border-accent/20 bg-gradient-to-b from-accent/5 to-transparent p-5 shadow-glass-sm ${!hasHoldings ? 'opacity-50 pointer-events-none' : ''}`}>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                  <Bot className="h-5 w-5" />
+                </div>
+                <h4 className="text-sm font-bold text-content-primary">
+                  AI 자산관리 프롬프트 채팅
+                </h4>
+              </div>
+              <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                <Sparkles className="h-3.5 w-3.5" /> {import.meta.env.VITE_GEMINI_API_KEY ? 'Gemini 1.5 Flash 연동' : '지능형 금융 AI 엔진 (내장)'}
+              </span>
+            </div>
+
+            {/* 프롬프트 입력 바 */}
+            <div className="relative flex items-center">
+              <textarea
+                value={userPrompt}
+                onChange={(e) => setUserPrompt(e.target.value)}
+                placeholder={`예: "${selectedAccount} 계좌에 백만원 추가 투자하려고 해. (매도는 안 하고 싶어)"`}
+                rows={3}
+                className="w-full resize-none rounded-xl border border-stroke bg-surface-card p-3.5 pr-14 text-xs text-content-primary placeholder:text-content-tertiary focus:border-accent focus:outline-none"
+              />
               <button
                 type="button"
-                onClick={() => alert(`[${selectedAccount}] AI 리밸런싱 계획이 성공적으로 가상 등록되었습니다!`)}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-700 active:scale-[0.99]"
+                onClick={() => handleRunAiRebalancing()}
+                disabled={isGenerating || !hasHoldings}
+                className="absolute right-3 bottom-3 flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-content-inverse shadow-md hover:opacity-90 disabled:opacity-50"
+                title="AI 리밸런싱 실행"
               >
-                <CheckCircle2 className="h-4 w-4" />
-                이 AI 리밸런싱 안 적용하기
+                {isGenerating ? <Loader2 className="h-4.5 w-4.5 animate-spin" /> : <Send className="h-4.5 w-4.5" />}
               </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+          </div>
+
+          {/* 4. AI 리밸런싱 결과 보고서 */}
+          <AnimatePresence>
+            {aiResult && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                className="space-y-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5"
+              >
+                {/* AI 총평 */}
+                <div className="border-b border-emerald-500/20 pb-3">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    <Sparkles className="h-4 w-4" /> AI 자문전략 리포트
+                  </div>
+                  <p className="mt-1.5 text-sm font-bold text-content-primary">{aiResult.summary}</p>
+                  <p className="mt-1 text-xs text-content-secondary leading-relaxed">{aiResult.adviceNote}</p>
+                </div>
+
+                {/* 종목별 매수/매도 액션 리스트 */}
+                <div className="space-y-2.5">
+                  <h5 className="text-xs font-bold text-content-secondary">종목별 AI 매수/매도 실행 가이드</h5>
+                  {aiResult.actions.map((act, idx) => {
+                    const isBuy = act.action === 'BUY';
+                    const isSell = act.action === 'SELL';
+                    return (
+                      <div
+                        key={idx}
+                        className={`rounded-xl border p-3.5 text-xs transition-all ${
+                          isBuy
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                            : isSell
+                            ? 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300'
+                            : 'border-stroke bg-surface-card text-content-secondary'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                                isBuy
+                                  ? 'bg-emerald-600 text-white'
+                                  : isSell
+                                  ? 'bg-rose-600 text-white'
+                                  : 'bg-gray-500 text-white'
+                              }`}
+                            >
+                              {isBuy && <TrendingUp className="h-3 w-3" />}
+                              {isSell && <TrendingDown className="h-3 w-3" />}
+                              {!isBuy && !isSell && <Minus className="h-3 w-3" />}
+                              {isBuy ? '매수' : isSell ? '매도' : '유지'}
+                            </span>
+                            <span className="font-bold text-content-primary">{act.stockName}</span>
+                          </div>
+
+                          <div className="text-right font-semibold">
+                            {isBuy && (
+                              <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                +{act.shares > 0 ? `${act.shares.toLocaleString()}주 (` : ''}{formatWonDigits(hideAmounts, act.amount)}{act.shares > 0 ? ')' : ''}
+                              </span>
+                            )}
+                            {isSell && (
+                              <span className="text-rose-600 dark:text-rose-400 font-bold">
+                                -{act.shares > 0 ? `${act.shares.toLocaleString()}주 (` : ''}{formatWonDigits(hideAmounts, act.amount)}{act.shares > 0 ? ')' : ''}
+                              </span>
+                            )}
+                            {!isBuy && !isSell && <span className="text-content-tertiary">변동 없음</span>}
+                          </div>
+                        </div>
+
+                        <div className="mt-2 flex items-center justify-between text-[11px] text-content-tertiary border-t border-stroke/40 pt-2">
+                          <span>비중 변화: {act.currentWeight}% ➔ <strong className="text-content-primary">{act.targetWeight}%</strong></span>
+                          <span className="truncate max-w-[280px]">{act.reason}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* 원클릭 적용 버튼 */}
+                <button
+                  type="button"
+                  onClick={() => alert(`[${selectedAccount}] AI 리밸런싱 계획이 성공적으로 가상 등록되었습니다!`)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-xs font-bold text-white shadow-md hover:bg-emerald-700 active:scale-[0.99]"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  이 AI 리밸런싱 안 적용하기
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </section>
   );

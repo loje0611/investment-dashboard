@@ -129,7 +129,7 @@ export function AssetDetailsTabs({
                 {etfTable.length === 0 ? (
                   <p className="py-16 text-center text-sm text-content-tertiary">ETF 데이터가 없습니다.</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {etfTable.map((row, i) => (
                       <AssetCard
                         key={row.id} name={row.name} index={i}
@@ -148,7 +148,7 @@ export function AssetDetailsTabs({
                 {pensionTable.length === 0 ? (
                   <p className="py-16 text-center text-sm text-content-tertiary">연금 데이터가 없습니다.</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {pensionTable.map((row, i) => (
                       <AssetCard
                         key={row.id} name={row.name} index={i}
