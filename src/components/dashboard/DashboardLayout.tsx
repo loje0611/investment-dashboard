@@ -286,21 +286,23 @@ export function DashboardLayout() {
 
       <Toast toast={syncToast} onDismiss={() => setSyncToast(null)} />
 
-      {/* FAB — 자산 정산 기록 */}
-      <motion.button
-        type="button"
-        aria-label="자산 정산 기록"
-        disabled={isSyncingAll}
-        onClick={handleSyncAll}
-        whileTap={{ scale: 0.92 }}
-        className="fixed bottom-[5rem] right-[max(calc((100vw-480px)/2+1rem),1rem)] z-50 flex h-12 w-12 items-center justify-center rounded-full bg-accent shadow-glass transition-colors hover:bg-accent-hover disabled:opacity-50"
-      >
-        {isSyncingAll ? (
-          <Loader2 className="h-5 w-5 animate-spin text-white" />
-        ) : (
-          <Calculator className="h-5 w-5 text-white" strokeWidth={2} />
-        )}
-      </motion.button>
+      {/* FAB — 자산 정산 기록 (홈 화면에서만 노출) */}
+      {mainTab === 'home' && (
+        <motion.button
+          type="button"
+          aria-label="자산 정산 기록"
+          disabled={isSyncingAll}
+          onClick={handleSyncAll}
+          whileTap={{ scale: 0.92 }}
+          className="fixed bottom-[5rem] right-[max(calc((100vw-480px)/2+1rem),1rem)] z-50 flex h-12 w-12 items-center justify-center rounded-full bg-accent shadow-glass transition-colors hover:bg-accent-hover disabled:opacity-50"
+        >
+          {isSyncingAll ? (
+            <Loader2 className="h-5 w-5 animate-spin text-white" />
+          ) : (
+            <Calculator className="h-5 w-5 text-white" strokeWidth={2} />
+          )}
+        </motion.button>
+      )}
 
       <BottomNav current={mainTab} onSelect={setMainTab} />
     </div>

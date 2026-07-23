@@ -38,12 +38,7 @@ const TARGET_ACCOUNTS = [
 
 type TargetAccountName = (typeof TARGET_ACCOUNTS)[number];
 
-const QUICK_PROMPTS = [
-  { label: '🇺🇸 미국 이주 대비 (PFIC 피하기)', text: '미국 이주를 대비해 국내 ETF/ELS 비중을 낮추고 미국 직투 달러 자산 비중을 60% 이상으로 확대해 줘.' },
-  { label: '💸 배당 강화 (60%)', text: '월 배당 현금 흐름을 극대화하기 위해 배당 성향이 높은 종목 비중을 60%로 확대해 줘.' },
-  { label: '🛡️ 안전 자산 확대', text: '하방 리스크를 줄이기 위해 채권 및 안전 자산 비중을 30% 이상 확보해 줘.' },
-  { label: '💰 현금 20% 확보', text: '수익이 발생한 종목을 일부 매도하여 현금 비중 20%를 확보해 줘.' },
-];
+
 
 /** 계좌명 매핑 함수 (Fuzzy 매칭) */
 function mapNameToTargetAccount(rawName: string): TargetAccountName | null {
@@ -405,22 +400,7 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
             </span>
           </div>
 
-          {/* 추천 프롬프트 칩 */}
-          <div className="mb-3 flex flex-wrap gap-1.5">
-            {QUICK_PROMPTS.map((qp, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => {
-                  setUserPrompt(qp.text);
-                  handleRunAiRebalancing(qp.text);
-                }}
-                className="rounded-lg border border-stroke bg-surface-card px-2.5 py-1 text-[11px] font-medium text-content-secondary transition-all hover:border-accent hover:text-accent"
-              >
-                {qp.label}
-              </button>
-            ))}
-          </div>
+
 
           {/* 프롬프트 입력 바 */}
           <div className="relative flex items-center">
