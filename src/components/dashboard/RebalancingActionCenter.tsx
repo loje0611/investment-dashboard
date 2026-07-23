@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store/useStore';
 import { formatWonDigits } from '../../utils/maskSensitiveAmount';
 import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAccounts';
+import { HoldingEditModal } from './HoldingEditModal';
 import {
   Bot,
   Sparkles,
@@ -16,6 +17,7 @@ import {
   Loader2,
   Info,
   PieChart,
+  Edit3,
 } from 'lucide-react';
 import {
   generateAiRebalancingPlan,
@@ -40,7 +42,7 @@ type TargetAccountName = (typeof TARGET_ACCOUNTS)[number];
 /** 계좌명 매핑 함수 (Fuzzy 매칭) */
 function mapNameToTargetAccount(rawName: string): TargetAccountName | null {
   const name = rawName.trim();
-  if (/^풍차\d+$/.test(name)) return null; // 자문사 위탁 풍차 제외
+  if (/^풍차\d+$/.test(name)) return null;
 
   if (name.includes('ISA_정은') || name.includes('ISA (정은)')) return 'ISA_정은';
   if (name.includes('ISA')) return 'ISA';
@@ -62,12 +64,13 @@ export interface RebalancingActionCenterProps {
 }
 
 export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: RebalancingActionCenterProps) {
-  const { etfList, pensionList, rebalancing, hideAmountsStore } = useStore(
+  const { etfList, pensionList, rebalancing, hideAmountsStore, applyAiRebalancingPlan } = useStore(
     useShallow((s) => ({
       etfList: s.etfList,
       pensionList: s.pensionList,
       rebalancing: s.rebalancing,
       hideAmountsStore: s.hideAmounts,
+      applyAiRebalancingPlan: s.applyAiRebalancingPlan,
     }))
   );
 
@@ -78,7 +81,20 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [aiResult, setAiResult] = useState<AiRebalancingResponse | null>(null);
 
-  // 계좌별 보유 종목 데이터 자동 매핑 (로컬 CSV + GAS 리밸런싱 테이블 데이터 연동)
+  // Holding Edit Modal State
+  const [editModalState, setEditModalState] = useState<{
+    open: boolean;
+    stockName: string;
+    quantity: number;
+    price: number;
+  }>({
+    open: false,
+    stockName: '',
+    quantity: 0,
+    price: 0,
+  });
+
+  // 계좌별 보유 종목 데이터 자동 매핑
   const accountHoldingsMap = useMemo(() => {
     const map: Record<TargetAccountName, AccountHoldingInput[]> = {
       ISA: [],
@@ -91,7 +107,6 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
       IRP_개인: [],
     };
 
-    // 1. GAS rebalancing 테이블 세부 데이터가 있는 경우 매핑
     const accountsFromTables = rebalancingTablesToAccounts(rebalancing || []);
     accountsFromTables.forEach((acc) => {
       const targetAcc = mapNameToTargetAccount(acc.label);
@@ -109,7 +124,6 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
       }
     });
 
-    // 2. etfList 매핑 - 해당 계좌에 세부 종목이 없는 경우에만 요약 항목 추가
     etfList.forEach((item) => {
       const name = String(item.상품명 || '').trim();
       const targetAcc = mapNameToTargetAccount(name);
@@ -130,7 +144,6 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
       }
     });
 
-    // 3. pensionList 매핑 - 해당 계좌에 세부 종목이 없는 경우에만 요약 항목 추가
     pensionList.forEach((item) => {
       const name = String(item.상품명 || '').trim();
       const targetAcc = mapNameToTargetAccount(name);
@@ -151,7 +164,6 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
       }
     });
 
-    // 각 계좌별 비중(%) 계산 및 목표비중 기본값 자동할당
     (Object.keys(map) as TargetAccountName[]).forEach((accKey) => {
       const holdings = map[accKey];
       const total = holdings.reduce((sum, h) => sum + h.currentValue, 0);
@@ -208,6 +220,14 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
     }
   };
 
+  // AI 리밸런싱 안 원클릭 적용 핸들러
+  const handleApplyAiPlan = () => {
+    if (!aiResult || !aiResult.actions || aiResult.actions.length === 0) return;
+    applyAiRebalancingPlan(selectedAccount, aiResult.actions);
+    alert(`🎉 [${selectedAccount}] 계좌에 AI 추천 매수 안(보유 주수 및 매수 금액)이 실시간 적용되었습니다!`);
+    setAiResult(null);
+  };
+
   return (
     <section className="flex flex-col gap-6">
       {/* 1. 계좌 선택 바 */}
@@ -258,9 +278,9 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
         </div>
       </div>
 
-      {/* 2. Desktop 2-Column Grid (Span 5: Portfolio / Span 7: AI Console) */}
+      {/* 2. Desktop 2-Column Grid */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Left Column: Account Portfolio Summary (Span 5) */}
+        {/* Left Column: Account Portfolio Summary */}
         <div className="rounded-2xl border border-stroke bg-surface-card p-5 shadow-glass-sm space-y-4 lg:col-span-5 flex flex-col justify-between">
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-stroke pb-3">
@@ -304,7 +324,7 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
               </div>
             )}
 
-            {/* 보유 종목 상세 목록 */}
+            {/* 보유 종목 상세 목록 + 수정 ✏️ 버튼 */}
             {hasHoldings ? (
               <div className="space-y-2.5 pt-1">
                 {currentHoldings.map((h, i) => {
@@ -321,7 +341,22 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
                       <div className="flex items-center gap-2.5">
                         <span className="flex h-2.5 w-2.5 rounded-full bg-accent" />
                         <div>
-                          <p className="font-bold text-content-primary">{h.name}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-bold text-content-primary">{h.name}</p>
+                            <button
+                              type="button"
+                              onClick={() => setEditModalState({
+                                open: true,
+                                stockName: h.name,
+                                quantity: h.quantity,
+                                price: h.currentPrice,
+                              })}
+                              className="flex h-5 w-5 items-center justify-center rounded bg-surface-tertiary text-content-tertiary transition-colors hover:bg-accent hover:text-white"
+                              title="보유 주수 및 단가 수정"
+                            >
+                              <Edit3 className="h-3 w-3" />
+                            </button>
+                          </div>
                           {h.quantity > 1 && (
                             <p className="text-[10px] text-content-tertiary">
                               {h.quantity.toLocaleString()}주 보유 · 현재가 {formatWonDigits(hideAmounts, h.currentPrice)}
@@ -379,7 +414,7 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
           </div>
         </div>
 
-        {/* Right Column: AI Prompt Console & Result Report (Span 7) */}
+        {/* Right Column: AI Prompt Console & Result Report */}
         <div className="space-y-6 lg:col-span-7">
           {/* 3. AI 채팅 프롬프트 콘솔 */}
           <div className={`rounded-2xl border border-accent/20 bg-gradient-to-b from-accent/5 to-transparent p-5 shadow-glass-sm ${!hasHoldings ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -499,17 +534,27 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
                 {/* 원클릭 적용 버튼 */}
                 <button
                   type="button"
-                  onClick={() => alert(`[${selectedAccount}] AI 리밸런싱 계획이 성공적으로 가상 등록되었습니다!`)}
+                  onClick={handleApplyAiPlan}
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-xs font-bold text-white shadow-md hover:bg-emerald-700 active:scale-[0.99]"
                 >
                   <CheckCircle2 className="h-4 w-4" />
-                  이 AI 리밸런싱 안 적용하기
+                  이 AI 매수 안을 보유 종목에 바로 적용하기
                 </button>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Holding Edit Modal */}
+      <HoldingEditModal
+        open={editModalState.open}
+        onClose={() => setEditModalState((s) => ({ ...s, open: false }))}
+        accountLabel={selectedAccount}
+        stockName={editModalState.stockName}
+        initialQuantity={editModalState.quantity}
+        initialPrice={editModalState.price}
+      />
     </section>
   );
 }
