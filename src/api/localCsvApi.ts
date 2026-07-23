@@ -29,7 +29,13 @@ function parseCsv(text: string): string[][] {
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
       if (char === '"') {
-        insideQuote = !insideQuote;
+        // RFC 4180: "" inside a quoted field represents a literal "
+        if (insideQuote && i + 1 < line.length && line[i + 1] === '"') {
+          entry += '"';
+          i++; // skip the second quote
+        } else {
+          insideQuote = !insideQuote;
+        }
       } else if (char === ',' && !insideQuote) {
         row.push(entry.trim());
         entry = '';
@@ -49,6 +55,27 @@ function parseNumber(val: string | undefined): number {
   const cleaned = val.replace(/,/g, '').replace(/%/g, '').replace(/원/g, '').trim();
   const num = parseFloat(cleaned);
   return isNaN(num) ? 0 : num;
+}
+
+/**
+ * 수익률 문자열을 퍼센트 단위 숫자로 변환합니다.
+ * - "-1.2%" → -1.2
+ * - "16.0%" → 16.0
+ * - "0.3457" (소수형, 0~1 사이) → 34.57
+ * - "53.57%" → 53.57
+ */
+function parseReturnRate(val: string | undefined): number {
+  if (!val) return 0;
+  const hasPercent = val.includes('%');
+  const cleaned = val.replace(/,/g, '').replace(/%/g, '').replace(/원/g, '').trim();
+  const num = parseFloat(cleaned);
+  if (isNaN(num)) return 0;
+  // 이미 % 기호가 있었으면 그대로 퍼센트 값 (e.g., "53.57%" → 53.57)
+  if (hasPercent) return num;
+  // % 기호가 없고 절대값이 1 미만이면 소수형 (e.g., 0.3457 → 34.57%)
+  if (Math.abs(num) < 1) return num * 100;
+  // 그 외는 이미 퍼센트 값으로 간주
+  return num;
 }
 
 /**
@@ -77,7 +104,8 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
         '현금 평가금': parseNumber(r[8]),
         '원금 총액': parseNumber(r[9]),
         '평가금 총액': parseNumber(r[10]),
-        수익률: r[11] ?? '0%',
+        // 수익률은 설정하지 않음 → homeFromTotalAssets.ts가
+        // 원금 총액/평가금 총액에서 직접 정확히 계산 (normalizePercentYield 오판 방지)
         '원금 증감액': parseNumber(r[12]),
         '평가 증감액': parseNumber(r[13]),
         일자: dateStr,
@@ -116,7 +144,7 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
           상품명: name,
           투자원금: principal,
           평가금액: valuation,
-          수익률: parseNumber(returnRateStr),
+          수익률: parseReturnRate(returnRateStr),
           비고: notes,
         });
       } else if (category === '연금') {
