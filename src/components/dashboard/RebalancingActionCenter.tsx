@@ -111,6 +111,7 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
             quantity: h.quantity,
             currentValue: h.currentValue,
             currentWeight: h.currentWeight,
+            targetWeight: h.targetWeight,
           });
         });
       }
@@ -133,6 +134,7 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
           quantity: 1,
           currentValue: valuation,
           currentWeight: 0,
+          targetWeight: 100,
         });
       }
     });
@@ -154,16 +156,22 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
           quantity: 1,
           currentValue: valuation,
           currentWeight: 0,
+          targetWeight: 100,
         });
       }
     });
 
-    // 각 계좌별 비중(%) 계산
+    // 각 계좌별 비중(%) 계산 및 목표비중 기본값 자동할당
     (Object.keys(map) as TargetAccountName[]).forEach((accKey) => {
       const holdings = map[accKey];
       const total = holdings.reduce((sum, h) => sum + h.currentValue, 0);
+      const equalTarget = holdings.length > 0 ? parseFloat((100 / holdings.length).toFixed(1)) : 100;
+
       holdings.forEach((h) => {
         h.currentWeight = total > 0 ? parseFloat(((h.currentValue / total) * 100).toFixed(1)) : 0;
+        if (h.targetWeight == null || h.targetWeight <= 0) {
+          h.targetWeight = equalTarget;
+        }
       });
     });
 
@@ -298,7 +306,7 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
                       key={i}
                       style={{ width: `${Math.max(h.currentWeight, 2)}%` }}
                       className={`${colors[i % colors.length]} transition-all duration-500`}
-                      title={`${h.name}: ${h.currentWeight}%`}
+                      title={`${h.name}: 현재 ${h.currentWeight}% / 목표 ${h.targetWeight ?? 0}%`}
                     />
                   );
                 })}
@@ -309,33 +317,63 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
           {/* 보유 종목 상세 목록 */}
           {hasHoldings ? (
             <div className="space-y-2 pt-1">
-              {currentHoldings.map((h, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between rounded-xl border border-stroke/50 bg-surface-secondary/40 p-2.5 text-xs transition-colors hover:bg-surface-secondary"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-2 w-2 rounded-full bg-accent" />
-                    <div>
-                      <p className="font-bold text-content-primary">{h.name}</p>
-                      {h.quantity > 1 && (
-                        <p className="text-[10px] text-content-tertiary">
-                          {h.quantity.toLocaleString()}주 보유 · 현재가 {formatWonDigits(hideAmounts, h.currentPrice)}
-                        </p>
-                      )}
+              {currentHoldings.map((h, i) => {
+                const targetW = h.targetWeight ?? 0;
+                const diff = parseFloat((h.currentWeight - targetW).toFixed(1));
+                const isOver = diff > 0;
+                const isMatch = Math.abs(diff) < 0.1;
+
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between rounded-xl border border-stroke/50 bg-surface-secondary/40 p-2.5 text-xs transition-colors hover:bg-surface-secondary"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-2 w-2 rounded-full bg-accent" />
+                      <div>
+                        <p className="font-bold text-content-primary">{h.name}</p>
+                        {h.quantity > 1 && (
+                          <p className="text-[10px] text-content-tertiary">
+                            {h.quantity.toLocaleString()}주 보유 · 현재가 {formatWonDigits(hideAmounts, h.currentPrice)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="font-bold text-content-primary">
+                        {formatWonDigits(hideAmounts, h.currentValue)}
+                      </p>
+
+                      <div className="mt-0.5 flex items-center justify-end gap-1.5 text-[11px]">
+                        <span className="font-semibold text-content-secondary">
+                          현재 <strong className="text-accent">{h.currentWeight}%</strong>
+                        </span>
+                        <span className="text-content-tertiary">/</span>
+                        <span className="text-content-tertiary">
+                          목표 {targetW}%
+                        </span>
+
+                        {isMatch ? (
+                          <span className="rounded bg-gray-500/10 px-1.5 py-0.2 text-[10px] font-bold text-gray-500">
+                            부합
+                          </span>
+                        ) : (
+                          <span
+                            className={`rounded px-1.5 py-0.2 text-[10px] font-bold ${
+                              isOver
+                                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                                : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                            }`}
+                          >
+                            {isOver ? `+${diff}%p 초과` : `${diff}%p 부족`}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-
-                  <div className="text-right">
-                    <p className="font-bold text-content-primary">
-                      {formatWonDigits(hideAmounts, h.currentValue)}
-                    </p>
-                    <p className="text-[11px] font-semibold text-accent">
-                      {h.currentWeight}%
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2 py-6 text-center">

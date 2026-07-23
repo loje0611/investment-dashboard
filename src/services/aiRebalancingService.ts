@@ -9,6 +9,7 @@ export interface AccountHoldingInput {
   quantity: number;
   currentValue: number;
   currentWeight: number;
+  targetWeight?: number;
 }
 
 export interface RebalancingActionItem {
