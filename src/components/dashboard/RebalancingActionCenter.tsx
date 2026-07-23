@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store/useStore';
 import { PageHeader } from '../ui/PageHeader';
 import { formatWonDigits } from '../../utils/maskSensitiveAmount';
+import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAccounts';
 import {
   Bot,
   Sparkles,
@@ -15,6 +16,7 @@ import {
   Send,
   Loader2,
   Info,
+  PieChart,
 } from 'lucide-react';
 import {
   generateAiRebalancingPlan,
@@ -43,30 +45,23 @@ const QUICK_PROMPTS = [
   { label: '💰 현금 20% 확보', text: '수익이 발생한 종목을 일부 매도하여 현금 비중 20%를 확보해 줘.' },
 ];
 
-/**
- * portfolio.csv 상품명 → 리밸런싱 계좌 매핑 규칙
- * - 풍차1~12: 자문사 위탁 운용 → 리밸런싱 대상 아님 (skip)
- * - CMA, 단기채: 현금성 자산 → 리밸런싱 대상 아님 (skip)
- * - ISA, ISA_정은, 해외투자, 해외투자_정은: 정확 매칭
- * - 퇴직연금: IRP_회사
- * - 개인연금(자문): IRP_개인
- * - 연금저축_정은: 연금저축_정은
- * - 연금저축: 연금저축
- */
-function mapEtfToAccount(name: string): TargetAccountName | null {
-  if (/^풍차\d+$/.test(name)) return null; // 자문사 위탁 → 제외
-  if (name === 'ISA_정은') return 'ISA_정은';
-  if (name === 'ISA') return 'ISA';
-  if (name === '해외투자_정은') return '해외투자_정은';
-  if (name === '해외투자') return '해외투자';
-  return null; // 미매핑 항목 제외
-}
+/** 계좌명 매핑 함수 (Fuzzy 매칭) */
+function mapNameToTargetAccount(rawName: string): TargetAccountName | null {
+  const name = rawName.trim();
+  if (/^풍차\d+$/.test(name)) return null; // 자문사 위탁 풍차 제외
 
-function mapPensionToAccount(name: string): TargetAccountName | null {
-  if (name === '연금저축_정은') return '연금저축_정은';
-  if (name === '연금저축') return '연금저축';
-  if (name.includes('퇴직')) return 'IRP_회사';
-  if (name.includes('개인연금')) return 'IRP_개인';
+  if (name.includes('ISA_정은') || name.includes('ISA (정은)')) return 'ISA_정은';
+  if (name.includes('ISA')) return 'ISA';
+
+  if (name.includes('해외투자_정은') || name.includes('해외 (정은)')) return '해외투자_정은';
+  if (name.includes('해외투자') || name.includes('해외')) return '해외투자';
+
+  if (name.includes('연금저축_정은') || name.includes('연금저축 (정은)')) return '연금저축_정은';
+  if (name.includes('연금저축')) return '연금저축';
+
+  if (name.includes('퇴직') || name.includes('IRP_회사') || name.includes('IRP (회사)')) return 'IRP_회사';
+  if (name.includes('개인연금') || name.includes('IRP_개인') || name.includes('IRP (개인)') || name.includes('IRP')) return 'IRP_개인';
+
   return null;
 }
 
@@ -75,10 +70,11 @@ export interface RebalancingActionCenterProps {
 }
 
 export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: RebalancingActionCenterProps) {
-  const { etfList, pensionList, hideAmountsStore } = useStore(
+  const { etfList, pensionList, rebalancing, hideAmountsStore } = useStore(
     useShallow((s) => ({
       etfList: s.etfList,
       pensionList: s.pensionList,
+      rebalancing: s.rebalancing,
       hideAmountsStore: s.hideAmounts,
     }))
   );
@@ -90,7 +86,7 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [aiResult, setAiResult] = useState<AiRebalancingResponse | null>(null);
 
-  // 계좌별 보유 종목 데이터 자동 매핑
+  // 계좌별 보유 종목 데이터 자동 매핑 (로컬 CSV + GAS 리밸런싱 테이블 데이터 연동)
   const accountHoldingsMap = useMemo(() => {
     const map: Record<TargetAccountName, AccountHoldingInput[]> = {
       ISA: [],
@@ -103,41 +99,63 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
       IRP_개인: [],
     };
 
-    // ETF 종목 매핑 (풍차 자문사 위탁 제외)
+    // 1. GAS rebalancing 테이블 세부 데이터가 있는 경우 매핑
+    const accountsFromTables = rebalancingTablesToAccounts(rebalancing || []);
+    accountsFromTables.forEach((acc) => {
+      const targetAcc = mapNameToTargetAccount(acc.label);
+      if (targetAcc && acc.holdings?.length > 0) {
+        acc.holdings.forEach((h) => {
+          map[targetAcc].push({
+            name: h.name,
+            currentPrice: h.currentPrice,
+            quantity: h.quantity,
+            currentValue: h.currentValue,
+            currentWeight: h.currentWeight,
+          });
+        });
+      }
+    });
+
+    // 2. etfList (로컬 CSV 또는 GAS ETF 목록) 매핑
     etfList.forEach((item) => {
       const name = String(item.상품명 || '').trim();
-      const account = mapEtfToAccount(name);
-      if (!account) return; // 풍차, 미매핑 항목 skip
+      const targetAcc = mapNameToTargetAccount(name);
+      if (!targetAcc) return;
 
       const valuation = item.평가금액 || 0;
-
-      map[account].push({
-        name,
-        currentPrice: valuation, // 계좌 단위 총액 (개별 종목 현재가가 아님)
-        quantity: 1,
-        currentValue: valuation,
-        currentWeight: 0,
-      });
+      // 이미 테이블 데이터로 들어간 종목이 없는 경우 추가
+      const exists = map[targetAcc].some((h) => h.name === name);
+      if (!exists && valuation > 0) {
+        map[targetAcc].push({
+          name,
+          currentPrice: valuation,
+          quantity: 1,
+          currentValue: valuation,
+          currentWeight: 0,
+        });
+      }
     });
 
-    // 연금 종목 매핑
+    // 3. pensionList 매핑
     pensionList.forEach((item) => {
       const name = String(item.상품명 || '').trim();
-      const account = mapPensionToAccount(name);
-      if (!account) return;
+      const targetAcc = mapNameToTargetAccount(name);
+      if (!targetAcc) return;
 
       const valuation = item.평가금액 || 0;
-
-      map[account].push({
-        name,
-        currentPrice: valuation,
-        quantity: 1,
-        currentValue: valuation,
-        currentWeight: 0,
-      });
+      const exists = map[targetAcc].some((h) => h.name === name);
+      if (!exists && valuation > 0) {
+        map[targetAcc].push({
+          name,
+          currentPrice: valuation,
+          quantity: 1,
+          currentValue: valuation,
+          currentWeight: 0,
+        });
+      }
     });
 
-    // 각 계좌별 비중(%) 계산 (더미 데이터 삽입 없음)
+    // 각 계좌별 비중(%) 계산
     (Object.keys(map) as TargetAccountName[]).forEach((accKey) => {
       const holdings = map[accKey];
       const total = holdings.reduce((sum, h) => sum + h.currentValue, 0);
@@ -147,7 +165,7 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
     });
 
     return map;
-  }, [etfList, pensionList]);
+  }, [etfList, pensionList, rebalancing]);
 
   const currentHoldings = useMemo(
     () => accountHoldingsMap[selectedAccount] || [],
@@ -196,15 +214,20 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
       <div className="flex-1 space-y-6 overflow-y-auto px-4 pb-10 scrollbar-hide">
         {/* 1. 계좌 선택 바 */}
         <div>
-          <label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-content-tertiary">
-            <Briefcase className="h-3.5 w-3.5 text-accent" />
-            리밸런싱 대상 계좌 선택
+          <label className="mb-2 flex items-center justify-between text-xs font-semibold text-content-tertiary">
+            <span className="flex items-center gap-1.5">
+              <Briefcase className="h-3.5 w-3.5 text-accent" />
+              리밸런싱 대상 계좌 선택
+            </span>
+            <span className="text-[11px] text-content-tertiary">
+              (8개 계좌 지원)
+            </span>
           </label>
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {TARGET_ACCOUNTS.map((accName) => {
               const isActive = selectedAccount === accName;
               const accHoldings = accountHoldingsMap[accName];
-              const isEmpty = accHoldings.length === 0;
+              const count = accHoldings.length;
               return (
                 <button
                   key={accName}
@@ -216,13 +239,21 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
                   className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-medium transition-all ${
                     isActive
                       ? 'bg-accent text-content-inverse shadow-md shadow-accent/20 font-semibold scale-[1.02]'
-                      : isEmpty
+                      : count === 0
                       ? 'border border-stroke/50 bg-surface-card/50 text-content-tertiary hover:bg-surface-secondary'
                       : 'border border-stroke bg-surface-card text-content-secondary hover:bg-surface-secondary'
                   }`}
                 >
                   <span>{accName}</span>
-                  {isEmpty && <span className="text-[9px] opacity-60">∅</span>}
+                  <span
+                    className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                      isActive
+                        ? 'bg-white/20 text-white'
+                        : 'bg-surface-tertiary text-content-tertiary'
+                    }`}
+                  >
+                    {count}
+                  </span>
                 </button>
               );
             })}
@@ -230,45 +261,88 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
         </div>
 
         {/* 2. 선택된 계좌의 현재 포트폴리오 요약 */}
-        <div className="rounded-2xl border border-stroke bg-surface-card p-4 shadow-sm">
+        <div className="rounded-2xl border border-stroke bg-surface-card p-4 shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b border-stroke pb-3">
             <div>
-              <span className="text-xs font-semibold text-accent">선택된 계좌</span>
+              <span className="text-xs font-semibold text-accent flex items-center gap-1">
+                <PieChart className="h-3.5 w-3.5" /> 계좌 보유 포트폴리오
+              </span>
               <h3 className="text-base font-bold text-content-primary">{selectedAccount}</h3>
             </div>
             <div className="text-right">
               <span className="text-xs text-content-tertiary">총 평가금액</span>
-              <p className="text-sm font-bold text-content-primary">
-                {hasHoldings ? formatWonDigits(hideAmounts, accountTotalValuation) : '—'}
+              <p className="text-base font-extrabold text-content-primary">
+                {hasHoldings ? formatWonDigits(hideAmounts, accountTotalValuation) : '0원'}
               </p>
             </div>
           </div>
 
+          {/* 자산 비중 프로그레스 바 시각화 */}
+          {hasHoldings && (
+            <div className="space-y-1.5">
+              <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-tertiary">
+                {currentHoldings.map((h, i) => {
+                  const colors = [
+                    'bg-indigo-500',
+                    'bg-emerald-500',
+                    'bg-amber-500',
+                    'bg-sky-500',
+                    'bg-rose-500',
+                    'bg-violet-500',
+                  ];
+                  return (
+                    <div
+                      key={i}
+                      style={{ width: `${Math.max(h.currentWeight, 2)}%` }}
+                      className={`${colors[i % colors.length]} transition-all duration-500`}
+                      title={`${h.name}: ${h.currentWeight}%`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 보유 종목 상세 목록 */}
           {hasHoldings ? (
-            <div className="mt-3 space-y-2">
+            <div className="space-y-2 pt-1">
               {currentHoldings.map((h, i) => (
-                <div key={i} className="flex items-center justify-between text-xs">
-                  <span className="font-medium text-content-secondary">{h.name}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-content-tertiary">
+                <div
+                  key={i}
+                  className="flex items-center justify-between rounded-xl border border-stroke/50 bg-surface-secondary/40 p-2.5 text-xs transition-colors hover:bg-surface-secondary"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-2 w-2 rounded-full bg-accent" />
+                    <div>
+                      <p className="font-bold text-content-primary">{h.name}</p>
+                      {h.quantity > 1 && (
+                        <p className="text-[10px] text-content-tertiary">
+                          {h.quantity.toLocaleString()}주 보유 · 현재가 {formatWonDigits(hideAmounts, h.currentPrice)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="font-bold text-content-primary">
                       {formatWonDigits(hideAmounts, h.currentValue)}
-                    </span>
-                    <span className="w-12 text-right font-semibold text-content-primary">
+                    </p>
+                    <p className="text-[11px] font-semibold text-accent">
                       {h.currentWeight}%
-                    </span>
+                    </p>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="mt-4 flex flex-col items-center gap-2 py-6 text-center">
+            <div className="flex flex-col items-center gap-2 py-6 text-center">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10">
                 <Info className="h-5 w-5 text-amber-500" />
               </div>
               <p className="text-sm font-semibold text-content-secondary">등록된 종목이 없습니다</p>
               <p className="text-xs text-content-tertiary leading-relaxed">
-                이 계좌에는 현재 portfolio.csv에 개별 종목 데이터가 없습니다.<br />
-                종목을 추가한 후 리밸런싱을 실행해 주세요.
+                현재 [{selectedAccount}] 계좌에 등록된 데이터가 없습니다.<br />
+                portfolio.csv에 항목을 추가하거나 다른 계좌를 선택해 주세요.
               </p>
             </div>
           )}
