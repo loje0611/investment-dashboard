@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { fetchDashboardData } from '../api/api';
+import { fetchLocalCsvDashboardData } from '../api/localCsvApi';
 import type {
   TotalAssetRow,
   EtfSheetRow,
@@ -8,6 +9,8 @@ import type {
   RebalancingTable,
   SheetDataRow,
 } from '../types/api';
+
+export type DataSourceMode = 'local' | 'gas';
 
 export interface DashboardState {
   totalAssets: TotalAssetRow[];
@@ -22,12 +25,14 @@ export interface DashboardState {
   isLoadingRebalancing: boolean;
   error: string | null;
   hideAmounts: boolean;
+  dataSourceMode: DataSourceMode;
 }
 
 export interface DashboardActions {
   fetchData: (endpoint?: string) => Promise<void>;
   clearError: () => void;
   setHideAmounts: (hide: boolean) => void;
+  setDataSourceMode: (mode: DataSourceMode) => void;
 }
 
 const initialState: DashboardState = {
@@ -43,6 +48,7 @@ const initialState: DashboardState = {
   isLoadingRebalancing: false,
   error: null,
   hideAmounts: false,
+  dataSourceMode: 'local',
 };
 
 function applyDashboardPayload(
@@ -59,13 +65,18 @@ function applyDashboardPayload(
   };
 }
 
-export const useStore = create<DashboardState & DashboardActions>((set) => ({
+export const useStore = create<DashboardState & DashboardActions>((set, get) => ({
   ...initialState,
 
   fetchData: async (endpoint) => {
     set({ isLoading: true, error: null, isLoadingAssets: true, isLoadingRebalancing: true });
     try {
-      const data = await fetchDashboardData(endpoint, 'all');
+      const mode = get().dataSourceMode;
+      const data =
+        mode === 'local'
+          ? await fetchLocalCsvDashboardData()
+          : await fetchDashboardData(endpoint, 'all');
+
       set({
         ...applyDashboardPayload(data),
         isLoading: false,
@@ -87,4 +98,9 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
   clearError: () => set({ error: null }),
 
   setHideAmounts: (hide) => set({ hideAmounts: hide }),
+
+  setDataSourceMode: (mode) => {
+    set({ dataSourceMode: mode });
+    get().fetchData();
+  },
 }));

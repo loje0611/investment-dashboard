@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { AmountHideToggle } from '../dashboard/AmountHideToggle'
+import { DataSourceToggle } from '../dashboard/DataSourceToggle'
 import { LogoutButton } from '../LogoutButton'
 
 interface PageHeaderProps {
@@ -13,6 +14,7 @@ export function PageHeader({ title, trailing }: PageHeaderProps) {
       <h1 className="text-lg font-semibold text-content-primary">{title}</h1>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
         {trailing}
+        <DataSourceToggle />
         <AmountHideToggle />
         <LogoutButton />
       </div>
