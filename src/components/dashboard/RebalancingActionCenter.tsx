@@ -116,16 +116,17 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
       }
     });
 
-    // 2. etfList (로컬 CSV 또는 GAS ETF 목록) 매핑
+    // 2. etfList (로컬 CSV 또는 GAS ETF 목록) 매핑 - 해당 계좌에 세부 종목이 없는 경우에만 요약 항목 추가
     etfList.forEach((item) => {
       const name = String(item.상품명 || '').trim();
       const targetAcc = mapNameToTargetAccount(name);
       if (!targetAcc) return;
 
+      // 이미 세부 종목들이 존재하는 계좌라면 총액 요약 항목 추가 금지 (이중 표시 방지)
+      if (map[targetAcc].length > 0) return;
+
       const valuation = item.평가금액 || 0;
-      // 이미 테이블 데이터로 들어간 종목이 없는 경우 추가
-      const exists = map[targetAcc].some((h) => h.name === name);
-      if (!exists && valuation > 0) {
+      if (valuation > 0) {
         map[targetAcc].push({
           name,
           currentPrice: valuation,
@@ -136,15 +137,17 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
       }
     });
 
-    // 3. pensionList 매핑
+    // 3. pensionList 매핑 - 해당 계좌에 세부 종목이 없는 경우에만 요약 항목 추가
     pensionList.forEach((item) => {
       const name = String(item.상품명 || '').trim();
       const targetAcc = mapNameToTargetAccount(name);
       if (!targetAcc) return;
 
+      // 이미 세부 종목들이 존재하는 계좌라면 총액 요약 항목 추가 금지 (이중 표시 방지)
+      if (map[targetAcc].length > 0) return;
+
       const valuation = item.평가금액 || 0;
-      const exists = map[targetAcc].some((h) => h.name === name);
-      if (!exists && valuation > 0) {
+      if (valuation > 0) {
         map[targetAcc].push({
           name,
           currentPrice: valuation,
