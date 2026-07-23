@@ -5,6 +5,8 @@ import type {
   PensionSheetRow,
   ElsRow,
   SheetDataRow,
+  RebalancingTable,
+  RebalancingTableRow,
 } from '../types/api';
 import type { SummaryCardItem } from '../types/dashboard';
 
@@ -106,6 +108,9 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
       const status = r[6] ?? '운용 중';
       const notes = r[7] ?? '';
 
+      // Skip summary header rows
+      if (name.includes('합계') || name.includes('총액')) continue;
+
       if (category === 'ETF/자문사') {
         etfList.push({
           상품명: name,
@@ -170,6 +175,55 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
     },
   ];
 
+  // 4. 리밸런싱 표 생성 (etfList & pensionList 기반)
+  const rebalancing: RebalancingTable[] = [];
+
+  // 4.1 ETF / 자문사 포트폴리오 테이블
+  if (etfList.length > 0) {
+    const totalEtf = etfList.reduce((sum, item) => sum + (item.평가금액 || 0), 0);
+    const etfRows: RebalancingTableRow[] = etfList.map((item, idx) => {
+      const val = item.평가금액 || 0;
+      const weight = totalEtf > 0 ? parseFloat(((val / totalEtf) * 100).toFixed(1)) : 0;
+      return {
+        종목명: item.상품명 || `ETF ${idx + 1}`,
+        현재가격: val,
+        보유수량: 1,
+        평가금액: val,
+        현재비중: weight,
+        목표비중: parseFloat((100 / etfList.length).toFixed(1)), // 균등 목표 비중
+      };
+    });
+
+    rebalancing.push({
+      accountLabel: 'ETF & 자문사 계좌',
+      sheet: '포트폴리오',
+      rows: etfRows,
+    });
+  }
+
+  // 4.2 연금 포트폴리오 테이블
+  if (pensionList.length > 0) {
+    const totalPension = pensionList.reduce((sum, item) => sum + (item.평가금액 || 0), 0);
+    const pensionRows: RebalancingTableRow[] = pensionList.map((item, idx) => {
+      const val = item.평가금액 || 0;
+      const weight = totalPension > 0 ? parseFloat(((val / totalPension) * 100).toFixed(1)) : 0;
+      return {
+        종목명: item.상품명 || `연금 ${idx + 1}`,
+        현재가격: val,
+        보유수량: 1,
+        평가금액: val,
+        현재비중: weight,
+        목표비중: parseFloat((100 / pensionList.length).toFixed(1)), // 균등 목표 비중
+      };
+    });
+
+    rebalancing.push({
+      accountLabel: '연금 자산 계좌',
+      sheet: '연금',
+      rows: pensionRows,
+    });
+  }
+
   return {
     totalAssets,
     etfList,
@@ -177,6 +231,6 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
     elsListSheetData,
     cashOther,
     summaryCards,
-    rebalancing: [],
+    rebalancing,
   };
 }
