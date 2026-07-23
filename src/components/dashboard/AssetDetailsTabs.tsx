@@ -20,7 +20,7 @@ interface AssetDetailsTabsProps {
 }
 
 import { Edit3 } from 'lucide-react'
-import { HoldingEditModal } from './HoldingEditModal'
+import { PrincipalEditModal } from './PrincipalEditModal'
 
 function AssetCard({ name, valuation, returnRate, hideAmounts, onTap, onEdit, index }: {
   name: string; valuation: number; returnRate: number
@@ -29,36 +29,40 @@ function AssetCard({ name, valuation, returnRate, hideAmounts, onTap, onEdit, in
   const isProfit = returnRate >= 0
 
   return (
-    <motion.div
+    <motion.button
+      type="button"
+      onClick={onTap}
+      aria-label={`${name} — 평가금 ${valuation.toLocaleString('ko-KR')}원, 수익률 ${returnRate.toFixed(2)}%`}
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
-      className="group relative w-full rounded-2xl border border-stroke bg-surface-card p-4 text-left transition-colors hover:bg-surface-hover"
+      className="group relative w-full rounded-2xl border border-stroke bg-surface-card p-4 text-left transition-colors hover:bg-surface-hover active:scale-[0.98]"
     >
       <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onTap}
-          className="truncate text-sm font-semibold text-accent hover:underline"
-        >
-          {name}
-        </button>
+        <p className="truncate text-sm font-semibold text-accent">{name}</p>
         {onEdit && (
-          <button
-            type="button"
+          <span
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation()
               onEdit()
             }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation()
+                onEdit()
+              }
+            }}
             className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-secondary text-content-tertiary transition-colors hover:bg-accent hover:text-white"
-            title="원금 및 수량 수정"
+            title="원금 수정"
           >
             <Edit3 className="h-3.5 w-3.5" />
-          </button>
+          </span>
         )}
       </div>
 
-      <div className="mt-2 flex items-end justify-between gap-3 cursor-pointer" onClick={onTap}>
+      <div className="mt-2 flex items-end justify-between gap-3">
         <p className="text-xl font-bold tabular-nums leading-snug text-content-primary">
           ₩{formatWonDigits(hideAmounts, valuation)}
         </p>
@@ -68,7 +72,7 @@ function AssetCard({ name, valuation, returnRate, hideAmounts, onTap, onEdit, in
           {isProfit ? '+' : ''}{Math.round(returnRate)}%
         </span>
       </div>
-    </motion.div>
+    </motion.button>
   )
 }
 
@@ -100,13 +104,11 @@ export function AssetDetailsTabs({
         productType={historyModal.kind}
       />
 
-      <HoldingEditModal
+      <PrincipalEditModal
         open={editModal.open}
         onClose={() => setEditModal((s) => ({ ...s, open: false }))}
-        accountLabel={editModal.name}
-        stockName={editModal.name}
-        initialQuantity={1}
-        initialPrice={editModal.valuation}
+        productName={editModal.name}
+        initialPrincipal={editModal.valuation}
       />
 
       {/* Tab Pills */}

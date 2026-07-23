@@ -280,8 +280,8 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
 
       {/* 2. Desktop 2-Column Grid */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Left Column: Account Portfolio Summary */}
-        <div className="rounded-2xl border border-stroke bg-surface-card p-6 shadow-glass-sm space-y-5 lg:col-span-5 flex flex-col justify-between">
+        {/* Left Column: Account Portfolio Summary (Expanded Width) */}
+        <div className="rounded-2xl border border-stroke bg-surface-card p-6 shadow-glass-sm space-y-5 lg:col-span-7 flex flex-col justify-between">
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-stroke pb-3.5">
               <div>
@@ -415,7 +415,7 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
         </div>
 
         {/* Right Column: AI Prompt Console & Result Report */}
-        <div className="space-y-6 lg:col-span-7">
+        <div className="space-y-6 lg:col-span-5">
           {/* 3. AI 채팅 프롬프트 콘솔 */}
           <div className={`rounded-2xl border border-accent/20 bg-gradient-to-b from-accent/5 to-transparent p-6 shadow-glass-sm ${!hasHoldings ? 'opacity-50 pointer-events-none' : ''}`}>
             <div className="mb-3.5 flex items-center justify-between">
