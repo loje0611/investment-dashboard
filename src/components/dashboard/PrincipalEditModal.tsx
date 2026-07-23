@@ -16,7 +16,7 @@ export function PrincipalEditModal({
   productName,
   initialPrincipal,
 }: PrincipalEditModalProps) {
-  const updateAccountHolding = useStore((s) => s.updateAccountHolding);
+  const updateAccountPrincipal = useStore((s) => s.updateAccountPrincipal);
 
   const [principal, setPrincipal] = useState<number>(initialPrincipal);
 
@@ -32,8 +32,7 @@ export function PrincipalEditModal({
       return;
     }
 
-    // 1개의 가상 수량으로 원금 업데이트 반영
-    updateAccountHolding(productName, productName, 1, principal);
+    updateAccountPrincipal(productName, principal);
     onClose();
   };
 
