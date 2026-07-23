@@ -41,10 +41,10 @@ function HistoryTooltipContent({ active, payload, label, coordinate, viewBox }: 
       style={flip ? { transform: `translateX(calc(-100% - ${TOOLTIP_OFFSET * 2}px))` } : undefined}
     >
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">평가일</p>
-      <p className="mt-0.5 text-sm font-semibold tabular-nums tracking-tight text-slate-50">{label ?? '—'}</p>
+      <p className="mt-0.5 text-sm font-semibold tabular-nums tracking-tight text-slate-50">{label ? String(label).split('T')[0] : '—'}</p>
       <div className="mt-2.5 border-t border-white/10 pt-2">
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">수익률</p>
-        <p className="mt-0.5 text-lg font-bold tabular-nums text-cyan-300">{n.toFixed(2)}%</p>
+        <p className="mt-0.5 text-lg font-bold tabular-nums text-cyan-300">{Math.round(n)}%</p>
       </div>
     </div>
   )
@@ -69,7 +69,7 @@ export function ProductHistoryModal({
       const rows = await fetchProductHistory(productName, productType)
       setSeries(
         rows.map(([date, rate]) => ({
-          date,
+          date: String(date).split('T')[0],
           rate: Number(rate),
         }))
       )

@@ -281,7 +281,7 @@ export function fetchLocalProductHistory(
     const r = historyRows[i];
     if (r.length < 11) continue;
 
-    const dateStr = r[0];
+    const dateStr = r[0].split('T')[0];
     let rate = 0;
 
     if (type === 'ETF') {

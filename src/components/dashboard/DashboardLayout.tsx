@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react
 import { useShallow } from 'zustand/react/shallow'
 import { Loader2, Calculator, RefreshCw, LayoutDashboard, PieChart, Bot, ShieldCheck } from 'lucide-react'
 import { useStore } from '../../store/useStore'
+import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAccounts'
 import { getWorstPerformer } from '../../utils/elsWorstPerformer'
 import { portfolioToEtfRows } from '../../utils/portfolioToEtf'
 import { pensionToRows } from '../../utils/pensionToRows'
@@ -73,19 +74,48 @@ function LazyChunkFallback({ label = '로딩 중…' }: { label?: string }) {
   )
 }
 
+
+
 export function DashboardLayout() {
   const {
-    etfList, pensionList, totalAssets, elsListSheetData, summaryCards,
+    etfList, pensionList, totalAssets, elsListSheetData, summaryCards, rebalancing,
     isLoading, isLoadingAssets, hideAmounts,
   } = useStore(
     useShallow((s) => ({
       etfList: s.etfList, pensionList: s.pensionList,
       totalAssets: s.totalAssets, elsListSheetData: s.elsListSheetData, summaryCards: s.summaryCards,
+      rebalancing: s.rebalancing,
       isLoading: s.isLoading, isLoadingAssets: s.isLoadingAssets,
       hideAmounts: s.hideAmounts,
     }))
   )
   const fetchData = useStore((s) => s.fetchData)
+
+  // 8개 계좌 실시간 보유종목 시가 합산 맵 계산
+  const realTimeAccountValuationMap = useMemo(() => {
+    const map: Record<string, { totalValuation: number; totalPrincipal: number }> = {}
+    const accountsFromTables = rebalancingTablesToAccounts(rebalancing || [])
+
+    accountsFromTables.forEach((acc) => {
+      const accName = acc.label.trim()
+      let totalVal = 0
+      let totalPrin = 0
+
+      acc.holdings.forEach((h) => {
+        const val = (h.quantity > 0 && h.currentPrice > 0)
+          ? (h.quantity * h.currentPrice)
+          : h.currentValue
+        totalVal += val
+        totalPrin += h.currentValue
+      })
+
+      if (totalVal > 0) {
+        map[accName] = { totalValuation: totalVal, totalPrincipal: totalPrin }
+      }
+    })
+
+    return map
+  }, [rebalancing])
 
   const [mainTab, setMainTab] = useHashTab<MainTabId>(VALID_TABS, 'home')
   const [isElsRegisterModalOpen, setIsElsRegisterModalOpen] = useState(false)
@@ -145,8 +175,44 @@ export function DashboardLayout() {
     })
   }, [elsListSheetData])
 
-  const etfTableForTab = useMemo((): EtfRow[] => etfList.length ? portfolioToEtfRows(etfList) : [], [etfList])
-  const pensionTableForTab = useMemo((): PensionRow[] => pensionList.length ? pensionToRows(pensionList) : [], [pensionList])
+  const etfTableForTab = useMemo((): EtfRow[] => {
+    const rows = etfList.length ? portfolioToEtfRows(etfList) : []
+    return rows.map((row) => {
+      const name = row.name.trim()
+      let key: string | null = null
+      if (name.includes('ISA_정은') || name.includes('ISA (정은)')) key = 'ISA_정은'
+      else if (name.includes('ISA')) key = 'ISA'
+      else if (name.includes('해외투자_정은') || name.includes('해외 (정은)')) key = '해외투자_정은'
+      else if (name.includes('해외투자') || name.includes('해외')) key = '해외투자'
+
+      if (key && realTimeAccountValuationMap[key]) {
+        const { totalValuation, totalPrincipal } = realTimeAccountValuationMap[key]
+        const returnRate = totalPrincipal > 0 ? Math.round(((totalValuation - totalPrincipal) / totalPrincipal) * 100) : row.returnRate
+        return { ...row, valuation: totalValuation, returnRate }
+      }
+      return row
+    })
+  }, [etfList, realTimeAccountValuationMap])
+
+  const pensionTableForTab = useMemo((): PensionRow[] => {
+    const rows = pensionList.length ? pensionToRows(pensionList) : []
+    return rows.map((row) => {
+      const name = row.name.trim()
+      let key: string | null = null
+      if (name.includes('연금저축_정은') || name.includes('연금저축 (정은)')) key = '연금저축_정은'
+      else if (name.includes('연금저축')) key = '연금저축'
+      else if (name.includes('퇴직연금') || name.includes('IRP_회사') || name.includes('IRP (회사)')) key = 'IRP_회사'
+      else if (name.includes('개인연금') || name.includes('IRP_개인') || name.includes('IRP (개인)')) key = 'IRP_개인'
+
+      if (key && realTimeAccountValuationMap[key]) {
+        const { totalValuation, totalPrincipal } = realTimeAccountValuationMap[key]
+        const returnRate = totalPrincipal > 0 ? Math.round(((totalValuation - totalPrincipal) / totalPrincipal) * 100) : row.returnRate
+        return { ...row, valuation: totalValuation, returnRate }
+      }
+      return row
+    })
+  }, [pensionList, realTimeAccountValuationMap])
+
   const principalValuationTrend = useMemo(() => totalAssetsToPrincipalValuationTrend(totalAssets), [totalAssets])
   const latestSnapshot = useMemo(() => getLatestTotalAssetSnapshot(totalAssets), [totalAssets])
   const homeSummaryCards = useMemo(() => mergeSummaryWithElsProfitCard(buildSummaryCardsFromSnapshot(latestSnapshot), summaryCards), [latestSnapshot, summaryCards])
