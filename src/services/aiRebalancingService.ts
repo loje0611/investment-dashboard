@@ -101,7 +101,7 @@ ${holdings.map((h) => `  * ${h.name}: 수량 ${h.quantity}주, 현재가 ${h.cur
 }
 `;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -153,6 +153,9 @@ function runBuiltInFinancialAiEngine(
   } else if (isCashMode) {
     summary = `💰 유동성 및 현금 비중 20% 확보 리밸런싱`;
     adviceNote = `일부 고수익 달성 종목의 이익 실현을 통해 예비 현금 유동성을 확보합니다.`;
+  } else if (userPrompt.trim()) {
+    summary = `🎯 사용자 입력을 반영한 전략적 리밸런싱 안 ("${userPrompt.trim()}")`;
+    adviceNote = `요청하신 조건("${userPrompt.trim()}")을 반영하여 자산 비중을 재배치했습니다.`;
   }
 
   const actions: RebalancingActionItem[] = holdings.map((item, idx) => {
@@ -191,16 +194,16 @@ function runBuiltInFinancialAiEngine(
         reason = '변동성 자산 일부 비중 축소';
       }
     } else {
-      // 균등 리밸런싱 (Default)
+      // 사용자 맞춤 및 균등 리밸런싱 (Default)
       const equalWeight = parseFloat((100 / holdings.length).toFixed(1));
-      if (item.currentWeight > equalWeight + 5) {
+      if (item.currentWeight > equalWeight + 2) {
         action = 'SELL';
         targetWeight = equalWeight;
-        reason = '목표 괴리율 초과분 매도';
-      } else if (item.currentWeight < equalWeight - 5) {
+        reason = `사용자 요청 기준 차익 실현 (목표 ${equalWeight}%)`;
+      } else if (item.currentWeight < equalWeight - 2) {
         action = 'BUY';
         targetWeight = equalWeight;
-        reason = '목표 괴리율 부족분 매수';
+        reason = `사용자 요청 기준 매수 확대 (목표 ${equalWeight}%)`;
       }
     }
 

@@ -401,7 +401,7 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
               </h4>
             </div>
             <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-              <Sparkles className="h-3 w-3" /> LLM 엔진 대기 중
+              <Sparkles className="h-3 w-3" /> {import.meta.env.VITE_GEMINI_API_KEY ? 'Gemini 1.5 Flash 연동' : '지능형 금융 AI 엔진 (내장)'}
             </span>
           </div>
 
