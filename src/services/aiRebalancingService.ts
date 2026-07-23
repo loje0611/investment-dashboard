@@ -80,9 +80,9 @@ ${holdings.map((h) => `  * ${h.name}: 수량 ${h.quantity}주, 현재가 ${h.cur
 [사용자 리밸런싱 요청사항]
 "${userPrompt}"
 
-[특이 조건 준수 사항]
-- 사용자가 "매도 금지", "매도 안 하고", "매도는 하지 않고", "추가 투입" 등을 명시한 경우 절대로 기존 보유 종목을 매도(SELL)하지 말고 매수(BUY) 또는 유지(HOLD)만 제안해 줘.
-- 신규 추가 입금액이 있는 경우 해당 자금 범위 내에서 목표 비중에 따라 효율적으로 분배 매수(BUY)하는 수량(주) 및 금액(원)을 계산해 줘.
+[특이 조건 엄격 준수 사항]
+1. 사용자가 "매도 금지", "매도 안 하고", "매도는 하지 않고", "추가 투입" 등을 명시한 경우 절대로 기존 보유 종목을 매도(SELL)하지 말고 매수(BUY) 또는 유지(HOLD)만 제안해 줘.
+2. 사용자가 "예수금 최소화", "남김없이", "예수금을 최소로", "최대로 매수" 등을 요구한 경우, 신규 추가 입금액을 거의 100% 사용하여 잔여 예수금이 최소(가장 싼 종목의 1주 가격 미만)가 되도록 종목별 매수 수량(주)을 극대화해서 계산해 줘.
 
 [반환 필수 JSON 형식 (markdown 라벨 없이 순수 JSON만 반환)]
 {
@@ -220,32 +220,48 @@ function runBuiltInFinancialAiEngine(
     adviceNote = `요청하신 조건("${userPrompt.trim()}")을 반영하여 자산 비중을 재배치했습니다.`;
   }
 
-  // 2. 추가 매수 모드(addCash > 0)일 때의 전용 분배 알고리즘
+  // 2. 추가 매수 모드(addCash > 0)일 때의 2단계 Greedy 예수금 최소화 분배 알고리즘
   if (addCash > 0) {
-    // 각 종목별 목표비중 총합
     const targetWeightsSum = holdings.reduce((sum, h) => sum + (h.targetWeight ?? (100 / holdings.length)), 0) || 100;
 
+    // 1차 비중 비례 매수 수량 계산
     let remainingCash = addCash;
-    const actions: RebalancingActionItem[] = holdings.map((item) => {
+    const itemBuys = holdings.map((item) => {
       const weight = item.targetWeight ?? (100 / holdings.length);
       const allocatedCash = (weight / targetWeightsSum) * addCash;
       const price = item.currentPrice > 0 ? item.currentPrice : item.currentValue || 100000;
-      
       const isAccountLevel = item.quantity === 1 && Math.abs(item.currentPrice - item.currentValue) < 1;
-      let shares = isAccountLevel ? 0 : Math.floor(allocatedCash / price);
-      let buyAmount = isAccountLevel ? Math.round(allocatedCash) : shares * price;
+      const shares = isAccountLevel ? 0 : Math.floor(allocatedCash / price);
+      const buyAmount = isAccountLevel ? Math.round(allocatedCash) : shares * price;
 
-      if (buyAmount > remainingCash) {
-        buyAmount = remainingCash;
-        if (!isAccountLevel && price > 0) {
-          shares = Math.floor(buyAmount / price);
-          buyAmount = shares * price;
+      return { item, price, isAccountLevel, shares, buyAmount };
+    });
+
+    itemBuys.forEach((ib) => {
+      remainingCash -= ib.buyAmount;
+    });
+
+    // 2차 Greedy 예수금 최소화 튜닝 (남은 예수금으로 구매 가능한 종목을 최대한 추가 매수)
+    if (remainingCash > 0) {
+      let improved = true;
+      while (improved && remainingCash > 0) {
+        improved = false;
+        // 구매 가능한 개별 종목 추출
+        const candidates = itemBuys.filter((ib) => !ib.isAccountLevel && ib.price > 0 && ib.price <= remainingCash);
+        if (candidates.length > 0) {
+          // 주당 가격이 높은 순(또는 비중 미달 순)으로 1주씩 추가 구매하여 예수금 최소화
+          candidates.sort((a, b) => b.price - a.price);
+          const pick = candidates[0];
+          pick.shares += 1;
+          pick.buyAmount += pick.price;
+          remainingCash -= pick.price;
+          improved = true;
         }
       }
+    }
 
+    const actions: RebalancingActionItem[] = itemBuys.map(({ item, shares, buyAmount }) => {
       const action: 'BUY' | 'SELL' | 'HOLD' = buyAmount > 0 ? 'BUY' : 'HOLD';
-      if (buyAmount > 0) remainingCash -= buyAmount;
-
       const newWeight = parseFloat((((item.currentValue + buyAmount) / (totalValuation + addCash)) * 100).toFixed(1));
 
       return {
@@ -255,7 +271,7 @@ function runBuiltInFinancialAiEngine(
         amount: buyAmount,
         currentWeight: item.currentWeight,
         targetWeight: newWeight,
-        reason: buyAmount > 0 ? `신규 자금 중 ${formatWonDigitsSimple(buyAmount)} 분배 매수` : '기존 비중 유지',
+        reason: buyAmount > 0 ? `신규 자금 분배 매수 (잔여예수금 최소화)` : '기존 비중 유지',
       };
     });
 
@@ -353,10 +369,4 @@ function runBuiltInFinancialAiEngine(
   };
 }
 
-function formatWonDigitsSimple(val: number): string {
-  if (val >= 10000) {
-    const man = Math.floor(val / 10000);
-    return `${man.toLocaleString()}만 원`;
-  }
-  return `${val.toLocaleString()}원`;
-}
+
