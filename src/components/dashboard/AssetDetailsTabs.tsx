@@ -86,8 +86,8 @@ export function AssetDetailsTabs({
   }>({ open: false, name: '', kind: 'ETF' })
 
   const [editModal, setEditModal] = useState<{
-    open: boolean; name: string; valuation: number
-  }>({ open: false, name: '', valuation: 0 })
+    open: boolean; name: string; principal: number
+  }>({ open: false, name: '', principal: 0 })
 
   const tabs: { id: TabId; label: string; count: number }[] = [
     { id: 'etf', label: 'ETF', count: etfTable.length },
@@ -108,7 +108,7 @@ export function AssetDetailsTabs({
         open={editModal.open}
         onClose={() => setEditModal((s) => ({ ...s, open: false }))}
         productName={editModal.name}
-        initialPrincipal={editModal.valuation}
+        initialPrincipal={editModal.principal}
       />
 
       {/* Tab Pills */}
@@ -124,24 +124,21 @@ export function AssetDetailsTabs({
               aria-controls={`tabpanel-${tab.id}`}
               id={`tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
-              className={`relative rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                isActive ? 'text-content-primary' : 'text-content-tertiary hover:text-content-secondary'
+              className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors ${
+                isActive
+                  ? 'bg-accent text-content-inverse shadow-sm'
+                  : 'border border-stroke bg-surface-card text-content-secondary hover:bg-surface-hover'
               }`}
             >
-              {isActive && (
-                <motion.div
-                  layoutId="asset-tab-pill"
-                  className="absolute inset-0 rounded-full border border-stroke bg-surface-card"
-                  transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
-                />
-              )}
-              <span className="relative z-10">
-                {tab.label}
-                {tab.count > 0 && (
-                  <span className={`ml-1 text-[10px] tabular-nums ${isActive ? 'text-accent' : 'text-content-tertiary'}`}>
-                    {tab.count}
-                  </span>
-                )}
+              <span>{tab.label}</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                  isActive
+                    ? 'bg-white/20 text-white'
+                    : 'bg-surface-tertiary text-content-tertiary'
+                }`}
+              >
+                {tab.count}
               </span>
             </button>
           )
@@ -167,15 +164,20 @@ export function AssetDetailsTabs({
                   <p className="py-16 text-center text-sm text-content-tertiary">ETF 데이터가 없습니다.</p>
                 ) : (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {etfTable.map((row, i) => (
-                      <AssetCard
-                        key={row.id} name={row.name} index={i}
-                        valuation={row.valuation} returnRate={row.returnRate}
-                        hideAmounts={hideAmounts}
-                        onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'ETF' })}
-                        onEdit={() => setEditModal({ open: true, name: row.name, valuation: row.valuation })}
-                      />
-                    ))}
+                    {etfTable.map((row, i) => {
+                      const calculatedPrincipal = (row.valuation > 0 && row.returnRate !== -100)
+                        ? Math.round(row.valuation / (1 + row.returnRate / 100))
+                        : row.valuation;
+                      return (
+                        <AssetCard
+                          key={row.id} name={row.name} index={i}
+                          valuation={row.valuation} returnRate={row.returnRate}
+                          hideAmounts={hideAmounts}
+                          onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'ETF' })}
+                          onEdit={() => setEditModal({ open: true, name: row.name, principal: calculatedPrincipal })}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </motion.div>
@@ -187,15 +189,20 @@ export function AssetDetailsTabs({
                   <p className="py-16 text-center text-sm text-content-tertiary">연금 데이터가 없습니다.</p>
                 ) : (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {pensionTable.map((row, i) => (
-                      <AssetCard
-                        key={row.id} name={row.name} index={i}
-                        valuation={row.valuation} returnRate={row.returnRate}
-                        hideAmounts={hideAmounts}
-                        onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'PENSION' })}
-                        onEdit={() => setEditModal({ open: true, name: row.name, valuation: row.valuation })}
-                      />
-                    ))}
+                    {pensionTable.map((row, i) => {
+                      const calculatedPrincipal = (row.valuation > 0 && row.returnRate !== -100)
+                        ? Math.round(row.valuation / (1 + row.returnRate / 100))
+                        : row.valuation;
+                      return (
+                        <AssetCard
+                          key={row.id} name={row.name} index={i}
+                          valuation={row.valuation} returnRate={row.returnRate}
+                          hideAmounts={hideAmounts}
+                          onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'PENSION' })}
+                          onEdit={() => setEditModal({ open: true, name: row.name, principal: calculatedPrincipal })}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </motion.div>
