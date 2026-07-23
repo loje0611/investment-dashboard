@@ -150,6 +150,20 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
           수익률: parseReturnRate(returnRateStr),
         });
       } else if (category === 'ELS') {
+        const ticker1 = r[11] ?? '';
+        const base1 = parseNumber(r[12]);
+        const cur1 = parseNumber(r[13]);
+
+        const ticker2 = r[14] ?? '';
+        const base2 = parseNumber(r[15]);
+        const cur2 = parseNumber(r[16]);
+
+        const ticker3 = r[17] ?? '';
+        const base3 = parseNumber(r[18]);
+        const cur3 = parseNumber(r[19]);
+
+        const nextEvalDate = r[20] ?? '';
+
         elsListSheetData.push({
           row_index: i,
           상품명: name,
@@ -159,7 +173,17 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
           상태: status,
           낙인배리어: 50,
           상환배리어: 80,
-          '다음 평가일': notes.replace('발행일: ', ''),
+          티커1: ticker1 || undefined,
+          기준가1: base1 > 0 ? base1 : undefined,
+          현재가1: cur1 > 0 ? cur1 : undefined,
+          티커2: ticker2 || undefined,
+          기준가2: base2 > 0 ? base2 : undefined,
+          현재가2: cur2 > 0 ? cur2 : undefined,
+          티커3: ticker3 || undefined,
+          기준가3: base3 > 0 ? base3 : undefined,
+          현재가3: cur3 > 0 ? cur3 : undefined,
+          '1차 평가일': nextEvalDate || undefined,
+          '다음 평가일': nextEvalDate || notes.replace('발행일: ', ''),
         });
       } else if (category === '현금성') {
         cashOther.push({
