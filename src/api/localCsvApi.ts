@@ -114,6 +114,8 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
   const cashOther: SheetDataRow[] = [];
   const rebalancingAccountMap: Record<string, RebalancingTableRow[]> = {};
 
+  let elsRowIndexCounter = 2;
+
   if (portfolioRows.length > 1) {
     for (let i = 1; i < portfolioRows.length; i++) {
       const r = portfolioRows[i];
@@ -165,7 +167,7 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
         const nextEvalDate = r[20] ?? '';
 
         elsListSheetData.push({
-          row_index: i,
+          row_index: elsRowIndexCounter++,
           상품명: name,
           증권사_회차: brokerSeries,
           가입금액: principal,
