@@ -201,19 +201,29 @@ export function DashboardLayout() {
     const rows = pensionList.length ? pensionToRows(pensionList) : []
     return rows.map((row) => {
       const name = row.name.trim()
-      let key: string | null = null
-      if (name.includes('연금저축_정은') || name.includes('연금저축 (정은)')) key = '연금저축_정은'
-      else if (name.includes('연금저축')) key = '연금저축'
-      else if (name.includes('퇴직연금') || name.includes('IRP_회사') || name.includes('IRP (회사)')) key = 'IRP_회사'
-      else if (name.includes('개인연금') || name.includes('IRP_개인') || name.includes('IRP (개인)')) key = 'IRP_개인'
+      let keys: string[] = []
+      if (name.includes('연금저축_정은') || name.includes('연금저축 (정은)')) keys = ['연금저축_정은']
+      else if (name.includes('연금저축')) keys = ['연금저축']
+      else if (name.includes('퇴직연금')) keys = ['IRP_회사', 'IRP_개인']
+      else if (name.includes('IRP_회사') || name.includes('IRP (회사)')) keys = ['IRP_회사']
+      else if (name.includes('개인연금') || name.includes('IRP_개인') || name.includes('IRP (개인)')) keys = ['IRP_개인']
 
-      if (key && realTimeAccountValuationMap[key]) {
-        const { totalValuation } = realTimeAccountValuationMap[key]
-        const principal = row.principal
-        const returnRate = principal > 0
-          ? Math.round(((totalValuation - principal) / principal) * 100)
-          : row.returnRate
-        return { ...row, principal, valuation: totalValuation, returnRate }
+      if (keys.length > 0) {
+        let sumValuation = 0
+        let hasValue = false
+        for (const k of keys) {
+          if (realTimeAccountValuationMap[k]) {
+            sumValuation += realTimeAccountValuationMap[k].totalValuation
+            hasValue = true
+          }
+        }
+        if (hasValue) {
+          const principal = row.principal
+          const returnRate = principal > 0
+            ? Math.round(((sumValuation - principal) / principal) * 100)
+            : row.returnRate
+          return { ...row, principal, valuation: sumValuation, returnRate }
+        }
       }
       return row
     })
