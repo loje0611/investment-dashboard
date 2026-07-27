@@ -32,7 +32,7 @@ function AssetCard({ name, valuation, returnRate, hideAmounts, onTap, onEdit, in
     <motion.button
       type="button"
       onClick={onTap}
-      aria-label={`${name} — 평가금 ${valuation.toLocaleString('ko-KR')}원, 수익률 ${returnRate.toFixed(2)}%`}
+      aria-label={`${name} — 평가금 ${Math.round(valuation).toLocaleString('ko-KR')}원, 수익률 ${returnRate.toFixed(2)}%`}
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}

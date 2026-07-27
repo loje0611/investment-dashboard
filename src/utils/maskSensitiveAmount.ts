@@ -3,12 +3,12 @@ export const AMOUNT_MASK = '#'
 
 export function formatWonDigits(hide: boolean, value: number): string {
   if (hide) return AMOUNT_MASK
-  return value.toLocaleString('ko-KR')
+  return Math.round(value).toLocaleString('ko-KR')
 }
 
 export function formatWonWithWonSymbol(hide: boolean, value: number): string {
   if (hide) return `₩${AMOUNT_MASK}`
-  return `₩${value.toLocaleString('ko-KR')}`
+  return `₩${Math.round(value).toLocaleString('ko-KR')}`
 }
 
 export function formatAxisAmountShort(hide: boolean, _value: number, formatted: string): string {
