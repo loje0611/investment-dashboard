@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { RefreshCw, LayoutDashboard, PieChart, Bot, ShieldCheck } from 'lucide-react'
+import { RefreshCw, LayoutDashboard, PieChart, Scale, ShieldCheck } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAccounts'
 import { portfolioToEtfRows } from '../../utils/portfolioToEtf'
@@ -12,7 +12,7 @@ import {
   buildPieSegmentsFromSnapshot,
 } from '../../utils/homeFromTotalAssets'
 import { generateInsightText } from '../../utils/generateInsight'
-import type { EtfRow, PensionRow } from '../../data/dashboardDummy'
+import type { EtfRow, PensionRow } from '../../types/dashboard'
 import { AmountHideToggle } from './AmountHideToggle'
 import { LogoutButton } from '../LogoutButton'
 import { useHashTab } from '../../hooks/useHashTab'
@@ -139,7 +139,7 @@ export function DashboardLayout() {
   const navItems = [
     { id: 'home' as const, label: '홈', icon: LayoutDashboard },
     { id: 'assets' as const, label: '자산 상세', icon: PieChart },
-    { id: 'rebalancing' as const, label: '리밸런싱', icon: Bot },
+    { id: 'rebalancing' as const, label: '리밸런싱', icon: Scale },
   ]
 
   return (

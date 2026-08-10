@@ -66,7 +66,6 @@ export interface RebalancingTable {
 /** 대시보드용 데이터 응답 구조 */
 export interface DashboardSheetResponse {
   totalAssets?: TotalAssetRow[];
-  summaryCards?: import('./dashboard').SummaryCardItem[];
   etfList?: EtfSheetRow[];
   pensionList?: PensionSheetRow[];
   rebalancing?: RebalancingTable[];

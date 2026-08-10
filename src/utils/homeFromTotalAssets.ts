@@ -1,4 +1,4 @@
-import type { PieSegment, SummaryCardItem } from '../data/dashboardDummy'
+import type { PieSegment, SummaryCardItem } from '../types/dashboard'
 import type { TotalAssetRow } from '../types/api'
 import { parseTotalAssetHistoryRows } from './totalAssetsToPrincipalValuation'
 

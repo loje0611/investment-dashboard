@@ -6,7 +6,6 @@ import type {
   RebalancingTable,
   RebalancingTableRow,
 } from '../types/api';
-import type { SummaryCardItem } from '../types/dashboard';
 
 import historyCsvText from '../data/history.csv?raw';
 import portfolioCsvText from '../data/portfolio.csv?raw';
@@ -157,32 +156,6 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
     }
   }
 
-  const latestAsset = totalAssets.length > 0 ? totalAssets[totalAssets.length - 1] : null;
-  const principalTotal = (latestAsset?.['원금 총액'] as number) || 0;
-  const valuationTotal = (latestAsset?.['평가금 총액'] as number) || 0;
-  const profitLoss = valuationTotal - principalTotal;
-  const returnRateNum = principalTotal > 0 ? parseFloat(((profitLoss / principalTotal) * 100).toFixed(1)) : 0;
-
-  const summaryCards: SummaryCardItem[] = [
-    {
-      id: 'card-total-val',
-      title: '평가금 총액',
-      amount: valuationTotal,
-      rate: returnRateNum,
-    },
-    {
-      id: 'card-total-principal',
-      title: '원금 총액',
-      amount: principalTotal,
-    },
-    {
-      id: 'card-total-profit',
-      title: '누적 손익',
-      amount: profitLoss,
-      rate: returnRateNum,
-    },
-  ];
-
   const rebalancing: RebalancingTable[] = Object.entries(rebalancingAccountMap).map(([accountLabel, rows]) => ({
     accountLabel,
     sheet: '포트_CSV',
@@ -191,7 +164,6 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
 
   return {
     totalAssets,
-    summaryCards,
     etfList,
     pensionList,
     rebalancing,

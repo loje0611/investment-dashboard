@@ -1,5 +1,5 @@
 import type { SheetDataRow } from '../types/api';
-import type { PensionRow } from '../data/dashboardDummy';
+import type { PensionRow } from '../types/dashboard';
 import { getProductSparklineData } from './productHistory';
 
 function toNumber(value: string | number | boolean | null | undefined): number {

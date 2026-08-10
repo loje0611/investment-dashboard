@@ -37,7 +37,6 @@ export interface DashboardState {
   etfList: EtfSheetRow[];
   pensionList: PensionSheetRow[];
   rebalancing: RebalancingTable[];
-  summaryCards: import('../types/dashboard').SummaryCardItem[];
   isLoading: boolean;
   isLoadingAssets: boolean;
   isLoadingRebalancing: boolean;
@@ -64,7 +63,6 @@ const initialState: DashboardState = {
   etfList: [],
   pensionList: [],
   rebalancing: [],
-  summaryCards: [],
   isLoading: false,
   isLoadingAssets: false,
   isLoadingRebalancing: false,
@@ -148,7 +146,6 @@ function applyDashboardPayload(
     etfList,
     pensionList,
     rebalancing,
-    summaryCards: data.summaryCards ?? [],
   };
 }
 

@@ -28,6 +28,18 @@
 - **Language**: Python (`scripts/update_prices.py`)
 - **Role**: Python 표준 라이브러리(`urllib`)로 네이버 금융·야후 파이낸스 시세 API에서 최신가를 조회하여 **로컬 CSV 파일**(`src/data/portfolio.csv`)의 보유 종목 단가를 갱신
 
+### 2.4 로컬 사용자 데이터 오버라이드 (User Overrides)
+- **저장소**: 브라우저 `localStorage` (`investment_dashboard_user_overrides_v2`)
+- **역할**: CSV 원본은 유지한 채, 사용자가 UI에서 수정한 **원금**·**보유 수량/단가**만 로컬에 덮어써 표시
+- **적용 범위**:
+  - `PrincipalEditModal`: ETF·연금 상품 원금 수정 → 수익률 재계산
+  - `HoldingEditModal`: 리밸런싱 탭 보유 종목 수량·현재가 수정 → 평가금액 재계산
+
+### 2.5 PWA (Progressive Web App)
+- **Manifest**: `public/manifest.json` — 앱 이름, 아이콘, 테마 색상
+- **Service Worker**: `public/sw.js` — 정적 자산 캐시 및 오프라인 재방문 지원
+- **등록**: `main.tsx`에서 앱 로드 시 service worker 등록
+
 ---
 
 ## 3. 데이터 모델 (Data Models & CSV Schema)
@@ -41,6 +53,7 @@
 ### 3.2 ETF/연금 현황 데이터 (EtfRow, PensionRow)
 - **필드**: `상품명`, `투자원금`, `평가금액`, `수익률`
 - **목적**: 자산 상세 탭의 테이블 구성 및 6개월 스파크라인(Sparkline) 차트 렌더링에 사용
+- **타입 구분**: CSV 파싱 결과는 `EtfSheetRow`·`PensionSheetRow`(`types/api.ts`), UI 표시용 변환 모델은 `EtfRow`·`PensionRow`(`types/dashboard.ts`)
 
 ### 3.3 포트폴리오(리밸런싱) 데이터 (RebalancingTable)
 - **구조**: 계좌별(Account Label)로 그룹핑된 테이블 형태 (`portfolio.csv`의 `보유종목_*` 행)
@@ -60,6 +73,7 @@
   - React, TypeScript, Vite, Tailwind CSS 환경 세팅
   - 전역 상태 관리를 위한 Zustand 세팅
   - 공통 네비게이션(사이드바 혹은 헤더) 및 메인 컨텐츠 영역 레이아웃 분리
+  - 금액 숨기기 토글(`AmountHideToggle`): 민감 금액 마스킹 표시 (Zustand `hideAmounts` 상태)
 - **Acceptance Criteria (인수 조건)**:
   - [ ] `npm run dev` 실행 시 에러 없이 기본 애플리케이션이 브라우저에 렌더링되어야 한다.
   - [ ] 홈, 자산 상세, 리밸런싱 탭으로 이동할 수 있는 네비게이션 UI가 동작해야 한다.
@@ -92,19 +106,25 @@
   - 상단 요약 카드(Summary Card) 컴포넌트: 총자산, ETF, 연금, 현금성 자산의 합계 및 수익률 표시
   - Recharts 라이브러리를 활용한 '총자산 시계열 스택 AreaChart(Trend)' 구현 (원금 총액·평가금 총액)
   - Recharts 라이브러리를 활용한 '자산군 비중 파이 차트(Asset Allocation)' 구현
+  - 총자산 시계열(`history.csv`) 기반 **자산 인사이트 브리핑** (`generateInsight.ts`): 전월 대비 원금·평가금 변동을 규칙 기반 문장으로 요약 (외부 AI API 미사용)
 - **Acceptance Criteria**:
   - [ ] CSV 데이터를 바탕으로 요약 카드의 금액과 수익률이 정확히 계산되어 표시되어야 한다.
   - [ ] 스택 AreaChart에 월별(또는 일별) 자산 추이가 시각적으로 끊김 없이 그려져야 한다.
   - [ ] 파이 차트에 자산 비중이 퍼센트 단위로 정확히 분할되어 색상별로 나타나야 한다.
+  - [ ] 전월 대비 변동 데이터가 있을 경우 홈 하단에 인사이트 브리핑 문구가 표시되어야 한다.
 
 ### Task 5: 자산 상세 탭 (ETF 및 연금) 구현
 - **목표**: 포트폴리오의 ETF와 연금 상품 리스트를 상세히 보여주는 뷰를 만듭니다. (Task 3 의존)
 - **구현 내용**:
   - CSV에서 가져온 ETF, 연금 데이터 배열을 **카드(Card) UI**로 렌더링 (상품명, 평가금액, 수익률 표시)
   - `etf_history.csv`·`pension_history.csv`(Google Sheets `ETF기록`·`연금기록` 탭 복사본)에서 최근 6개 평가일 수익률을 읽어 스파크라인(Sparkline) 미니 차트 컴포넌트에 연결
+  - 카드 탭 시 `ProductHistoryModal`로 해당 상품의 **전체 수익률 이력** AreaChart 표시 (`localCsvApi.fetchLocalProductHistory`)
+  - `PrincipalEditModal`로 상품 원금 수정 및 `localStorage` 오버라이드 저장 (§2.4)
 - **Acceptance Criteria**:
   - [ ] 각 상품의 평가금액, 수익률이 카드 UI에 누락 없이 출력되어야 한다. (원금은 카드에 표시하지 않으며, 편집 모달 등에서만 관리)
   - [ ] 각 카드마다 `etf_history.csv` / `pension_history.csv`의 최근 6개월(또는 6개 평가일) 수익률 배열을 기반으로 스파크라인 차트가 정상적으로 그려져야 한다.
+  - [ ] 카드 탭 시 상품별 수익률 이력 모달이 열리고, 일자별 수익률 차트가 표시되어야 한다.
+  - [ ] 원금 편집 후 수익률이 재계산되어 카드에 반영되어야 하며, 새로고침 후에도 오버라이드가 유지되어야 한다.
 
 ### Task 6: 포트폴리오 리밸런싱 기능 구현
 - **목표**: 현재 자산 비중과 CSV에 정의된 목표 비중을 비교해 매매 가이드를 제공합니다. (Task 3 의존)
@@ -125,6 +145,7 @@
        - **추천 매수 금액 합계 ≤ 추가 투입 금액** (초과 불가)  
        - 개별 주식만 있는 계좌는 1주 단가 미만 잔액이 남을 수 있음 (이 경우 남는 금액이 최소 예수금)
   - 각 종목 카드에 매매 가이드 표시: 액션(매수/매도/유지), 추천 주식 수, 추천 금액, 반영 후 예상 비중(%)
+  - `HoldingEditModal`로 보유 수량·현재가 수정 및 `localStorage` 오버라이드 저장 (§2.4)
 - **Acceptance Criteria**:
   - [ ] 계좌별 종목들이 카드(Card) UI 형태로 나열되며, CSV에서 파싱된 목표 비중(%)이 카드 상에 정상 출력되어야 한다. (목표 비중 사용자 입력 기능 없음)
   - [ ] 상단에 리밸런싱 방식(순수 리밸런싱 / 추가 매수 리밸런싱)을 선택할 수 있는 UI(토글 또는 탭)가 제공되어야 한다.
@@ -132,6 +153,7 @@
   - [ ] '추가 매수 리밸런싱' 모드 선택 시 추가 투입 금액 입력 폼이 제공되며, 매도 제안 없이 각 주식의 추가 매수 수량/금액만 카드에 계산·표시되어야 한다.
   - [ ] '추가 매수 리밸런싱' 모드에서 **모든 종목의 추천 매수 금액 합계가 추가 투입 금액을 초과하지 않아야** 하며, 1주 단위 제약 하에서 **잔여 예수금이 최소**가 되도록 계산되어야 한다.
   - [ ] '순수 리밸런싱' 모드 선택 시 매수 및 매도가 포함된 계산 결과(주식 수, 금액, 예상 비중)가 각 종목 카드에 명확히 표시되어야 한다.
+  - [ ] 보유 수량·단가 편집 후 리밸런싱 계산 결과가 즉시 반영되어야 하며, 새로고침 후에도 오버라이드가 유지되어야 한다.
 
 ### Task 7: 로컬 데이터 업데이트 스크립트 (Python) 구축
 - **목표**: 외부 정보를 바탕으로 로컬 CSV 파일을 최신화하여 수동 입력의 번거로움을 줄입니다.

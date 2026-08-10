@@ -1,5 +1,5 @@
 import type { SheetDataRow } from '../types/api';
-import type { EtfRow } from '../data/dashboardDummy';
+import type { EtfRow } from '../types/dashboard';
 import { getProductSparklineData } from './productHistory';
 
 function toNumber(value: string | number | boolean | null | undefined): number {

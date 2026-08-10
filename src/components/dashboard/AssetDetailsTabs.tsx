@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { EtfRow, PensionRow } from '../../data/dashboardDummy'
+import { Edit3 } from 'lucide-react'
+import type { EtfRow, PensionRow } from '../../types/dashboard'
 import { formatWonDigits } from '../../utils/maskSensitiveAmount'
-
-type ProductHistoryKind = 'ETF' | 'PENSION'
+import type { ProductHistoryKind } from '../../utils/productHistory'
 import { ProductHistoryModal } from './ProductHistoryModal'
+import { PrincipalEditModal } from './PrincipalEditModal'
 import { SkeletonCard } from '../ui/SkeletonCard'
 import { Sparkline } from '../ui/Sparkline'
 
@@ -16,9 +17,6 @@ interface AssetDetailsTabsProps {
   isLoading?: boolean
   hideAmounts: boolean
 }
-
-import { Edit3 } from 'lucide-react'
-import { PrincipalEditModal } from './PrincipalEditModal'
 
 function AssetCard({ name, valuation, returnRate, sparklineData, hideAmounts, onTap, onEdit, index }: {
   name: string; valuation: number; returnRate: number; sparklineData: number[]

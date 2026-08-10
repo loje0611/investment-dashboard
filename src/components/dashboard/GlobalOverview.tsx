@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area,
 } from 'recharts'
-import type { PieSegment, SummaryCardItem } from '../../data/dashboardDummy'
+import type { PieSegment, SummaryCardItem } from '../../types/dashboard'
 import type {
   PrincipalValuationPoint,
   PrincipalValuationTrend,

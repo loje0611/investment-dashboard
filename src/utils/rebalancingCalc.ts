@@ -212,12 +212,11 @@ export function computeAdditionalBuyRebalancing(
     return { item, price, accountLevel, shares, buyAmount };
   });
 
-  let totalSpent = itemBuys.reduce((sum, ib) => sum + ib.buyAmount, 0);
-  let remainingCash = addCash - totalSpent;
-
+  let remainingCash = addCash - itemBuys.reduce((sum, ib) => sum + ib.buyAmount, 0);
   remainingCash = greedySpendRemainingCash(itemBuys, remainingCash);
   remainingCash = distributeRemainderToAccountLevel(itemBuys, holdings, remainingCash);
 
+  const totalSpent = itemBuys.reduce((sum, ib) => sum + ib.buyAmount, 0);
   const newTotal = totalValuation + totalSpent;
 
   return itemBuys.map(({ item, shares, buyAmount }) => {

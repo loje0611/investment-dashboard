@@ -12,7 +12,9 @@ import {
 } from 'recharts'
 import type { TooltipProps } from 'recharts'
 import { fetchLocalProductHistory as fetchProductHistory } from '../../api/localCsvApi'
-export type ProductHistoryKind = 'ETF' | 'PENSION'
+import type { ProductHistoryKind } from '../../utils/productHistory'
+
+export type { ProductHistoryKind }
 
 export interface ProductHistoryModalProps {
   open: boolean

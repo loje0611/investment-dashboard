@@ -1,5 +1,5 @@
 import type { RebalancingTableRow } from '../types/api';
-import type { RebalancingAccount, RebalancingHolding } from '../data/dashboardDummy';
+import type { RebalancingAccount, RebalancingHolding } from '../types/dashboard';
 
 function toNumber(value: unknown): number {
   if (value == null) return 0;
