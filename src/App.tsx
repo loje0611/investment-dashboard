@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { DashboardLayout } from './components/dashboard/DashboardLayout'
 import { LoginPage } from './components/LoginPage'
+import { isAuthBypassEnabled } from './config/auth'
 import { useAuthStore } from './store/authStore'
 
 function App() {
@@ -20,7 +21,7 @@ function App() {
     )
   }
 
-  if (!user) {
+  if (!user && !isAuthBypassEnabled) {
     return <LoginPage />
   }
 

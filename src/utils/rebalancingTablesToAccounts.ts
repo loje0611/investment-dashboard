@@ -125,7 +125,7 @@ const TARGET_WEIGHT_KEYS = [
 const TARGET_WEIGHT_PATTERNS = ['포트비율', '최종 비율', '목표비중'];
 
 /**
- * GAS에서 내려온 계좌별 표(리밸런싱) 배열을 RebalancingAccount[]로 변환합니다.
+ * portfolio.csv의 계좌별 표(리밸런싱) 배열을 RebalancingAccount[]로 변환합니다.
  * 표마다 헤더 열 이름이 다르거나 오타(헌재가격, 포드비율 등)가 있어도 유연하게 매핑합니다.
  */
 export function rebalancingTablesToAccounts(

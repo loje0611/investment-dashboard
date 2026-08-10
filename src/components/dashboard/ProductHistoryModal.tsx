@@ -11,7 +11,8 @@ import {
   YAxis,
 } from 'recharts'
 import type { TooltipProps } from 'recharts'
-import { fetchProductHistory, type ProductHistoryKind } from '../../api/api'
+import { fetchLocalProductHistory as fetchProductHistory } from '../../api/localCsvApi'
+export type ProductHistoryKind = 'ETF' | 'PENSION'
 
 export interface ProductHistoryModalProps {
   open: boolean

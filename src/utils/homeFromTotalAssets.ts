@@ -2,13 +2,11 @@ import type { PieSegment, SummaryCardItem } from '../data/dashboardDummy'
 import type { TotalAssetRow } from '../types/api'
 import { parseTotalAssetHistoryRows } from './totalAssetsToPrincipalValuation'
 
-/** 총자산 시트 14열 헤더(띄어쓰기 포함) — GAS `convertValuesToObjects_` 키와 동일 */
+/** 총자산 데이터 14열 헤더(띄어쓰기 포함, history.csv 레거시 형식) */
 export const TOTAL_ASSET_HEADERS_14 = [
   '평가일',
   '연금 원금',
   '연금 평가금',
-  'ELS 원금',
-  'ELS 평가금',
   'ETF 원금',
   'ETF 평가금',
   '현금 원금',
@@ -62,16 +60,14 @@ export interface LatestTotalAssetSnapshot {
   totalYieldPercent: number | null
   연금평가금: number
   연금원금: number
-  els평가금: number
-  els원금: number
   etf평가금: number
   etf원금: number
   현금평가금: number
+  현금원금: number
 }
 
 /**
  * 총자산 이력에서 차트·요약에 쓸 최신 행 스냅샷.
- * `parseTotalAssetHistoryRows`로 날짜·원금 총액·평가금 총액이 읽히는 행 중 최신을 택한 뒤, 14열 세부 평가금을 같은 행에서 읽습니다.
  */
 export function getLatestTotalAssetSnapshot(rows: TotalAssetRow[]): LatestTotalAssetSnapshot | null {
   const parsed = parseTotalAssetHistoryRows(rows)
@@ -79,15 +75,14 @@ export function getLatestTotalAssetSnapshot(rows: TotalAssetRow[]): LatestTotalA
   const latest = parsed[parsed.length - 1]
   const row = latest.row
 
-  const num = (h: (typeof TOTAL_ASSET_HEADERS_14)[number]) => coerceNumber(getTotalAssetCell(row, h)) ?? 0
+  const num = (h: string) => coerceNumber(getTotalAssetCell(row, h)) ?? 0
 
   const 연금평가금 = num('연금 평가금')
   const 연금원금 = num('연금 원금')
-  const els평가금 = num('ELS 평가금')
-  const els원금 = num('ELS 원금')
   const etf평가금 = num('ETF 평가금')
   const etf원금 = num('ETF 원금')
   const 현금평가금 = num('현금 평가금')
+  const 현금원금 = num('현금 원금')
 
   const totalValuation = coerceNumber(getTotalAssetCell(row, '평가금 총액')) ?? latest.valuation
   const totalPrincipal = coerceNumber(getTotalAssetCell(row, '원금 총액')) ?? latest.principal
@@ -105,11 +100,10 @@ export function getLatestTotalAssetSnapshot(rows: TotalAssetRow[]): LatestTotalA
     totalYieldPercent,
     연금평가금,
     연금원금,
-    els평가금,
-    els원금,
     etf평가금,
     etf원금,
     현금평가금,
+    현금원금,
   }
 }
 
@@ -146,10 +140,10 @@ export function buildSummaryCardsFromSnapshot(
       rate: segmentRate(snap.etf원금, snap.etf평가금) ?? undefined,
     },
     {
-      id: 'els',
-      title: 'ELS 평가',
-      amount: snap.els평가금,
-      rate: segmentRate(snap.els원금, snap.els평가금) ?? undefined,
+      id: 'cash',
+      title: '현금성 평가',
+      amount: snap.현금평가금,
+      rate: segmentRate(snap.현금원금, snap.현금평가금) ?? undefined,
     },
   ]
 }
@@ -163,9 +157,8 @@ export function buildSummaryCardsFromLatestTotalAssets(
 
 const PIE_COLORS: Record<string, string> = {
   ETF: '#6366f1',
-  ELS: '#f59e0b',
   연금: '#10b981',
-  기타: '#64748b',
+  현금: '#64748b',
 }
 
 /** 스냅샷을 직접 받아 파이 비중(%) 계산 (중복 파싱 방지) */
@@ -174,9 +167,8 @@ export function buildPieSegmentsFromSnapshot(snap: LatestTotalAssetSnapshot | nu
 
   const parts: { name: keyof typeof PIE_COLORS; value: number }[] = []
   if (snap.etf평가금 > 0) parts.push({ name: 'ETF', value: snap.etf평가금 })
-  if (snap.els평가금 > 0) parts.push({ name: 'ELS', value: snap.els평가금 })
   if (snap.연금평가금 > 0) parts.push({ name: '연금', value: snap.연금평가금 })
-  if (snap.현금평가금 > 0) parts.push({ name: '기타', value: snap.현금평가금 })
+  if (snap.현금평가금 > 0) parts.push({ name: '현금', value: snap.현금평가금 })
 
   const sum = parts.reduce((a, b) => a + b.value, 0)
   if (sum <= 0) return []
@@ -191,15 +183,4 @@ export function buildPieSegmentsFromSnapshot(snap: LatestTotalAssetSnapshot | nu
 /** @deprecated buildPieSegmentsFromSnapshot 사용 권장 */
 export function buildPieSegmentsFromLatestTotalAssets(rows: TotalAssetRow[]): PieSegment[] {
   return buildPieSegmentsFromSnapshot(getLatestTotalAssetSnapshot(rows))
-}
-
-/** API `els-profit` 카드를 유지해 5장 구성으로 병합 */
-export function mergeSummaryWithElsProfitCard(
-  coreFromTotalAssets: SummaryCardItem[],
-  apiCards: SummaryCardItem[]
-): SummaryCardItem[] {
-  const profit = apiCards.find((c) => c.id === 'els-profit')
-  if (!coreFromTotalAssets.length) return apiCards
-  if (profit) return [...coreFromTotalAssets, profit]
-  return coreFromTotalAssets
 }

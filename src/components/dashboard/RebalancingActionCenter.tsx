@@ -1,31 +1,27 @@
 import { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store/useStore';
 import { formatWonDigits } from '../../utils/maskSensitiveAmount';
 import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAccounts';
+import {
+  computePureRebalancing,
+  computeAdditionalBuyRebalancing,
+  type RebalancingHoldingInput,
+  type RebalancingActionResult,
+} from '../../utils/rebalancingCalc';
 import { HoldingEditModal } from './HoldingEditModal';
 import {
-  Bot,
-  Sparkles,
-  CheckCircle2,
   TrendingUp,
   TrendingDown,
   Minus,
   Briefcase,
-  Send,
-  Loader2,
   Info,
   PieChart,
   Edit3,
+  Scale,
+  Wallet,
 } from 'lucide-react';
-import {
-  generateAiRebalancingPlan,
-  type AiRebalancingResponse,
-  type AccountHoldingInput,
-} from '../../services/aiRebalancingService';
 
-/** 지정된 8개 핵심 계좌 선택 목록 */
 const TARGET_ACCOUNTS = [
   'ISA',
   'ISA_정은',
@@ -38,8 +34,8 @@ const TARGET_ACCOUNTS = [
 ] as const;
 
 type TargetAccountName = (typeof TARGET_ACCOUNTS)[number];
+type RebalancingMode = 'pure' | 'additional';
 
-/** 계좌명 매핑 함수 (Fuzzy 매칭) */
 function mapNameToTargetAccount(rawName: string): TargetAccountName | null {
   const name = rawName.trim();
   if (/^풍차\d+$/.test(name)) return null;
@@ -59,29 +55,61 @@ function mapNameToTargetAccount(rawName: string): TargetAccountName | null {
   return null;
 }
 
+function ActionBadge({ action }: { action: RebalancingActionResult['action'] }) {
+  const isBuy = action === 'BUY';
+  const isSell = action === 'SELL';
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-black ${
+        isBuy
+          ? 'bg-emerald-600 text-white'
+          : isSell
+          ? 'bg-rose-600 text-white'
+          : 'bg-gray-500/20 text-content-tertiary'
+      }`}
+    >
+      {isBuy && <TrendingUp className="h-3 w-3" />}
+      {isSell && <TrendingDown className="h-3 w-3" />}
+      {!isBuy && !isSell && <Minus className="h-3 w-3" />}
+      {isBuy ? '매수' : isSell ? '매도' : '유지'}
+    </span>
+  );
+}
+
+function formatActionDetail(
+  action: RebalancingActionResult,
+  hideAmounts: boolean
+): string {
+  if (action.action === 'HOLD' || action.amount <= 0) return '조정 불필요';
+
+  const amountStr = formatWonDigits(hideAmounts, action.amount);
+  if (action.shares > 0) {
+    return `${action.shares.toLocaleString()}주 (${amountStr})`;
+  }
+  return amountStr;
+}
+
 export interface RebalancingActionCenterProps {
   hideAmounts?: boolean;
 }
 
 export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: RebalancingActionCenterProps) {
-  const { etfList, pensionList, rebalancing, hideAmountsStore, applyAiRebalancingPlan } = useStore(
+  const { etfList, pensionList, rebalancing, hideAmountsStore } = useStore(
     useShallow((s) => ({
       etfList: s.etfList,
       pensionList: s.pensionList,
       rebalancing: s.rebalancing,
       hideAmountsStore: s.hideAmounts,
-      applyAiRebalancingPlan: s.applyAiRebalancingPlan,
     }))
   );
 
   const hideAmounts = hideAmountsProp ?? hideAmountsStore;
 
   const [selectedAccount, setSelectedAccount] = useState<TargetAccountName>('ISA');
-  const [userPrompt, setUserPrompt] = useState<string>('');
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [aiResult, setAiResult] = useState<AiRebalancingResponse | null>(null);
+  const [rebalancingMode, setRebalancingMode] = useState<RebalancingMode>('pure');
+  const [additionalCashInput, setAdditionalCashInput] = useState<string>('');
 
-  // Holding Edit Modal State
   const [editModalState, setEditModalState] = useState<{
     open: boolean;
     stockName: string;
@@ -94,9 +122,8 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
     price: 0,
   });
 
-  // 계좌별 보유 종목 데이터 자동 매핑
   const accountHoldingsMap = useMemo(() => {
-    const map: Record<TargetAccountName, AccountHoldingInput[]> = {
+    const map: Record<TargetAccountName, RebalancingHoldingInput[]> = {
       ISA: [],
       ISA_정은: [],
       연금저축: [],
@@ -127,11 +154,9 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
     etfList.forEach((item) => {
       const name = String(item.상품명 || '').trim();
       const targetAcc = mapNameToTargetAccount(name);
-      if (!targetAcc) return;
+      if (!targetAcc || map[targetAcc].length > 0) return;
 
-      if (map[targetAcc].length > 0) return;
-
-      const valuation = item.평가금액 || 0;
+      const valuation = Number(item.평가금액) || 0;
       if (valuation > 0) {
         map[targetAcc].push({
           name,
@@ -147,11 +172,9 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
     pensionList.forEach((item) => {
       const name = String(item.상품명 || '').trim();
       const targetAcc = mapNameToTargetAccount(name);
-      if (!targetAcc) return;
+      if (!targetAcc || map[targetAcc].length > 0) return;
 
-      if (map[targetAcc].length > 0) return;
-
-      const valuation = item.평가금액 || 0;
+      const valuation = Number(item.평가금액) || 0;
       if (valuation > 0) {
         map[targetAcc].push({
           name,
@@ -185,6 +208,26 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
     [accountHoldingsMap, selectedAccount]
   );
 
+  const additionalCash = useMemo(() => {
+    const n = parseInt(additionalCashInput.replace(/,/g, ''), 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }, [additionalCashInput]);
+
+  const actionResults = useMemo((): RebalancingActionResult[] => {
+    if (!currentHoldings.length) return [];
+
+    if (rebalancingMode === 'pure') {
+      return computePureRebalancing(currentHoldings);
+    }
+    return computeAdditionalBuyRebalancing(currentHoldings, additionalCash);
+  }, [currentHoldings, rebalancingMode, additionalCash]);
+
+  const actionByName = useMemo(() => {
+    const map = new Map<string, RebalancingActionResult>();
+    actionResults.forEach((r) => map.set(r.stockName, r));
+    return map;
+  }, [actionResults]);
+
   const accountTotalValuation = useMemo(
     () => currentHoldings.reduce((sum, h) => sum + h.currentValue, 0),
     [currentHoldings]
@@ -192,68 +235,26 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
 
   const hasHoldings = currentHoldings.length > 0;
 
-  // AI 리밸런싱 실행 핸들러
-  const handleRunAiRebalancing = async (overridePrompt?: string) => {
-    const promptToUse = overridePrompt || userPrompt;
-    if (!promptToUse.trim()) {
-      alert('어떻게 리밸런싱하고 싶은지 채팅창에 내용을 입력해 주세요!');
-      return;
-    }
-
-    if (!hasHoldings) {
-      alert('선택된 계좌에 보유 종목이 없습니다. 다른 계좌를 선택해 주세요.');
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const plan = await generateAiRebalancingPlan(
-        selectedAccount,
-        currentHoldings,
-        promptToUse
-      );
-      setAiResult(plan);
-    } catch (e) {
-      alert('AI 분석 중 오류가 발생했습니다.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  // AI 리밸런싱 안 원클릭 적용 핸들러
-  const handleApplyAiPlan = () => {
-    if (!aiResult || !aiResult.actions || aiResult.actions.length === 0) return;
-    applyAiRebalancingPlan(selectedAccount, aiResult.actions);
-    alert(`🎉 [${selectedAccount}] 계좌에 AI 추천 매수 안(보유 주수 및 매수 금액)이 실시간 적용되었습니다!`);
-    setAiResult(null);
-  };
-
   return (
     <section className="flex flex-col gap-6">
-      {/* 1. 계좌 선택 바 */}
+      {/* 계좌 선택 */}
       <div>
         <label className="mb-2.5 flex items-center justify-between text-sm font-bold text-content-secondary">
           <span className="flex items-center gap-1.5">
             <Briefcase className="h-4 w-4 text-accent" />
             리밸런싱 대상 계좌 선택
           </span>
-          <span className="text-xs font-semibold text-content-tertiary">
-            (8개 핵심 계좌)
-          </span>
+          <span className="text-xs font-semibold text-content-tertiary">(8개 핵심 계좌)</span>
         </label>
         <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
           {TARGET_ACCOUNTS.map((accName) => {
             const isActive = selectedAccount === accName;
-            const accHoldings = accountHoldingsMap[accName];
-            const count = accHoldings.length;
+            const count = accountHoldingsMap[accName].length;
             return (
               <button
                 key={accName}
                 type="button"
-                onClick={() => {
-                  setSelectedAccount(accName);
-                  setAiResult(null);
-                }}
+                onClick={() => setSelectedAccount(accName)}
                 className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-all ${
                   isActive
                     ? 'bg-accent text-content-inverse shadow-md shadow-accent/20 font-black scale-[1.02]'
@@ -265,9 +266,7 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
                 <span>{accName}</span>
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-black ${
-                    isActive
-                      ? 'bg-white/20 text-white'
-                      : 'bg-surface-tertiary text-content-tertiary'
+                    isActive ? 'bg-white/20 text-white' : 'bg-surface-tertiary text-content-tertiary'
                   }`}
                 >
                   {count}
@@ -278,275 +277,218 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
         </div>
       </div>
 
-      {/* 2. Desktop 2-Column Grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Left Column: Account Portfolio Summary (Expanded Width) */}
-        <div className="rounded-2xl border border-stroke bg-surface-card p-6 shadow-glass-sm space-y-5 lg:col-span-7 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-stroke pb-3.5">
-              <div>
-                <span className="text-xs font-bold text-accent flex items-center gap-1.5">
-                  <PieChart className="h-4 w-4" /> 계좌 보유 포트폴리오
-                </span>
-                <h3 className="text-xl font-black text-content-primary mt-0.5">{selectedAccount}</h3>
-              </div>
-              <div className="text-right">
-                <span className="text-xs font-semibold text-content-tertiary">총 평가금액</span>
-                <p className="text-xl font-black text-content-primary mt-0.5">
-                  {hasHoldings ? formatWonDigits(hideAmounts, accountTotalValuation) : '0원'}
-                </p>
-              </div>
-            </div>
-
-            {/* 자산 비중 프로그레스 바 시각화 */}
-            {hasHoldings && (
-              <div className="space-y-1.5">
-                <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-surface-tertiary">
-                  {currentHoldings.map((h, i) => {
-                    const colors = [
-                      'bg-indigo-500',
-                      'bg-emerald-500',
-                      'bg-amber-500',
-                      'bg-sky-500',
-                      'bg-rose-500',
-                      'bg-violet-500',
-                    ];
-                    return (
-                      <div
-                        key={i}
-                        style={{ width: `${Math.max(h.currentWeight, 2)}%` }}
-                        className={`${colors[i % colors.length]} transition-all duration-500`}
-                        title={`${h.name}: 현재 ${h.currentWeight}% / 목표 ${h.targetWeight ?? 0}%`}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* 보유 종목 상세 목록 + 수정 ✏️ 버튼 */}
-            {hasHoldings ? (
-              <div className="space-y-3 pt-1">
-                {currentHoldings.map((h, i) => {
-                  const targetW = h.targetWeight ?? 0;
-                  const diff = parseFloat((h.currentWeight - targetW).toFixed(1));
-                  const isOver = diff > 0;
-                  const isMatch = Math.abs(diff) < 0.1;
-
-                  return (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between rounded-xl border border-stroke/50 bg-surface-secondary/40 p-3.5 text-sm transition-colors hover:bg-surface-secondary"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-3 w-3 rounded-full bg-accent" />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-bold text-base text-content-primary">{h.name}</p>
-                            <button
-                              type="button"
-                              onClick={() => setEditModalState({
-                                open: true,
-                                stockName: h.name,
-                                quantity: h.quantity,
-                                price: h.currentPrice,
-                              })}
-                              className="flex h-6 w-6 items-center justify-center rounded bg-surface-tertiary text-content-tertiary transition-colors hover:bg-accent hover:text-white"
-                              title="보유 주수 및 단가 수정"
-                            >
-                              <Edit3 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                          {h.quantity > 1 && (
-                            <p className="text-xs font-semibold text-content-tertiary mt-0.5">
-                              {h.quantity.toLocaleString()}주 보유 · 현재가 {formatWonDigits(hideAmounts, h.currentPrice)}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <p className="font-extrabold text-base text-content-primary">
-                          {formatWonDigits(hideAmounts, h.currentValue)}
-                        </p>
-
-                        <div className="mt-1 flex items-center justify-end gap-2 text-xs font-bold">
-                          <span className="text-content-secondary">
-                            현재 <strong className="text-accent">{h.currentWeight}%</strong>
-                          </span>
-                          <span className="text-content-tertiary">/</span>
-                          <span className="text-content-tertiary">
-                            목표 {targetW}%
-                          </span>
-
-                          {isMatch ? (
-                            <span className="rounded bg-gray-500/10 px-2 py-0.5 text-xs font-bold text-gray-500">
-                              부합
-                            </span>
-                          ) : (
-                            <span
-                              className={`rounded px-2 py-0.5 text-xs font-bold ${
-                                isOver
-                                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                                  : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                              }`}
-                            >
-                              {isOver ? `+${diff}%p 초과` : `${diff}%p 부족`}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-2 py-10 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10">
-                  <Info className="h-6 w-6 text-amber-500" />
-                </div>
-                <p className="text-base font-bold text-content-secondary">등록된 종목이 없습니다</p>
-                <p className="text-xs text-content-tertiary leading-relaxed">
-                  현재 [{selectedAccount}] 계좌에 등록된 데이터가 없습니다.
-                </p>
-              </div>
-            )}
-          </div>
+      {/* 리밸런싱 방식 선택 */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-1.5 rounded-2xl border border-stroke bg-surface-secondary/60 p-1.5">
+          <button
+            type="button"
+            onClick={() => setRebalancingMode('pure')}
+            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+              rebalancingMode === 'pure'
+                ? 'bg-accent text-white shadow-sm'
+                : 'text-content-secondary hover:bg-surface-card'
+            }`}
+          >
+            <Scale className="h-4 w-4" />
+            순수 리밸런싱
+          </button>
+          <button
+            type="button"
+            onClick={() => setRebalancingMode('additional')}
+            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+              rebalancingMode === 'additional'
+                ? 'bg-accent text-white shadow-sm'
+                : 'text-content-secondary hover:bg-surface-card'
+            }`}
+          >
+            <Wallet className="h-4 w-4" />
+            추가 매수 리밸런싱
+          </button>
         </div>
 
-        {/* Right Column: AI Prompt Console & Result Report */}
-        <div className="space-y-6 lg:col-span-5">
-          {/* 3. AI 채팅 프롬프트 콘솔 */}
-          <div className={`rounded-2xl border border-accent/20 bg-gradient-to-b from-accent/5 to-transparent p-6 shadow-glass-sm ${!hasHoldings ? 'opacity-50 pointer-events-none' : ''}`}>
-            <div className="mb-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent">
-                  <Bot className="h-5 w-5" />
-                </div>
-                <h4 className="text-base font-bold text-content-primary">
-                  AI 자산관리 프롬프트 채팅
-                </h4>
-              </div>
-              <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                <Sparkles className="h-4 w-4" /> {import.meta.env.VITE_GEMINI_API_KEY ? 'Gemini 1.5 Flash 연동' : '지능형 금융 AI 엔진 (내장)'}
-              </span>
-            </div>
-
-            {/* 프롬프트 입력 바 */}
-            <div className="relative flex items-center">
-              <textarea
-                value={userPrompt}
-                onChange={(e) => setUserPrompt(e.target.value)}
-                placeholder={`예: "${selectedAccount} 계좌에 백만원 추가 투자하려고 해. (매도는 안 하고 싶어)"`}
-                rows={3}
-                className="w-full resize-none rounded-xl border border-stroke bg-surface-card p-4 pr-16 text-sm font-semibold text-content-primary placeholder:text-content-tertiary focus:border-accent focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => handleRunAiRebalancing()}
-                disabled={isGenerating || !hasHoldings}
-                className="absolute right-3.5 bottom-3.5 flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-content-inverse shadow-md hover:opacity-90 disabled:opacity-50"
-                title="AI 리밸런싱 실행"
-              >
-                {isGenerating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-              </button>
-            </div>
+        {rebalancingMode === 'additional' && (
+          <div className="flex items-center gap-2">
+            <label htmlFor="additional-cash" className="shrink-0 text-xs font-bold text-content-secondary">
+              추가 투입 금액
+            </label>
+            <input
+              id="additional-cash"
+              type="text"
+              inputMode="numeric"
+              value={additionalCashInput}
+              onChange={(e) => setAdditionalCashInput(e.target.value.replace(/[^\d]/g, ''))}
+              placeholder="예: 1000000"
+              className="w-full max-w-[200px] rounded-xl border border-stroke bg-surface-card px-3 py-2 text-sm font-bold text-content-primary placeholder:text-content-tertiary focus:border-accent focus:outline-none sm:w-44"
+            />
+            <span className="text-xs font-semibold text-content-tertiary">원</span>
           </div>
-
-          {/* 4. AI 리밸런싱 결과 보고서 */}
-          <AnimatePresence>
-            {aiResult && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                className="space-y-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6"
-              >
-                {/* AI 총평 */}
-                <div className="border-b border-emerald-500/20 pb-4">
-                  <div className="flex items-center gap-2 text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                    <Sparkles className="h-4.5 w-4.5" /> AI 자문전략 리포트
-                  </div>
-                  <p className="mt-2 text-base font-extrabold text-content-primary">{aiResult.summary}</p>
-                  <p className="mt-1.5 text-sm text-content-secondary leading-relaxed font-semibold">{aiResult.adviceNote}</p>
-                </div>
-
-                {/* 종목별 매수/매도 액션 리스트 */}
-                <div className="space-y-3">
-                  <h5 className="text-sm font-extrabold text-content-secondary">종목별 AI 매수/매도 실행 가이드</h5>
-                  {aiResult.actions.map((act, idx) => {
-                    const isBuy = act.action === 'BUY';
-                    const isSell = act.action === 'SELL';
-                    return (
-                      <div
-                        key={idx}
-                        className={`rounded-xl border p-4 text-sm transition-all ${
-                          isBuy
-                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                            : isSell
-                            ? 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300'
-                            : 'border-stroke bg-surface-card text-content-secondary'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <span
-                              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-black ${
-                                isBuy
-                                  ? 'bg-emerald-600 text-white'
-                                  : isSell
-                                  ? 'bg-rose-600 text-white'
-                                  : 'bg-gray-500 text-white'
-                              }`}
-                            >
-                              {isBuy && <TrendingUp className="h-3.5 w-3.5" />}
-                              {isSell && <TrendingDown className="h-3.5 w-3.5" />}
-                              {!isBuy && !isSell && <Minus className="h-3.5 w-3.5" />}
-                              {isBuy ? '매수' : isSell ? '매도' : '유지'}
-                            </span>
-                            <span className="font-extrabold text-base text-content-primary">{act.stockName}</span>
-                          </div>
-
-                          <div className="text-right font-extrabold text-base">
-                            {isBuy && (
-                              <span className="text-emerald-600 dark:text-emerald-400">
-                                +{act.shares > 0 ? `${act.shares.toLocaleString()}주 (` : ''}{formatWonDigits(hideAmounts, act.amount)}{act.shares > 0 ? ')' : ''}
-                              </span>
-                            )}
-                            {isSell && (
-                              <span className="text-rose-600 dark:text-rose-400">
-                                -{act.shares > 0 ? `${act.shares.toLocaleString()}주 (` : ''}{formatWonDigits(hideAmounts, act.amount)}{act.shares > 0 ? ')' : ''}
-                              </span>
-                            )}
-                            {!isBuy && !isSell && <span className="text-content-tertiary">변동 없음</span>}
-                          </div>
-                        </div>
-
-                        <div className="mt-2.5 flex items-center justify-between text-xs text-content-tertiary border-t border-stroke/40 pt-2 font-semibold">
-                          <span>비중 변화: {act.currentWeight}% ➔ <strong className="text-content-primary font-bold">{act.targetWeight}%</strong></span>
-                          <span className="truncate max-w-[320px]">{act.reason}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* 원클릭 적용 버튼 */}
-                <button
-                  type="button"
-                  onClick={handleApplyAiPlan}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-sm font-extrabold text-white shadow-md hover:bg-emerald-700 active:scale-[0.99]"
-                >
-                  <CheckCircle2 className="h-5 w-5" />
-                  이 AI 매수 안을 보유 종목에 바로 적용하기
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        )}
       </div>
 
-      {/* Holding Edit Modal */}
+      {rebalancingMode === 'additional' && additionalCash <= 0 && hasHoldings && (
+        <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+          추가 투입 금액을 입력하면 목표 비중에 맞춘 매수 수량이 계산됩니다. (매도 제안 없음)
+        </p>
+      )}
+
+      {/* 계좌 포트폴리오 + 종목 카드 */}
+      <div className="rounded-2xl border border-stroke bg-surface-card p-6 shadow-glass-sm">
+        <div className="mb-4 flex items-center justify-between border-b border-stroke pb-3.5">
+          <div>
+            <span className="flex items-center gap-1.5 text-xs font-bold text-accent">
+              <PieChart className="h-4 w-4" /> 계좌 보유 포트폴리오
+            </span>
+            <h3 className="mt-0.5 text-xl font-black text-content-primary">{selectedAccount}</h3>
+          </div>
+          <div className="text-right">
+            <span className="text-xs font-semibold text-content-tertiary">총 평가금액</span>
+            <p className="mt-0.5 text-xl font-black text-content-primary">
+              {hasHoldings ? formatWonDigits(hideAmounts, accountTotalValuation) : '0원'}
+            </p>
+          </div>
+        </div>
+
+        {hasHoldings && (
+          <div className="mb-4">
+            <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-surface-tertiary">
+              {currentHoldings.map((h, i) => {
+                const colors = [
+                  'bg-indigo-500',
+                  'bg-emerald-500',
+                  'bg-amber-500',
+                  'bg-sky-500',
+                  'bg-rose-500',
+                  'bg-violet-500',
+                ];
+                return (
+                  <div
+                    key={h.name}
+                    style={{ width: `${Math.max(h.currentWeight, 2)}%` }}
+                    className={`${colors[i % colors.length]} transition-all duration-500`}
+                    title={`${h.name}: 현재 ${h.currentWeight}% / 목표 ${h.targetWeight}%`}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {hasHoldings ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {currentHoldings.map((h) => {
+              const targetW = h.targetWeight ?? 0;
+              const diff = parseFloat((h.currentWeight - targetW).toFixed(1));
+              const isOver = diff > 0;
+              const isMatch = Math.abs(diff) < 0.1;
+              const action = actionByName.get(h.name);
+
+              return (
+                <div
+                  key={h.name}
+                  className="flex flex-col gap-3 rounded-xl border border-stroke/50 bg-surface-secondary/40 p-4 transition-colors hover:bg-surface-secondary"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-bold text-base text-content-primary">{h.name}</p>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditModalState({
+                              open: true,
+                              stockName: h.name,
+                              quantity: h.quantity,
+                              price: h.currentPrice,
+                            })
+                          }
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-surface-tertiary text-content-tertiary transition-colors hover:bg-accent hover:text-white"
+                          title="보유 주수 및 단가 수정"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {h.quantity > 1 && (
+                        <p className="mt-0.5 text-xs font-semibold text-content-tertiary">
+                          {h.quantity.toLocaleString()}주 · 현재가 {formatWonDigits(hideAmounts, h.currentPrice)}
+                        </p>
+                      )}
+                    </div>
+                    <p className="shrink-0 font-extrabold text-base text-content-primary">
+                      {formatWonDigits(hideAmounts, h.currentValue)}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+                    <span className="text-content-secondary">
+                      현재 <strong className="text-accent">{h.currentWeight}%</strong>
+                    </span>
+                    <span className="text-content-tertiary">/</span>
+                    <span className="text-content-tertiary">목표 {targetW}%</span>
+                    {isMatch ? (
+                      <span className="rounded bg-gray-500/10 px-2 py-0.5 text-gray-500">부합</span>
+                    ) : (
+                      <span
+                        className={`rounded px-2 py-0.5 ${
+                          isOver
+                            ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                            : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                        }`}
+                      >
+                        {isOver ? `+${diff}%p 초과` : `${diff}%p 부족`}
+                      </span>
+                    )}
+                  </div>
+
+                  {action && (
+                    <div
+                      className={`rounded-lg border px-3 py-2.5 ${
+                        action.action === 'BUY'
+                          ? 'border-emerald-500/30 bg-emerald-500/10'
+                          : action.action === 'SELL'
+                          ? 'border-rose-500/30 bg-rose-500/10'
+                          : 'border-stroke/50 bg-surface-card/60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <ActionBadge action={action.action} />
+                        <span
+                          className={`text-sm font-extrabold tabular-nums ${
+                            action.action === 'BUY'
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : action.action === 'SELL'
+                              ? 'text-rose-600 dark:text-rose-400'
+                              : 'text-content-tertiary'
+                          }`}
+                        >
+                          {action.action === 'BUY' && '+'}
+                          {action.action === 'SELL' && '-'}
+                          {formatActionDetail(action, hideAmounts)}
+                        </span>
+                      </div>
+                      {action.action !== 'HOLD' && (
+                        <p className="mt-1.5 text-[11px] font-semibold text-content-tertiary">
+                          반영 후 예상 비중: {action.projectedWeight}%
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 py-10 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10">
+              <Info className="h-6 w-6 text-amber-500" />
+            </div>
+            <p className="text-base font-bold text-content-secondary">등록된 종목이 없습니다</p>
+            <p className="text-xs leading-relaxed text-content-tertiary">
+              현재 [{selectedAccount}] 계좌에 등록된 데이터가 없습니다.
+            </p>
+          </div>
+        )}
+      </div>
+
       <HoldingEditModal
         open={editModalState.open}
         onClose={() => setEditModalState((s) => ({ ...s, open: false }))}

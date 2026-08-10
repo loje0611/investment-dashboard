@@ -1,17 +1,11 @@
 import { create } from 'zustand';
-import { fetchDashboardData } from '../api/api';
 import { fetchLocalCsvDashboardData } from '../api/localCsvApi';
 import type {
   TotalAssetRow,
   EtfSheetRow,
   PensionSheetRow,
-  ElsRow,
   RebalancingTable,
-  SheetDataRow,
 } from '../types/api';
-import type { RebalancingActionItem } from '../services/aiRebalancingService';
-
-export type DataSourceMode = 'local' | 'gas';
 
 const OVERRIDES_STORAGE_KEY = 'investment_dashboard_user_overrides_v2';
 
@@ -43,15 +37,12 @@ export interface DashboardState {
   etfList: EtfSheetRow[];
   pensionList: PensionSheetRow[];
   rebalancing: RebalancingTable[];
-  cashOther: SheetDataRow[];
-  elsListSheetData: ElsRow[];
   summaryCards: import('../types/dashboard').SummaryCardItem[];
   isLoading: boolean;
   isLoadingAssets: boolean;
   isLoadingRebalancing: boolean;
   error: string | null;
   hideAmounts: boolean;
-  dataSourceMode: DataSourceMode;
   userOverrides: UserOverrides;
 }
 
@@ -59,17 +50,12 @@ export interface DashboardActions {
   fetchData: (endpoint?: string) => Promise<void>;
   clearError: () => void;
   setHideAmounts: (hide: boolean) => void;
-  setDataSourceMode: (mode: DataSourceMode) => void;
   updateAccountPrincipal: (productName: string, newPrincipal: number) => void;
   updateAccountHolding: (
     accountLabel: string,
     stockName: string,
     quantity: number,
     currentPrice: number
-  ) => void;
-  applyAiRebalancingPlan: (
-    accountLabel: string,
-    actions: RebalancingActionItem[]
   ) => void;
 }
 
@@ -78,15 +64,12 @@ const initialState: DashboardState = {
   etfList: [],
   pensionList: [],
   rebalancing: [],
-  cashOther: [],
-  elsListSheetData: [],
   summaryCards: [],
   isLoading: false,
   isLoadingAssets: false,
   isLoadingRebalancing: false,
   error: null,
   hideAmounts: false,
-  dataSourceMode: 'local',
   userOverrides: loadUserOverrides(),
 };
 
@@ -165,8 +148,6 @@ function applyDashboardPayload(
     etfList,
     pensionList,
     rebalancing,
-    cashOther: data.cashOther ?? [],
-    elsListSheetData: data.elsListSheetData ?? [],
     summaryCards: data.summaryCards ?? [],
   };
 }
@@ -174,15 +155,10 @@ function applyDashboardPayload(
 export const useStore = create<DashboardState & DashboardActions>((set, get) => ({
   ...initialState,
 
-  fetchData: async (endpoint) => {
+  fetchData: async () => {
     set({ isLoading: true, error: null, isLoadingAssets: true, isLoadingRebalancing: true });
     try {
-      const mode = get().dataSourceMode;
-      const data =
-        mode === 'local'
-          ? await fetchLocalCsvDashboardData()
-          : await fetchDashboardData(endpoint, 'all');
-
+      const data = await fetchLocalCsvDashboardData();
       const overrides = get().userOverrides;
 
       set({
@@ -206,11 +182,6 @@ export const useStore = create<DashboardState & DashboardActions>((set, get) => 
   clearError: () => set({ error: null }),
 
   setHideAmounts: (hide) => set({ hideAmounts: hide }),
-
-  setDataSourceMode: (mode) => {
-    set({ dataSourceMode: mode });
-    get().fetchData();
-  },
 
   updateAccountPrincipal: (productName, newPrincipal) => {
     const state = get();
@@ -313,77 +284,6 @@ export const useStore = create<DashboardState & DashboardActions>((set, get) => 
       }
       return table;
     });
-
-    set({
-      userOverrides: updatedOverrides,
-      rebalancing: updatedRebalancing,
-    });
-  },
-
-  applyAiRebalancingPlan: (accountLabel, aiActions) => {
-    const state = get();
-    const buyActions = aiActions.filter((a) => a.action === 'BUY' && (a.shares > 0 || a.amount > 0));
-    if (buyActions.length === 0) return;
-
-    const cleanAcc = accountLabel.trim();
-    const accHoldings = { ...(state.userOverrides.holdings[cleanAcc] || {}) };
-
-    const updatedRebalancing = state.rebalancing.map((table) => {
-      if (table.accountLabel.trim().toLowerCase() === cleanAcc.toLowerCase()) {
-        const updatedRows = [...table.rows];
-
-        buyActions.forEach((act) => {
-          const cleanStock = act.stockName.trim();
-          const idx = updatedRows.findIndex((r) => String(r.종목명 || '').trim() === cleanStock);
-          if (idx >= 0) {
-            const row = updatedRows[idx];
-            const oldQty = typeof row.보유수량 === 'number' ? row.보유수량 : parseFloat(String(row.보유수량 || 0)) || 0;
-            const oldPrice = typeof row.현재가 === 'number' ? row.현재가 : parseFloat(String(row.현재가 || 0)) || 0;
-            const oldValuation = typeof row.평가금액 === 'number' ? row.평가금액 : parseFloat(String(row.평가금액 || 0)) || 0;
-
-            const addShares = act.shares > 0 ? act.shares : 0;
-            const newQty = oldQty + addShares;
-            const price = oldPrice > 0 ? oldPrice : act.amount / (addShares || 1);
-            const newValuation = oldValuation + act.amount;
-
-            updatedRows[idx] = {
-              ...row,
-              보유수량: newQty,
-              현재가: price,
-              평가금액: newValuation,
-            };
-
-            accHoldings[cleanStock] = { quantity: newQty, currentPrice: price };
-          } else {
-            const price = act.amount / (act.shares || 1);
-            updatedRows.push({
-              계좌명: accountLabel,
-              종목명: act.stockName,
-              보유수량: act.shares || 1,
-              현재가: price,
-              평가금액: act.amount,
-              현재비중: 0.1,
-              목표비중: act.targetWeight / 100,
-            });
-
-            accHoldings[cleanStock] = { quantity: act.shares || 1, currentPrice: price };
-          }
-        });
-
-        return { ...table, rows: updatedRows };
-      }
-      return table;
-    });
-
-    const updatedOverrides = {
-      ...state.userOverrides,
-      holdings: {
-        ...state.userOverrides.holdings,
-        [cleanAcc]: accHoldings,
-      },
-    };
-
-    saveUserOverrides(updatedOverrides);
 
     set({
       userOverrides: updatedOverrides,

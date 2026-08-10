@@ -1,29 +1,27 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { EtfRow, PensionRow, ElsCardItem } from '../../data/dashboardDummy'
+import type { EtfRow, PensionRow } from '../../data/dashboardDummy'
 import { formatWonDigits } from '../../utils/maskSensitiveAmount'
-import { ProductHistoryModal } from './ProductHistoryModal'
-import type { ProductHistoryKind } from '../../api/api'
-import { ElsRiskProgressBar } from '../ElsRiskProgressBar'
-import { SkeletonCard } from '../ui/SkeletonCard'
 
-type TabId = 'etf' | 'pension' | 'els'
+type ProductHistoryKind = 'ETF' | 'PENSION'
+import { ProductHistoryModal } from './ProductHistoryModal'
+import { SkeletonCard } from '../ui/SkeletonCard'
+import { Sparkline } from '../ui/Sparkline'
+
+type TabId = 'etf' | 'pension'
 
 interface AssetDetailsTabsProps {
   etfTable: EtfRow[]
   pensionTable: PensionRow[]
-  elsItems: ElsCardItem[]
   isLoading?: boolean
   hideAmounts: boolean
-  onElsRegister?: () => void
-  onElsRedeem?: (item: ElsCardItem) => void
 }
 
 import { Edit3 } from 'lucide-react'
 import { PrincipalEditModal } from './PrincipalEditModal'
 
-function AssetCard({ name, valuation, returnRate, hideAmounts, onTap, onEdit, index }: {
-  name: string; valuation: number; returnRate: number
+function AssetCard({ name, valuation, returnRate, sparklineData, hideAmounts, onTap, onEdit, index }: {
+  name: string; valuation: number; returnRate: number; sparklineData: number[]
   hideAmounts: boolean; onTap: () => void; onEdit?: () => void; index: number
 }) {
   const isProfit = returnRate >= 0
@@ -66,19 +64,24 @@ function AssetCard({ name, valuation, returnRate, hideAmounts, onTap, onEdit, in
         <p className="text-xl font-bold tabular-nums leading-snug text-content-primary">
           ₩{formatWonDigits(hideAmounts, valuation)}
         </p>
-        <span className={`shrink-0 rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums ${
-          isProfit ? 'bg-profit-bg text-profit' : 'bg-loss-bg text-loss'
-        }`}>
-          {isProfit ? '+' : ''}{Math.round(returnRate)}%
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          {sparklineData.length >= 2 && (
+            <Sparkline data={sparklineData} width={88} height={28} />
+          )}
+          <span className={`rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums ${
+            isProfit ? 'bg-profit-bg text-profit' : 'bg-loss-bg text-loss'
+          }`}>
+            {isProfit ? '+' : ''}{Math.round(returnRate)}%
+          </span>
+        </div>
       </div>
     </motion.button>
   )
 }
 
 export function AssetDetailsTabs({
-  etfTable, pensionTable, elsItems,
-  isLoading = false, hideAmounts, onElsRegister, onElsRedeem,
+  etfTable, pensionTable,
+  isLoading = false, hideAmounts,
 }: AssetDetailsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('etf')
   const [historyModal, setHistoryModal] = useState<{
@@ -92,7 +95,6 @@ export function AssetDetailsTabs({
   const tabs: { id: TabId; label: string; count: number }[] = [
     { id: 'etf', label: 'ETF', count: etfTable.length },
     { id: 'pension', label: '연금', count: pensionTable.length },
-    { id: 'els', label: 'ELS', count: elsItems.length },
   ]
 
   return (
@@ -111,7 +113,6 @@ export function AssetDetailsTabs({
         initialPrincipal={editModal.principal}
       />
 
-      {/* Tab Pills */}
       <div className="mb-3 flex shrink-0 gap-1.5" role="tablist" aria-label="자산 유형">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id
@@ -145,7 +146,6 @@ export function AssetDetailsTabs({
         })}
       </div>
 
-      {/* Content */}
       <div
         className="min-h-0 flex-1 overflow-auto scrollbar-hide"
         role="tabpanel"
@@ -168,6 +168,7 @@ export function AssetDetailsTabs({
                       <AssetCard
                         key={row.id} name={row.name} index={i}
                         valuation={row.valuation} returnRate={row.returnRate}
+                        sparklineData={row.sparklineData}
                         hideAmounts={hideAmounts}
                         onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'ETF' })}
                         onEdit={() => setEditModal({ open: true, name: row.name, principal: row.principal })}
@@ -188,48 +189,11 @@ export function AssetDetailsTabs({
                       <AssetCard
                         key={row.id} name={row.name} index={i}
                         valuation={row.valuation} returnRate={row.returnRate}
+                        sparklineData={row.sparklineData}
                         hideAmounts={hideAmounts}
                         onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'PENSION' })}
                         onEdit={() => setEditModal({ open: true, name: row.name, principal: row.principal })}
                       />
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            )}
-
-            {activeTab === 'els' && (
-              <motion.div key="els" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-                {onElsRegister && (
-                  <button
-                    type="button"
-                    onClick={onElsRegister}
-                    className="mb-3 w-full rounded-2xl border border-dashed border-accent/30 bg-accent-muted py-3 text-sm font-semibold text-accent transition-colors hover:bg-accent/20"
-                  >
-                    + 상품 추가
-                  </button>
-                )}
-                {elsItems.length === 0 ? (
-                  <p className="py-16 text-center text-sm text-content-tertiary">등록된 ELS 상품이 없습니다.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {elsItems.map((item, i) => (
-                      <motion.div key={item.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: i * 0.04 }}>
-                        <button
-                          type="button"
-                          disabled={item.rowIndex == null}
-                          onClick={() => { if (item.rowIndex != null) onElsRedeem?.(item) }}
-                          className="w-full rounded-2xl border border-stroke bg-surface-card p-4 text-left transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="font-semibold text-slate-100">{item.productName}</p>
-                            <p className="shrink-0 text-xs font-medium tabular-nums text-slate-300">{item.nextRedemptionDate}</p>
-                          </div>
-                          <div className="mt-3">
-                            <ElsRiskProgressBar currentLevel={item.currentLevel} kiBarrier={item.kiBarrier} redemptionBarrier={item.redemptionBarrier} barHeight="h-3" />
-                          </div>
-                        </button>
-                      </motion.div>
                     ))}
                   </div>
                 )}

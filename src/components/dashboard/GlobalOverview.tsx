@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
-import { PieChart as PieChartIcon, Sparkles, ShieldCheck, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { PieChart as PieChartIcon, Sparkles, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area,
 } from 'recharts'
-import type { PieSegment, SummaryCardItem, ElsCardItem } from '../../data/dashboardDummy'
+import type { PieSegment, SummaryCardItem } from '../../data/dashboardDummy'
 import type {
   PrincipalValuationPoint,
   PrincipalValuationTrend,
@@ -17,7 +17,6 @@ interface GlobalOverviewProps {
   pieData: PieSegment[]
   principalValuationTrend: PrincipalValuationTrend | null
   insightText?: string | null
-  elsManageTabItems?: ElsCardItem[]
   totalAssetsRowCount?: number
   isLoading?: boolean
   hideAmounts: boolean
@@ -119,7 +118,6 @@ export function GlobalOverview({
   pieData,
   principalValuationTrend,
   insightText,
-  elsManageTabItems = [],
   hideAmounts,
 }: GlobalOverviewProps) {
   const [period, setPeriod] = useState<PeriodId>('all')
@@ -276,46 +274,14 @@ export function GlobalOverview({
         </div>
       </div>
 
-      {/* 3. Bottom Grid: Insight & ELS Status (Span 6 + 6) */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Left: AI Insight Briefing (Span 6) */}
-        {insightText && (
-          <div className="rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/5 to-transparent p-5 shadow-glass-sm lg:col-span-6">
-            <div className="mb-2 flex items-center gap-2 text-xs font-bold text-accent">
-              <Sparkles className="h-4 w-4" /> AI 자산 진단 브리핑
-            </div>
-            <p className="text-sm font-semibold text-content-primary leading-relaxed">{insightText}</p>
+      {insightText && (
+        <div className="rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/5 to-transparent p-5 shadow-glass-sm">
+          <div className="mb-2 flex items-center gap-2 text-xs font-bold text-accent">
+            <Sparkles className="h-4 w-4" /> AI 자산 진단 브리핑
           </div>
-        )}
-
-        {/* Right: ELS Risk / Early Redemption Summary (Span 6) */}
-        {elsManageTabItems.length > 0 && (
-          <div className="rounded-2xl border border-stroke bg-surface-card p-5 shadow-glass-sm lg:col-span-6">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                <h4 className="text-sm font-bold text-content-primary">운용 중인 ELS 조기상환 현황</h4>
-              </div>
-              <span className="text-xs font-semibold text-content-tertiary">총 {elsManageTabItems.length}건</span>
-            </div>
-
-            <div className="space-y-2">
-              {elsManageTabItems.slice(0, 3).map((item) => (
-                <div key={item.id} className="flex items-center justify-between rounded-xl border border-stroke/60 bg-surface-secondary/40 p-3 text-xs">
-                  <div>
-                    <span className="font-bold text-content-primary">{item.productName}</span>
-                    <p className="text-[11px] text-content-tertiary">다음 평가: {item.nextRedemptionDate}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-semibold text-content-secondary">가입: {formatWonDigits(hideAmounts, item.joinAmount || 0)}</span>
-                    <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">정상 운용 중</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+          <p className="text-sm font-semibold text-content-primary leading-relaxed">{insightText}</p>
+        </div>
+      )}
     </div>
   )
 }
