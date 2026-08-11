@@ -53,8 +53,10 @@ def main():
         
         current_cash = parse_float(last_row[col_cash_val])
         print("[1/3] 현금 자산")
+        last_date = last_row[0]
+        print(f"- 마지막 스냅샷 날짜: {last_date}")
         print(f"- 최근 현금 평가금: {int(current_cash):,} 원")
-        new_cash_str = get_input("> 새로운 현금 입력: ")
+        new_cash_str = get_input("> 새로운 현금 입력 (변경 없으면 Enter): ")
         
         if new_cash_str:
             new_cash = parse_float(new_cash_str)
@@ -63,6 +65,18 @@ def main():
             
             diff_prin = new_cash - old_cash_prin
             diff_val = new_cash - old_cash_val
+            
+            # 사용자에게 스냅샷 추가 여부 묻기
+            print(f"\n[선택] '{last_date}'의 기록을 직접 수정할까요, 아니면 오늘 날짜로 새로운 스냅샷(행)을 추가할까요?")
+            mode = get_input("  1: 덮어쓰기 (기본값) / 2: 오늘 날짜로 새 행 추가 > ")
+            
+            if mode == '2':
+                from datetime import datetime
+                today_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                new_row = list(last_row)
+                new_row[0] = today_str
+                last_row = new_row
+                history_rows.append(last_row)
             
             last_row[col_cash_prin] = format_number(new_cash)
             last_row[col_cash_val] = format_number(new_cash)
@@ -77,7 +91,10 @@ def main():
                 return_rate = ((new_total_val - new_total_prin) / new_total_prin) * 100
                 last_row[col_return] = f"{return_rate}%"
             
-            history_rows[-1] = last_row
+            if mode != '2':
+                history_rows[-1] = last_row
+            else:
+                history_rows[-1] = last_row # Already appended above, this updates the reference
             
             with open(HISTORY_CSV_PATH, 'w', encoding='utf-8', newline='') as f:
                 writer = csv.writer(f, lineterminator='\n')
