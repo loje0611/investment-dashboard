@@ -151,63 +151,7 @@ def main():
             writer = csv.writer(f, lineterminator='\n')
             writer.writerows(port_rows)
 
-    # 3. Update history.csv (Cash sum synchronization)
-    if os.path.exists(HISTORY_CSV_PATH):
-        with open(HISTORY_CSV_PATH, 'r', encoding='utf-8', newline='') as f:
-            history_rows = list(csv.reader(f))
-        
-        if len(history_rows) > 1:
-            header = history_rows[0]
-            last_row = list(history_rows[-1])
-            
-            col_cash_prin = header.index('현금 원금') if '현금 원금' in header else 7
-            col_cash_val = header.index('현금 평가금') if '현금 평가금' in header else 8
-            col_total_prin = header.index('원금 총액') if '원금 총액' in header else 9
-            col_total_val = header.index('평가금 총액') if '평가금 총액' in header else 10
-            col_return = header.index('수익률') if '수익률' in header else 11
-            
-            old_cash_prin = parse_float(last_row[col_cash_prin])
-            old_cash_val = parse_float(last_row[col_cash_val])
-            
-            diff_prin = cash_sum_prin - old_cash_prin
-            diff_val = cash_sum_val - old_cash_val
-
-            if diff_prin != 0 or diff_val != 0:
-                print("\n[알림] 현금성 자산 변동이 감지되어 history.csv 스냅샷을 갱신합니다.")
-                last_date = last_row[0]
-                print(f"[선택] '{last_date}'의 기록을 덮어쓸까요, 아니면 오늘 날짜로 새로운 스냅샷(행)을 추가할까요?")
-                mode = get_input("  1: 덮어쓰기 (기본값) / 2: 오늘 날짜로 새 행 추가 > ")
-                
-                if mode == '2':
-                    from datetime import datetime
-                    today_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z")
-                    new_row = list(last_row)
-                    new_row[0] = today_str
-                    last_row = new_row
-                    history_rows.append(last_row)
-                
-                last_row[col_cash_prin] = format_number(cash_sum_prin)
-                last_row[col_cash_val] = format_number(cash_sum_val)
-                
-                new_total_prin = parse_float(last_row[col_total_prin]) + diff_prin
-                new_total_val = parse_float(last_row[col_total_val]) + diff_val
-                last_row[col_total_prin] = format_number(new_total_prin)
-                last_row[col_total_val] = format_number(new_total_val)
-                
-                if new_total_prin > 0:
-                    return_rate = ((new_total_val - new_total_prin) / new_total_prin) * 100
-                    last_row[col_return] = f"{return_rate}%"
-                
-                if mode != '2':
-                    history_rows[-1] = last_row
-                else:
-                    history_rows[-1] = last_row 
-                
-                with open(HISTORY_CSV_PATH, 'w', encoding='utf-8', newline='') as f:
-                    writer = csv.writer(f, lineterminator='\n')
-                    writer.writerows(history_rows)
-
-    print("\n✅ CSV 원본 업데이트가 완료되었습니다! (cash.csv, portfolio.csv, history.csv)")
+    print("\n✅ CSV 원본 업데이트가 완료되었습니다! (cash.csv, portfolio.csv)")
 
 if __name__ == '__main__':
     main()

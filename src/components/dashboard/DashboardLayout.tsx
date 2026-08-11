@@ -142,10 +142,34 @@ export function DashboardLayout() {
     })
   }, [pensionList, realTimeAccountValuationMap])
 
+  const currentSnapshot = useMemo(() => {
+    let etfVal = 0, etfPrin = 0
+    etfTableForTab.forEach((r) => { etfVal += r.valuation; etfPrin += r.principal })
+
+    let penVal = 0, penPrin = 0
+    pensionTableForTab.forEach((r) => { penVal += r.valuation; penPrin += r.principal })
+
+    let cashVal = 0, cashPrin = 0
+    cashTableForTab.forEach((r) => { cashVal += r.valuation; cashPrin += r.principal })
+
+    const totalVal = etfVal + penVal + cashVal
+    const totalPrin = etfPrin + penPrin + cashPrin
+    const totalYield = totalPrin > 0 ? ((totalVal - totalPrin) / totalPrin) * 100 : null
+
+    return {
+      row: {},
+      totalValuation: totalVal,
+      totalPrincipal: totalPrin,
+      totalYieldPercent: totalYield,
+      연금평가금: penVal, 연금원금: penPrin,
+      etf평가금: etfVal, etf원금: etfPrin,
+      현금평가금: cashVal, 현금원금: cashPrin,
+    } as any
+  }, [etfTableForTab, pensionTableForTab, cashTableForTab])
+
   const principalValuationTrend = useMemo(() => totalAssetsToPrincipalValuationTrend(totalAssets), [totalAssets])
-  const latestSnapshot = useMemo(() => getLatestTotalAssetSnapshot(totalAssets), [totalAssets])
-  const homeSummaryCards = useMemo(() => buildSummaryCardsFromSnapshot(latestSnapshot), [latestSnapshot])
-  const homePieData = useMemo(() => buildPieSegmentsFromSnapshot(latestSnapshot), [latestSnapshot])
+  const homeSummaryCards = useMemo(() => buildSummaryCardsFromSnapshot(currentSnapshot), [currentSnapshot])
+  const homePieData = useMemo(() => buildPieSegmentsFromSnapshot(currentSnapshot), [currentSnapshot])
   const insightText = useMemo(() => generateInsightText(principalValuationTrend), [principalValuationTrend])
 
   const navItems = [
