@@ -101,9 +101,15 @@ def main():
         pensions = []
         
         for i, row in enumerate(port_rows[1:], start=1):
-            if len(row) <= col_cat:
+            if len(row) <= max(col_cat, col_name):
                 continue
             cat = row[col_cat]
+            name = row[col_name].strip()
+            
+            # 하위 보유종목이나 빈 이름은 스킵
+            if cat.startswith('보유종목') or not name:
+                continue
+                
             if 'ETF' in cat or '자문사' in cat:
                 etfs.append((i, row))
             elif '연금' in cat or 'IRP' in cat or 'DC' in cat:
