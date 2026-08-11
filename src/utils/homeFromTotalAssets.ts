@@ -44,11 +44,9 @@ export function getTotalAssetCell(row: TotalAssetRow, header: string): unknown {
   return undefined
 }
 
-/** 시트에 저장된 수익률: 소수(0.12) 또는 퍼센트(12) 혼재 대비 */
+/** 수익률은 퍼센트 단위로 저장되어 있으므로 그대로 반환 */
 function normalizePercentYield(raw: number | null): number | null {
   if (raw == null || !Number.isFinite(raw)) return null
-  if (raw === 0) return 0
-  if (Math.abs(raw) < 1.5) return raw * 100
   return raw
 }
 

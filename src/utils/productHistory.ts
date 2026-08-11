@@ -57,13 +57,12 @@ function parseDateValue(raw: string): Date | null {
   return null;
 }
 
-/** 시트 수익률: 소수(0.07=7%) 또는 퍼센트(44.7) 혼재 */
+/** 수익률은 퍼센트 단위로 저장되어 있으므로 그대로 반올림만 수행 */
 function toRatePercent(raw: string | undefined): number {
   if (!raw) return 0;
   const cleaned = raw.replace(/,/g, '').replace(/%/g, '').trim();
   const n = parseFloat(cleaned);
   if (!Number.isFinite(n)) return 0;
-  if (Math.abs(n) < 1.5) return Math.round(n * 10000) / 100;
   return Math.round(n * 100) / 100;
 }
 

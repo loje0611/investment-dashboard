@@ -57,15 +57,13 @@ function parseNumber(val: string | undefined): number {
 
 /**
  * 수익률 문자열을 퍼센트 단위 숫자로 변환합니다.
+ * CSV에 이미 퍼센트 단위로 저장되어 있으므로 그대로 반환합니다.
  */
 function parseReturnRate(val: string | undefined): number {
   if (!val) return 0;
-  const hasPercent = val.includes('%');
   const cleaned = val.replace(/,/g, '').replace(/%/g, '').replace(/원/g, '').trim();
   const num = parseFloat(cleaned);
   if (isNaN(num)) return 0;
-  if (hasPercent) return num;
-  if (Math.abs(num) < 1) return num * 100;
   return num;
 }
 
