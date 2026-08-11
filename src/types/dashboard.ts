@@ -47,6 +47,17 @@ export interface PensionRow {
   monthlyDeltas: number[]
 }
 
+/** 현금 테이블 행 */
+export interface CashRow {
+  id: string
+  name: string
+  principal: number
+  valuation: number
+  returnRate: number
+  sparklineData: number[]
+  monthlyDeltas: number[]
+}
+
 /** 리밸런싱: 계좌별 종목 */
 export interface RebalancingHolding {
   id: string

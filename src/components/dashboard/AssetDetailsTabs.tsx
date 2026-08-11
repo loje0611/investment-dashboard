@@ -1,37 +1,40 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-import type { EtfRow, PensionRow } from '../../types/dashboard'
+import type { EtfRow, PensionRow, CashRow } from '../../types/dashboard'
 import { formatWonDigits } from '../../utils/maskSensitiveAmount'
 import type { ProductHistoryKind } from '../../utils/productHistory'
 import { ProductHistoryModal } from './ProductHistoryModal'
 import { SkeletonCard } from '../ui/SkeletonCard'
 import { Sparkline } from '../ui/Sparkline'
 
-type TabId = 'etf' | 'pension'
+type TabId = 'etf' | 'pension' | 'cash'
 
 interface AssetDetailsTabsProps {
   etfTable: EtfRow[]
   pensionTable: PensionRow[]
+  cashTable: CashRow[]
   isLoading?: boolean
   hideAmounts: boolean
 }
 
 function AssetCard({ name, valuation, returnRate, sparklineData, hideAmounts, onTap, index }: {
   name: string; valuation: number; returnRate: number; sparklineData: number[]
-  hideAmounts: boolean; onTap: () => void; index: number
+  hideAmounts: boolean; onTap?: () => void; index: number
 }) {
   const isProfit = returnRate >= 0
+  const isCash = sparklineData.length === 0 && returnRate === 0
 
   return (
     <motion.button
       type="button"
       onClick={onTap}
-      aria-label={`${name} — 평가금 ${Math.round(valuation).toLocaleString('ko-KR')}원, 수익률 ${returnRate.toFixed(2)}%`}
+      disabled={!onTap}
+      aria-label={`${name} — 평가금 ${Math.round(valuation).toLocaleString('ko-KR')}원`}
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
-      className="group relative w-full rounded-2xl border border-stroke bg-surface-card p-4 text-left transition-colors hover:bg-surface-hover active:scale-[0.98]"
+      className={`group relative w-full rounded-2xl border border-stroke bg-surface-card p-4 text-left transition-colors ${onTap ? 'hover:bg-surface-hover active:scale-[0.98]' : ''}`}
     >
       <div className="flex items-center justify-between">
         <p className="truncate text-sm font-semibold text-accent">{name}</p>
@@ -41,23 +44,25 @@ function AssetCard({ name, valuation, returnRate, sparklineData, hideAmounts, on
         <p className="text-xl font-bold tabular-nums leading-snug text-content-primary">
           ₩{formatWonDigits(hideAmounts, valuation)}
         </p>
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          {sparklineData.length >= 2 && (
-            <Sparkline data={sparklineData} width={88} height={28} />
-          )}
-          <span className={`rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums ${
-            isProfit ? 'bg-profit-bg text-profit' : 'bg-loss-bg text-loss'
-          }`}>
-            {isProfit ? '+' : ''}{Math.round(returnRate)}%
-          </span>
-        </div>
+        {!isCash && (
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            {sparklineData.length >= 2 && (
+              <Sparkline data={sparklineData} width={88} height={28} />
+            )}
+            <span className={`rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums ${
+              isProfit ? 'bg-profit-bg text-profit' : 'bg-loss-bg text-loss'
+            }`}>
+              {isProfit ? '+' : ''}{Math.round(returnRate)}%
+            </span>
+          </div>
+        )}
       </div>
     </motion.button>
   )
 }
 
 export function AssetDetailsTabs({
-  etfTable, pensionTable,
+  etfTable, pensionTable, cashTable,
   isLoading = false, hideAmounts,
 }: AssetDetailsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('etf')
@@ -67,6 +72,7 @@ export function AssetDetailsTabs({
   const tabs: { id: TabId; label: string; count: number }[] = [
     { id: 'etf', label: 'ETF', count: etfTable.length },
     { id: 'pension', label: '연금', count: pensionTable.length },
+    { id: 'cash', label: '현금', count: cashTable.length },
   ]
 
   return (
@@ -156,6 +162,25 @@ export function AssetDetailsTabs({
                         sparklineData={row.sparklineData}
                         hideAmounts={hideAmounts}
                         onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'PENSION' })}
+                      />
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {activeTab === 'cash' && (
+              <motion.div key="cash" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+                {cashTable.length === 0 ? (
+                  <p className="py-16 text-center text-sm text-content-tertiary">현금 데이터가 없습니다.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {cashTable.map((row, i) => (
+                      <AssetCard
+                        key={row.id} name={row.name} index={i}
+                        valuation={row.valuation} returnRate={row.returnRate}
+                        sparklineData={row.sparklineData}
+                        hideAmounts={hideAmounts}
                       />
                     ))}
                   </div>

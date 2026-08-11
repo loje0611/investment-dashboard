@@ -4,6 +4,7 @@ import type {
   TotalAssetRow,
   EtfSheetRow,
   PensionSheetRow,
+  CashSheetRow,
   RebalancingTable,
 } from '../types/api';
 
@@ -11,6 +12,7 @@ export interface DashboardState {
   totalAssets: TotalAssetRow[];
   etfList: EtfSheetRow[];
   pensionList: PensionSheetRow[];
+  cashList: CashSheetRow[];
   rebalancing: RebalancingTable[];
   isLoading: boolean;
   isLoadingAssets: boolean;
@@ -29,6 +31,7 @@ const initialState: DashboardState = {
   totalAssets: [],
   etfList: [],
   pensionList: [],
+  cashList: [],
   rebalancing: [],
   isLoading: false,
   isLoadingAssets: false,

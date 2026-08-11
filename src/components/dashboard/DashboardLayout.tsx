@@ -35,11 +35,11 @@ function LazyChunkFallback({ label = '로딩 중…' }: { label?: string }) {
 
 export function DashboardLayout() {
   const {
-    etfList, pensionList, totalAssets, rebalancing,
+    etfList, pensionList, cashList, totalAssets, rebalancing,
     isLoading, isLoadingAssets, hideAmounts,
   } = useStore(
     useShallow((s) => ({
-      etfList: s.etfList, pensionList: s.pensionList,
+      etfList: s.etfList, pensionList: s.pensionList, cashList: s.cashList,
       totalAssets: s.totalAssets, rebalancing: s.rebalancing,
       isLoading: s.isLoading, isLoadingAssets: s.isLoadingAssets,
       hideAmounts: s.hideAmounts,
@@ -75,6 +75,18 @@ export function DashboardLayout() {
   const [mainTab, setMainTab] = useHashTab<MainTabId>(VALID_TABS, 'home')
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  const cashTableForTab = useMemo(() => {
+    return cashList.map((row, idx) => ({
+      id: `cash-${idx}`,
+      name: row.상품명 || '이름 없음',
+      principal: row.투자원금 || 0,
+      valuation: row.평가금액 || 0,
+      returnRate: row.수익률 || 0,
+      sparklineData: [], // Cash doesn't have sparklines yet
+      monthlyDeltas: [],
+    }))
+  }, [cashList])
 
   const etfTableForTab = useMemo((): EtfRow[] => {
     const rows = etfList.length ? portfolioToEtfRows(etfList) : []
@@ -214,6 +226,7 @@ export function DashboardLayout() {
             <AssetDetailsTabs
               etfTable={etfTableForTab}
               pensionTable={pensionTableForTab}
+              cashTable={cashTableForTab}
               isLoading={isLoading || isLoadingAssets}
               hideAmounts={hideAmounts}
             />

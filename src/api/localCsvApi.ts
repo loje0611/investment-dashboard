@@ -9,6 +9,7 @@ import type {
 
 import historyCsvText from '../data/history.csv?raw';
 import portfolioCsvText from '../data/portfolio.csv?raw';
+import cashCsvText from '../data/cash.csv?raw';
 import { getProductHistorySeries } from '../utils/productHistory';
 
 /**
@@ -162,10 +163,26 @@ export async function fetchLocalCsvDashboardData(): Promise<DashboardSheetRespon
     rows,
   }));
 
+  const cashRows = parseCsv(cashCsvText);
+  const cashList: import('../types/api').CashSheetRow[] = [];
+  if (cashRows.length > 1) {
+    for (let i = 1; i < cashRows.length; i++) {
+      const r = cashRows[i];
+      if (r.length < 4) continue;
+      cashList.push({
+        상품명: r[0],
+        투자원금: parseNumber(r[1]),
+        평가금액: parseNumber(r[2]),
+        수익률: parseReturnRate(r[3]),
+      });
+    }
+  }
+
   return {
     totalAssets,
     etfList,
     pensionList,
+    cashList,
     rebalancing,
   };
 }

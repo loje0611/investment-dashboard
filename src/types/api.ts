@@ -52,6 +52,15 @@ export interface PensionSheetRow extends SheetDataRow {
   [key: string]: string | number | boolean | null | undefined;
 }
 
+/** 현금현황 데이터 한 행 */
+export interface CashSheetRow extends SheetDataRow {
+  상품명?: string;
+  투자원금?: number;
+  평가금액?: number;
+  수익률?: number;
+  [key: string]: string | number | boolean | null | undefined;
+}
+
 /** 리밸런싱 표 하나 (계좌별 표) */
 export interface RebalancingTableRow {
   [key: string]: string | number | boolean | null | undefined;
@@ -68,5 +77,6 @@ export interface DashboardSheetResponse {
   totalAssets?: TotalAssetRow[];
   etfList?: EtfSheetRow[];
   pensionList?: PensionSheetRow[];
+  cashList?: CashSheetRow[];
   rebalancing?: RebalancingTable[];
 }
