@@ -29,8 +29,23 @@ def main():
     print("=========================================")
     print("        월 스냅샷 정산 도구")
     print("=========================================")
+    print("먼저 주가(update_prices.py)를 최신화한 뒤,")
     print("현재 portfolio.csv 와 cash.csv의 총합을 계산하여")
     print("history.csv에 새로운 월 정산 행을 추가합니다...\n")
+
+    # 0. Run update_prices.py first
+    print("[알림] 최신 주가를 가져옵니다 (update_prices.py 실행 중...)")
+    try:
+        update_prices_script = os.path.join(SCRIPT_DIR, 'update_prices.py')
+        if os.path.exists(update_prices_script):
+            subprocess.run([sys.executable, update_prices_script], check=True, cwd=os.path.dirname(SCRIPT_DIR))
+            print("✅ 주가 업데이트가 완료되었습니다.\n")
+        else:
+            print("⚠️ update_prices.py 스크립트를 찾을 수 없어 주가 갱신을 생략합니다.\n")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ 주가 업데이트 중 오류가 발생했습니다: {e}")
+        print("정산을 중단합니다.")
+        sys.exit(1)
 
     # 1. Read portfolio.csv
     if not os.path.exists(PORTFOLIO_CSV_PATH):
