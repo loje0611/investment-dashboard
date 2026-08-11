@@ -7,7 +7,6 @@ import { portfolioToEtfRows } from '../../utils/portfolioToEtf'
 import { pensionToRows } from '../../utils/pensionToRows'
 import { totalAssetsToPrincipalValuationTrend } from '../../utils/totalAssetsToPrincipalValuation'
 import {
-  getLatestTotalAssetSnapshot,
   buildSummaryCardsFromSnapshot,
   buildPieSegmentsFromSnapshot,
 } from '../../utils/homeFromTotalAssets'
