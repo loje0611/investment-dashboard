@@ -13,7 +13,6 @@ import {
 import { generateInsightText } from '../../utils/generateInsight'
 import type { EtfRow, PensionRow } from '../../types/dashboard'
 import { AmountHideToggle } from './AmountHideToggle'
-import { LogoutButton } from '../LogoutButton'
 import { useHashTab } from '../../hooks/useHashTab'
 
 const GlobalOverview = lazy(() => import('./GlobalOverview').then(m => ({ default: m.GlobalOverview })))
@@ -225,7 +224,6 @@ export function DashboardLayout() {
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
             <AmountHideToggle />
-            <LogoutButton />
           </div>
         </div>
       </header>

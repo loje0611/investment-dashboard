@@ -17,7 +17,6 @@
 - **Styling**: Tailwind CSS, PostCSS, Autoprefixer
 - **State Management**: Zustand (전역 상태 및 데이터 스토어 관리)
 - **Data Visualization**: Recharts (시계열 스택 AreaChart, 자산 비중 파이 차트), Framer Motion (애니메이션)
-- **Authentication**: `@react-oauth/google`
 
 ### 2.2 Data Source (Database)
 - **Database**: 로컬 CSV 파일 (`portfolio.csv`, `history.csv`, `etf_history.csv`, `pension_history.csv` 등)
@@ -73,19 +72,8 @@
   - [ ] `npm run dev` 실행 시 에러 없이 기본 애플리케이션이 브라우저에 렌더링되어야 한다.
   - [ ] 홈, 자산 상세, 리밸런싱 탭으로 이동할 수 있는 네비게이션 UI가 동작해야 한다.
   - [ ] 데이터가 없는 상태에서도 레이아웃이 깨지지 않아야 한다.
-  - [ ] (로컬 개발) `.env`에 `VITE_AUTH_BYPASS=true`를 설정하면 인증 없이 대시보드 레이아웃을 검증할 수 있어야 한다. (`npm run dev` 전용, 프로덕션 빌드에서는 무시)
 
-### Task 2: 사용자 인증 (Google OAuth) 기능 구현
-- **목표**: 인가된 사용자만 대시보드에 접근할 수 있도록 인증 시스템을 구축합니다.
-- **구현 내용**:
-  - `@react-oauth/google` 라이브러리를 활용한 Google 로그인 페이지 구현
-  - 인증 상태를 추적하는 AuthStore(Zustand) 구현 및 LocalStorage 토큰 관리 로직 작성
-- **Acceptance Criteria**:
-  - [ ] 미인증 사용자가 대시보드 URL 접속 시 로그인 페이지로 강제 리다이렉트되어야 한다.
-  - [ ] Google 로그인 버튼을 눌러 성공적으로 인증하면 대시보드 레이아웃(Task 1)으로 진입해야 한다.
-  - [ ] 인증 성공 시 이메일 정보가 LocalStorage(`investment-dashboard-auth-v1`)에 안전하게 저장되어야 한다.
-
-### Task 3: 로컬 CSV 파싱 및 데이터 모델 기반 구축
+### Task 2: 로컬 CSV 파싱 및 데이터 모델 기반 구축
 - **목표**: 애플리케이션 내부에 위치한 로컬 CSV 파일들을 파싱하여 프론트엔드에서 사용할 수 있는 데이터 모델로 변환합니다.
 - **구현 내용**:
   - `TotalAssetRow`, `EtfRow`, `PensionRow` 등 CSV 스키마와 1:1 매칭되는 TypeScript 인터페이스 작성
