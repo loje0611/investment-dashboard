@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Edit3 } from 'lucide-react'
+
 import type { EtfRow, PensionRow } from '../../types/dashboard'
 import { formatWonDigits } from '../../utils/maskSensitiveAmount'
 import type { ProductHistoryKind } from '../../utils/productHistory'
 import { ProductHistoryModal } from './ProductHistoryModal'
-import { PrincipalEditModal } from './PrincipalEditModal'
 import { SkeletonCard } from '../ui/SkeletonCard'
 import { Sparkline } from '../ui/Sparkline'
 
@@ -18,9 +17,9 @@ interface AssetDetailsTabsProps {
   hideAmounts: boolean
 }
 
-function AssetCard({ name, valuation, returnRate, sparklineData, hideAmounts, onTap, onEdit, index }: {
+function AssetCard({ name, valuation, returnRate, sparklineData, hideAmounts, onTap, index }: {
   name: string; valuation: number; returnRate: number; sparklineData: number[]
-  hideAmounts: boolean; onTap: () => void; onEdit?: () => void; index: number
+  hideAmounts: boolean; onTap: () => void; index: number
 }) {
   const isProfit = returnRate >= 0
 
@@ -36,26 +35,6 @@ function AssetCard({ name, valuation, returnRate, sparklineData, hideAmounts, on
     >
       <div className="flex items-center justify-between">
         <p className="truncate text-sm font-semibold text-accent">{name}</p>
-        {onEdit && (
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => {
-              e.stopPropagation()
-              onEdit()
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.stopPropagation()
-                onEdit()
-              }
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-secondary text-content-tertiary transition-colors hover:bg-accent hover:text-white"
-            title="원금 수정"
-          >
-            <Edit3 className="h-3.5 w-3.5" />
-          </span>
-        )}
       </div>
 
       <div className="mt-2 flex items-end justify-between gap-3">
@@ -85,11 +64,6 @@ export function AssetDetailsTabs({
   const [historyModal, setHistoryModal] = useState<{
     open: boolean; name: string; kind: ProductHistoryKind
   }>({ open: false, name: '', kind: 'ETF' })
-
-  const [editModal, setEditModal] = useState<{
-    open: boolean; name: string; principal: number
-  }>({ open: false, name: '', principal: 0 })
-
   const tabs: { id: TabId; label: string; count: number }[] = [
     { id: 'etf', label: 'ETF', count: etfTable.length },
     { id: 'pension', label: '연금', count: pensionTable.length },
@@ -102,13 +76,6 @@ export function AssetDetailsTabs({
         onClose={() => setHistoryModal((s) => ({ ...s, open: false }))}
         productName={historyModal.name}
         productType={historyModal.kind}
-      />
-
-      <PrincipalEditModal
-        open={editModal.open}
-        onClose={() => setEditModal((s) => ({ ...s, open: false }))}
-        productName={editModal.name}
-        initialPrincipal={editModal.principal}
       />
 
       <div className="mb-3 flex shrink-0 gap-1.5" role="tablist" aria-label="자산 유형">
@@ -169,7 +136,6 @@ export function AssetDetailsTabs({
                         sparklineData={row.sparklineData}
                         hideAmounts={hideAmounts}
                         onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'ETF' })}
-                        onEdit={() => setEditModal({ open: true, name: row.name, principal: row.principal })}
                       />
                     ))}
                   </div>
@@ -190,7 +156,6 @@ export function AssetDetailsTabs({
                         sparklineData={row.sparklineData}
                         hideAmounts={hideAmounts}
                         onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'PENSION' })}
-                        onEdit={() => setEditModal({ open: true, name: row.name, principal: row.principal })}
                       />
                     ))}
                   </div>

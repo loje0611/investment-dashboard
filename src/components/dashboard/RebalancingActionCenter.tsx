@@ -9,7 +9,6 @@ import {
   type RebalancingHoldingInput,
   type RebalancingActionResult,
 } from '../../utils/rebalancingCalc';
-import { HoldingEditModal } from './HoldingEditModal';
 import {
   TrendingUp,
   TrendingDown,
@@ -17,7 +16,6 @@ import {
   Briefcase,
   Info,
   PieChart,
-  Edit3,
   Scale,
   Wallet,
 } from 'lucide-react';
@@ -109,19 +107,6 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
   const [selectedAccount, setSelectedAccount] = useState<TargetAccountName>('ISA');
   const [rebalancingMode, setRebalancingMode] = useState<RebalancingMode>('pure');
   const [additionalCashInput, setAdditionalCashInput] = useState<string>('');
-
-  const [editModalState, setEditModalState] = useState<{
-    open: boolean;
-    stockName: string;
-    quantity: number;
-    price: number;
-  }>({
-    open: false,
-    stockName: '',
-    quantity: 0,
-    price: 0,
-  });
-
   const accountHoldingsMap = useMemo(() => {
     const map: Record<TargetAccountName, RebalancingHoldingInput[]> = {
       ISA: [],
@@ -391,21 +376,6 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="truncate font-bold text-base text-content-primary">{h.name}</p>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEditModalState({
-                              open: true,
-                              stockName: h.name,
-                              quantity: h.quantity,
-                              price: h.currentPrice,
-                            })
-                          }
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-surface-tertiary text-content-tertiary transition-colors hover:bg-accent hover:text-white"
-                          title="보유 주수 및 단가 수정"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                        </button>
                       </div>
                       {h.quantity > 1 && (
                         <p className="mt-0.5 text-xs font-semibold text-content-tertiary">
@@ -488,15 +458,6 @@ export function RebalancingActionCenter({ hideAmounts: hideAmountsProp }: Rebala
           </div>
         )}
       </div>
-
-      <HoldingEditModal
-        open={editModalState.open}
-        onClose={() => setEditModalState((s) => ({ ...s, open: false }))}
-        accountLabel={selectedAccount}
-        stockName={editModalState.stockName}
-        initialQuantity={editModalState.quantity}
-        initialPrice={editModalState.price}
-      />
     </section>
   );
 }
