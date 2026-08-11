@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { RefreshCw, LayoutDashboard, PieChart, Scale, ShieldCheck } from 'lucide-react'
+import { LayoutDashboard, PieChart, Scale, ShieldCheck } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAccounts'
 import { portfolioToEtfRows } from '../../utils/portfolioToEtf'
