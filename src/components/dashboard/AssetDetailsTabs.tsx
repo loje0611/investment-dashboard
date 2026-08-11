@@ -69,10 +69,14 @@ export function AssetDetailsTabs({
   const [historyModal, setHistoryModal] = useState<{
     open: boolean; name: string; kind: ProductHistoryKind
   }>({ open: false, name: '', kind: 'ETF' })
+  const validEtfTable = etfTable.filter(r => r.valuation > 0)
+  const validPensionTable = pensionTable.filter(r => r.valuation > 0)
+  const validCashTable = cashTable.filter(r => r.valuation > 0)
+
   const tabs: { id: TabId; label: string; count: number }[] = [
-    { id: 'etf', label: 'ETF', count: etfTable.length },
-    { id: 'pension', label: '연금', count: pensionTable.length },
-    { id: 'cash', label: '현금', count: cashTable.length },
+    { id: 'etf', label: 'ETF', count: validEtfTable.length },
+    { id: 'pension', label: '연금', count: validPensionTable.length },
+    { id: 'cash', label: '현금', count: validCashTable.length },
   ]
 
   return (
@@ -131,11 +135,11 @@ export function AssetDetailsTabs({
           <AnimatePresence mode="wait">
             {activeTab === 'etf' && (
               <motion.div key="etf" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-                {etfTable.length === 0 ? (
+                {validEtfTable.length === 0 ? (
                   <p className="py-16 text-center text-sm text-content-tertiary">ETF 데이터가 없습니다.</p>
                 ) : (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {etfTable.map((row, i) => (
+                    {validEtfTable.map((row, i) => (
                       <AssetCard
                         key={row.id} name={row.name} index={i}
                         valuation={row.valuation} returnRate={row.returnRate}
@@ -151,11 +155,11 @@ export function AssetDetailsTabs({
 
             {activeTab === 'pension' && (
               <motion.div key="pension" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-                {pensionTable.length === 0 ? (
+                {validPensionTable.length === 0 ? (
                   <p className="py-16 text-center text-sm text-content-tertiary">연금 데이터가 없습니다.</p>
                 ) : (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {pensionTable.map((row, i) => (
+                    {validPensionTable.map((row, i) => (
                       <AssetCard
                         key={row.id} name={row.name} index={i}
                         valuation={row.valuation} returnRate={row.returnRate}
@@ -171,11 +175,11 @@ export function AssetDetailsTabs({
 
             {activeTab === 'cash' && (
               <motion.div key="cash" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-                {cashTable.length === 0 ? (
+                {validCashTable.length === 0 ? (
                   <p className="py-16 text-center text-sm text-content-tertiary">현금 데이터가 없습니다.</p>
                 ) : (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {cashTable.map((row, i) => (
+                    {validCashTable.map((row, i) => (
                       <AssetCard
                         key={row.id} name={row.name} index={i}
                         valuation={row.valuation} returnRate={row.returnRate}
