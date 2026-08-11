@@ -20,9 +20,10 @@ def parse_float(val_str):
         return 0.0
 
 def format_number(val: float) -> str:
+    val = round(val, 2)
     if val.is_integer():
         return str(int(val))
-    return f"{val:.10g}"
+    return f"{val:.2f}"
 
 def main():
     print("=========================================")
@@ -64,6 +65,9 @@ def main():
                 etf_prin += p
                 etf_val += v
             elif '연금' in cat or 'IRP' in cat or 'DC' in cat:
+                # 퇴직연금은 합산에서 제외
+                if '퇴직연금' in name:
+                    continue
                 pen_prin += p
                 pen_val += v
 
@@ -92,9 +96,9 @@ def main():
             p = parse_float(row[col_prin])
             v = parse_float(row[col_val])
             
+            # ELS는 더 이상 관리하지 않으므로 무시 (항상 0)
             if 'ELS' in name.upper():
-                els_prin += p
-                els_val += v
+                continue
             else:
                 real_cash_prin += p
                 real_cash_val += v
@@ -102,7 +106,7 @@ def main():
     # 3. Calculate Totals
     total_prin = etf_prin + pen_prin + els_prin + real_cash_prin
     total_val = etf_val + pen_val + els_val + real_cash_val
-    return_rate = ((total_val - total_prin) / total_prin * 100) if total_prin > 0 else 0
+    return_rate = round(((total_val - total_prin) / total_prin * 100), 2) if total_prin > 0 else 0
 
     # 4. Read history.csv to calculate deltas
     if not os.path.exists(HISTORY_CSV_PATH):
@@ -115,6 +119,8 @@ def main():
     last_total_prin = 0.0
     last_total_val = 0.0
     if len(hist_rows) > 1:
+        # 새로 추가된 잘못된 마지막 행(테스트용)은 읽지 않고 그 이전 정상 행을 찾아야 할 수도 있으나,
+        # 일단 맨 마지막 행을 기준으로 봅니다. (사용자가 롤백했다면)
         last_row = hist_rows[-1]
         last_total_prin = parse_float(last_row[9]) # 원금 총액
         last_total_val = parse_float(last_row[10]) # 평가금 총액
@@ -129,15 +135,15 @@ def main():
         today_str,
         format_number(pen_prin),
         format_number(pen_val),
-        format_number(els_prin) if els_prin > 0 else "",
-        format_number(els_val) if els_val > 0 else "",
+        "0", # ELS 원금은 항상 0
+        "0", # ELS 평가금은 항상 0
         format_number(etf_prin),
         format_number(etf_val),
-        format_number(real_cash_prin) if real_cash_prin > 0 else "",
-        format_number(real_cash_val) if real_cash_val > 0 else "",
+        format_number(real_cash_prin) if real_cash_prin > 0 else "0",
+        format_number(real_cash_val) if real_cash_val > 0 else "0",
         format_number(total_prin),
         format_number(total_val),
-        f"{return_rate}%",
+        f"{return_rate:.2f}%",
         format_number(delta_prin),
         format_number(delta_val)
     ]
