@@ -12,7 +12,6 @@ import {
 } from '../../utils/homeFromTotalAssets'
 import { generateInsightText } from '../../utils/generateInsight'
 import type { EtfRow, PensionRow } from '../../types/dashboard'
-import { AmountHideToggle } from './AmountHideToggle'
 import { useHashTab } from '../../hooks/useHashTab'
 
 const GlobalOverview = lazy(() => import('./GlobalOverview').then(m => ({ default: m.GlobalOverview })))
@@ -214,17 +213,6 @@ export function DashboardLayout() {
             })}
           </nav>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void fetchData()}
-              className="flex h-8 w-8 items-center justify-center rounded-xl border border-stroke bg-surface-card text-content-secondary transition-colors hover:bg-surface-secondary hover:text-content-primary"
-              title="데이터 새로고침"
-            >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
-            <AmountHideToggle />
-          </div>
         </div>
       </header>
 

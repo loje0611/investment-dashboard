@@ -37,6 +37,10 @@
     --color-skeleton-to: rgba(255, 255, 255, 0.08);
   }
 
+  html {
+    font-size: 110%;
+  }
+
   body {
     background-color: var(--color-bg-primary);
     color: var(--color-text-primary);

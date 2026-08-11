@@ -4,6 +4,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area,
 } from 'recharts'
+import { motion } from 'framer-motion'
 import type { PieSegment, SummaryCardItem } from '../../types/dashboard'
 import type {
   PrincipalValuationPoint,
@@ -113,6 +114,18 @@ function MomDeltaPill({ title, delta, hideAmounts }: { title: string; delta: num
   )
 }
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+}
+const itemVariants = {
+  hidden: { opacity: 0, y: 15 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+}
+
 export function GlobalOverview({
   cards = [],
   pieData,
@@ -139,38 +152,40 @@ export function GlobalOverview({
     <div className="flex flex-col gap-6">
       {/* 1. Top Summary Cards (Desktop 4-Column Grid) */}
       {cards.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {cards.slice(0, 4).map((card, idx) => {
             const hasRate = card.rate !== undefined
             const isProfit = (card.rate ?? 0) >= 0
             return (
-              <div
+              <motion.div
+                variants={itemVariants}
+                whileHover={{ y: -4, transition: { duration: 0.2 } }}
                 key={card.id || idx}
-                className="flex flex-col justify-between rounded-2xl border border-stroke bg-surface-card p-5 shadow-glass-sm transition-all hover:border-accent/30 hover:shadow-md"
+                className="flex flex-col justify-between rounded-2xl border border-stroke/50 bg-gradient-to-br from-white/[0.08] to-transparent backdrop-blur-md p-5 shadow-glass-sm transition-all hover:border-accent/40 hover:shadow-lg"
               >
                 <div className="flex items-center justify-between text-xs font-semibold text-content-tertiary">
                   <span>{card.title}</span>
+                </div>
+                <div className="mt-4 flex items-end justify-between">
+                  <p className="text-xl font-black text-content-primary">
+                    {formatWonDigits(hideAmounts, card.amount ?? 0)}
+                  </p>
                   {hasRate && (
                     <span
-                      className={`flex items-center gap-0.5 rounded-lg px-2 py-0.5 text-[11px] font-bold ${
+                      className={`flex items-center gap-0.5 rounded-lg px-2 py-1 text-xl font-black ${
                         isProfit
-                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                          ? 'bg-emerald-500/20 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]'
+                          : 'bg-rose-500/20 text-rose-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.4)]'
                       }`}
                     >
                       {isProfit ? '+' : ''}{Math.round(card.rate!)}%
                     </span>
                   )}
                 </div>
-                <div className="mt-3">
-                  <p className="text-xl font-black text-content-primary">
-                    {formatWonDigits(hideAmounts, card.amount ?? 0)}
-                  </p>
-                </div>
-              </div>
+              </motion.div>
             )
           })}
-        </div>
+        </motion.div>
       )}
 
       {/* 2. Main Analytics Section (2-Column Desktop Grid) */}
@@ -204,12 +219,12 @@ export function GlobalOverview({
                 <AreaChart data={trendStackData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="trendFillPrincipal" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0} />
+                      <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.5} />
+                      <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.05} />
                     </linearGradient>
                     <linearGradient id="trendFillValuation" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-chart-2)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--color-chart-2)" stopOpacity={0} />
+                      <stop offset="5%" stopColor="var(--color-chart-2)" stopOpacity={0.5} />
+                      <stop offset="95%" stopColor="var(--color-chart-2)" stopOpacity={0.05} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
@@ -217,8 +232,8 @@ export function GlobalOverview({
                   <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-tertiary)' }} tickFormatter={(v) => formatAxisAmountShort(hideAmounts, v, formatYAxis(v))} width={50} axisLine={false} tickLine={false} />
                   <Tooltip content={(props) => <TrendTooltip {...props} hideAmounts={hideAmounts} />} />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', color: 'var(--color-text-secondary)' }} />
-                  <Area type="monotone" dataKey="원금총액" name="원금 총액" stackId="1" stroke="var(--color-chart-1)" strokeWidth={2.5} fill="url(#trendFillPrincipal)" fillOpacity={1} dot={false} activeDot={{ r: 5 }} />
-                  <Area type="monotone" dataKey="평가증분" name="평가금 총액" stackId="1" stroke="var(--color-chart-2)" strokeWidth={2.5} fill="url(#trendFillValuation)" fillOpacity={1} dot={false} activeDot={{ r: 5 }} />
+                  <Area type="monotone" dataKey="원금총액" name="원금 총액" stackId="1" stroke="var(--color-chart-1)" strokeWidth={3} fill="url(#trendFillPrincipal)" fillOpacity={1} dot={false} activeDot={{ r: 6, strokeWidth: 2, fill: '#fff' }} />
+                  <Area type="monotone" dataKey="평가증분" name="평가금 총액" stackId="1" stroke="var(--color-chart-2)" strokeWidth={3} fill="url(#trendFillValuation)" fillOpacity={1} dot={false} activeDot={{ r: 6, strokeWidth: 2, fill: '#fff' }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -230,7 +245,7 @@ export function GlobalOverview({
         </div>
 
         {/* Right Column: Asset Allocation Pie Chart (Span 4) */}
-        <div className="flex flex-col rounded-2xl border border-stroke bg-surface-card p-5 shadow-glass-sm lg:col-span-4">
+        <div className="flex flex-col rounded-2xl border border-stroke bg-surface-card p-5 shadow-glass-sm lg:col-span-4 transition-transform duration-300 hover:shadow-lg">
           <h3 className="mb-2 text-base font-bold text-content-primary">자산 비중 배분</h3>
           <p className="mb-4 text-xs text-content-tertiary">포트폴리오 자산군 구성비</p>
 
@@ -240,11 +255,14 @@ export function GlobalOverview({
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={75}
-                      paddingAngle={3} startAngle={90} endAngle={-270}
+                      data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80}
+                      paddingAngle={5} cornerRadius={6} startAngle={90} endAngle={-270}
                       dataKey="value" nameKey="name" stroke="none"
+                      animationBegin={200} animationDuration={800}
                     >
-                      {pieData.map((entry, i) => (<Cell key={`cell-${i}`} fill={entry.color} />))}
+                      {pieData.map((entry, i) => (
+                        <Cell key={`cell-${i}`} fill={entry.color} className="transition-all duration-300 hover:opacity-80" />
+                      ))}
                     </Pie>
                     <Tooltip formatter={(value: number) => [`${formatPiePercent(value)}%`, '비중']} />
                   </PieChart>
@@ -275,11 +293,14 @@ export function GlobalOverview({
       </div>
 
       {insightText && (
-        <div className="rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/5 to-transparent p-5 shadow-glass-sm">
-          <div className="mb-2 flex items-center gap-2 text-xs font-bold text-accent">
-            <Sparkles className="h-4 w-4" /> AI 자산 진단 브리핑
+        <div className="relative overflow-hidden rounded-2xl border border-accent/30 p-[1px] shadow-glass-sm">
+          <div className="absolute inset-0 bg-gradient-to-r from-accent/30 via-fuchsia-500/30 to-accent/30 bg-[length:200%_auto] animate-[shimmer_3s_linear_infinite]" />
+          <div className="relative rounded-2xl bg-surface-card/95 backdrop-blur-xl p-6">
+            <div className="mb-3 flex items-center gap-2 text-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-accent to-fuchsia-400">
+              <Sparkles className="h-5 w-5 text-accent" /> AI 자산 진단 브리핑
+            </div>
+            <p className="text-sm font-semibold text-content-primary leading-relaxed">{insightText}</p>
           </div>
-          <p className="text-sm font-semibold text-content-primary leading-relaxed">{insightText}</p>
         </div>
       )}
     </div>
