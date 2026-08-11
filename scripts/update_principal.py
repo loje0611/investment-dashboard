@@ -153,5 +153,25 @@ def main():
 
     print("\n✅ CSV 원본 업데이트가 완료되었습니다! (cash.csv, portfolio.csv)")
 
+    # 3. Git Push
+    print("\n[알림] 업데이트된 CSV 데이터를 Git에 반영하고 원격 저장소에 Push합니다...")
+    import subprocess
+    try:
+        # src/data 내의 파일들만 추가
+        subprocess.run(['git', 'add', 'src/data/cash.csv', 'src/data/portfolio.csv'], check=True, cwd=os.path.dirname(SCRIPT_DIR))
+        
+        # 변경사항이 있는지 확인
+        result = subprocess.run(['git', 'status', '--porcelain'], capture_output=True, text=True, cwd=os.path.dirname(SCRIPT_DIR))
+        if 'src/data/cash.csv' in result.stdout or 'src/data/portfolio.csv' in result.stdout:
+            from datetime import datetime
+            commit_msg = f"chore(data): update principal and cash data ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
+            subprocess.run(['git', 'commit', '-m', commit_msg], check=True, cwd=os.path.dirname(SCRIPT_DIR))
+            subprocess.run(['git', 'push'], check=True, cwd=os.path.dirname(SCRIPT_DIR))
+            print("🚀 Git Push가 성공적으로 완료되었습니다!")
+        else:
+            print("ℹ️ 변경된 CSV 데이터가 없어 Git Push를 생략합니다.")
+    except Exception as e:
+        print(f"❌ Git 반영 중 오류가 발생했습니다: {e}")
+
 if __name__ == '__main__':
     main()
