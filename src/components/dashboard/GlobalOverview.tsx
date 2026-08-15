@@ -325,7 +325,7 @@ export function GlobalOverview({
                     name="수익률 (%)"
                     stroke="#f59e0b"
                     strokeWidth={2.5}
-                    dot={{ r: 2.5, fill: '#f59e0b', strokeWidth: 1, stroke: '#fff' }}
+                    dot={false}
                     activeDot={{ r: 5, strokeWidth: 2, fill: '#f59e0b', stroke: '#fff' }}
                   />
                 </ComposedChart>
