@@ -111,9 +111,9 @@ def main():
             p = parse_float(row[col_prin])
             v = parse_float(row[col_val])
             
-            # ELS는 더 이상 관리하지 않으므로 무시 (항상 0)
             if 'ELS' in name.upper():
-                continue
+                els_prin += p
+                els_val += v
             else:
                 real_cash_prin += p
                 real_cash_val += v
@@ -150,8 +150,8 @@ def main():
         today_str,
         format_number(pen_prin),
         format_number(pen_val),
-        "0", # ELS 원금은 항상 0
-        "0", # ELS 평가금은 항상 0
+        format_number(els_prin) if els_prin > 0 else "0",
+        format_number(els_val) if els_val > 0 else "0",
         format_number(etf_prin),
         format_number(etf_val),
         format_number(real_cash_prin) if real_cash_prin > 0 else "0",
