@@ -16,7 +16,7 @@
 - **Framework/Build**: React 18, TypeScript, Vite
 - **Styling**: Tailwind CSS, PostCSS, Autoprefixer
 - **State Management**: Zustand (전역 상태 및 데이터 스토어 관리)
-- **Data Visualization**: Recharts (시계열 스택 AreaChart, 자산 비중 파이 차트), Framer Motion (애니메이션)
+- **Data Visualization**: Recharts (원금/평가금 스택 Area 및 시계열 수익률 Line 복합 차트, 자산 비중 파이 차트), Framer Motion (애니메이션)
 
 ### 2.2 Data Source (Database)
 - **Database**: 로컬 CSV 파일 (`portfolio.csv`, `history.csv`, `etf_history.csv`, `pension_history.csv` 등)
@@ -42,7 +42,7 @@
 
 ### 3.1 총자산 데이터 (TotalAssetRow)
 - **필드**: `평가일` (YYYY-MM-DD), `연금 원금`, `연금 평가금`, `ETF 원금`, `ETF 평가금`, `현금 원금`, `현금 평가금`, `원금 총액`, `평가금 총액`, `수익률` 등
-- **목적**: 대시보드의 시계열 자산 추이(Trend) 차트 렌더링에 사용
+- **목적**: 대시보드의 시계열 자산 추이(원금/평가금) 및 수익률(%) 변화 복합 차트 렌더링에 사용
 
 ### 3.2 ETF/연금 현황 데이터 (EtfRow, PensionRow)
 - **필드**: `상품명`, `투자원금`, `평가금액`, `수익률`
@@ -87,12 +87,15 @@
 - **목표**: CSV에서 추출한 데이터를 바탕으로 홈 화면에 요약 정보와 차트를 렌더링합니다. (Task 3 의존)
 - **구현 내용**:
   - 상단 요약 카드(Summary Card) 컴포넌트: 총자산, ETF, 연금, 현금성 자산의 합계 및 수익률 표시
-  - Recharts 라이브러리를 활용한 '총자산 시계열 스택 AreaChart(Trend)' 구현 (원금 총액·평가금 총액)
+  - Recharts 라이브러리를 활용한 '총자산 시계열 자산 변동 추이 및 수익률 복합 차트(Trend)' 구현:
+    - 원금 총액 및 평가금 총액(스택 AreaChart / 좌측 Y축: 금액 단위)
+    - 시계열 총 수익률(%) 변화(LineChart / 우측 Y축: 퍼센트 단위 및 인터랙티브 툴팁 연동)
   - Recharts 라이브러리를 활용한 '자산군 비중 파이 차트(Asset Allocation)' 구현
-  - 총자산 시계열(`history.csv`) 기반 **자산 인사이트 브리핑** (`generateInsight.ts`): 전월 대비 원금·평가금 변동을 규칙 기반 문장으로 요약 (외부 AI API 미사용)
+  - 총자산 시계열(`history.csv`) 기반 **자산 인사이트 브리핑** (`generateInsight.ts`): 전월 대비 원금·평가금·수익률 변동을 규칙 기반 문장으로 요약 (외부 AI API 미사용)
 - **Acceptance Criteria**:
   - [ ] CSV 데이터를 바탕으로 요약 카드의 금액과 수익률이 정확히 계산되어 표시되어야 한다.
-  - [ ] 스택 AreaChart에 월별(또는 일별) 자산 추이가 시각적으로 끊김 없이 그려져야 한다.
+  - [ ] 자산 변동 추이 차트에 원금 총액과 평가금 총액의 스택 영역뿐만 아니라, 시계열에 따른 **수익률(%) 변화 라인**이 시각적으로 명확히 표시되어야 한다.
+  - [ ] 차트 마우스 호버 시 툴팁(Tooltip)에 해당 시점의 원금 총액, 평가금 총액, 수익률(%)이 누락 없이 노출되어야 한다.
   - [ ] 파이 차트에 자산 비중이 퍼센트 단위로 정확히 분할되어 색상별로 나타나야 한다.
   - [ ] 전월 대비 변동 데이터가 있을 경우 홈 하단에 인사이트 브리핑 문구가 표시되어야 한다.
 
