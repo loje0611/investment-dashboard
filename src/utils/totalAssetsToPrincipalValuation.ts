@@ -5,6 +5,8 @@ export interface PrincipalValuationPoint {
   label: string
   원금총액: number
   평가금총액: number
+  /** 총 수익률 (%) */
+  수익률: number
 }
 
 export interface PrincipalValuationTrend {
@@ -13,12 +15,16 @@ export interface PrincipalValuationTrend {
   momPrincipal: number | null
   /** 최신 평가일 행 기준 전월 대비 평가금 변화 */
   momValuation: number | null
+  /** 최신 평가일 행 기준 전월 대비 수익률 변화 (%p) */
+  momRate: number | null
+  /** 최신 수익률 (%) */
+  latestRate: number | null
   /** 최신 데이터 라벨 (표시용) */
   latestLabel: string | null
 }
 
 /**
- * 전각·탭·연속 공백 정리 (시트 헤더가 탭으로 붙어 있거나 "원금　총액" 형태일 때 대응)
+ * 전각·탭·연속 공백 정리 (시트 헤더가 탭으로 붙어 있거나 "원금 총액" 형태일 때 대응)
  */
 function normalizeKey(k: string): string {
   return k
@@ -297,6 +303,30 @@ function getMomFromRow(row: TotalAssetRow, nkMap: Map<string, string>): { princi
   return { principal, valuation }
 }
 
+const RATE_KEYS = ['수익률', '총수익률', '수익율', '수익률(%)', 'rate', 'return'] as const
+
+function getRateFromRow(
+  row: TotalAssetRow,
+  nkMap: Map<string, string>,
+  principal: number,
+  valuation: number
+): number {
+  for (const k of RATE_KEYS) {
+    const raw = getByNormalizedKeysWithMap(row, nkMap, [k])
+    if (raw != null && raw !== '') {
+      const s = String(raw).replace(/%/g, '').replace(/,/g, '').trim()
+      const n = parseFloat(s)
+      if (!Number.isNaN(n)) {
+        return Math.abs(n) < 1.0 && n !== 0 ? Math.round(n * 10000) / 100 : Math.round(n * 100) / 100
+      }
+    }
+  }
+  if (principal > 0) {
+    return Math.round(((valuation - principal) / principal) * 10000) / 100
+  }
+  return 0
+}
+
 function formatChartLabel(d: Date): string {
   const y = String(d.getFullYear()).slice(-2)
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -307,6 +337,7 @@ export interface ParsedTotalAssetHistoryRow {
   date: Date
   principal: number
   valuation: number
+  rate: number
   row: TotalAssetRow
 }
 
@@ -319,14 +350,15 @@ export function parseTotalAssetHistoryRows(rows: TotalAssetRow[]): ParsedTotalAs
     const principal = getPrincipalFromRow(row, nkMap)
     const valuation = getValuationFromRow(row, nkMap)
     if (!date || principal == null || valuation == null) continue
-    parsed.push({ date, principal, valuation, row })
+    const rate = getRateFromRow(row, nkMap, principal, valuation)
+    parsed.push({ date, principal, valuation, rate, row })
   }
   parsed.sort((a, b) => a.date.getTime() - b.date.getTime())
   return parsed
 }
 
 /**
- * 총자산 시트 행 배열에서 원금·평가금 시계열과 최신 전월 대비 증감을 만듭니다.
+ * 총자산 시트 행 배열에서 원금·평가금·수익률 시계열과 최신 전월 대비 증감을 만듭니다.
  * 날짜 기준 오름차순(과거→최신)으로 정렬합니다.
  */
 export function totalAssetsToPrincipalValuationTrend(
@@ -342,6 +374,7 @@ export function totalAssetsToPrincipalValuationTrend(
     label: formatChartLabel(p.date),
     원금총액: p.principal,
     평가금총액: p.valuation,
+    수익률: p.rate,
   }))
 
   const latest = parsed[parsed.length - 1]
@@ -359,10 +392,14 @@ export function totalAssetsToPrincipalValuationTrend(
     momValuation = latest.valuation - prev.valuation
   }
 
+  const momRate = prev != null ? Math.round((latest.rate - prev.rate) * 100) / 100 : null
+
   return {
     points,
     momPrincipal,
     momValuation,
+    momRate,
+    latestRate: latest.rate,
     latestLabel: formatChartLabel(latest.date),
   }
 }

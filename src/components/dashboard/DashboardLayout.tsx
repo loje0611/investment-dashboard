@@ -9,6 +9,7 @@ import { totalAssetsToPrincipalValuationTrend } from '../../utils/totalAssetsToP
 import {
   buildSummaryCardsFromSnapshot,
   buildPieSegmentsFromSnapshot,
+  type LatestTotalAssetSnapshot,
 } from '../../utils/homeFromTotalAssets'
 import { generateInsightText } from '../../utils/generateInsight'
 import type { EtfRow, PensionRow } from '../../types/dashboard'
@@ -161,7 +162,7 @@ export function DashboardLayout() {
       연금평가금: penVal, 연금원금: penPrin,
       etf평가금: etfVal, etf원금: etfPrin,
       현금평가금: cashVal, 현금원금: cashPrin,
-    } as any
+    } as LatestTotalAssetSnapshot
   }, [etfTableForTab, pensionTableForTab, cashTableForTab])
 
   const principalValuationTrend = useMemo(() => totalAssetsToPrincipalValuationTrend(totalAssets), [totalAssets])

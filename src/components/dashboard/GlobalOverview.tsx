@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { PieChart as PieChartIcon, Sparkles, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
-  XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Legend, ComposedChart, Area, Line,
 } from 'recharts'
 import { motion } from 'framer-motion'
 import type { PieSegment, SummaryCardItem } from '../../types/dashboard'
@@ -68,31 +68,42 @@ function PeriodPills({ selected, onSelect }: { selected: PeriodId; onSelect: (id
 }
 
 function TrendTooltip({ active, payload, label, hideAmounts }: {
-  active?: boolean; payload?: any[]; label?: string; hideAmounts: boolean
+  active?: boolean; payload?: Array<{ payload?: TrendStackPoint }>; label?: string; hideAmounts: boolean
 }) {
   if (!active || !payload?.length) return null
   const row = payload[0]?.payload as TrendStackPoint | undefined
   if (!row) return null
+  const rate = row.수익률 ?? 0
+  const isProfit = rate >= 0
   return (
-    <div className="rounded-xl border border-stroke-strong bg-surface-elevated/95 p-3 shadow-glass backdrop-blur-xl">
-      <p className="mb-2 text-xs font-semibold text-content-secondary">{label}</p>
-      <div className="flex flex-col gap-1.5">
+    <div className="rounded-xl border border-stroke-strong bg-surface-elevated/95 p-3.5 shadow-glass backdrop-blur-xl min-w-[200px]">
+      <p className="mb-2.5 text-xs font-bold text-content-secondary border-b border-stroke/60 pb-1.5">{label}</p>
+      <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: 'var(--color-chart-1)' }} />
-            <span className="text-sm font-medium text-content-secondary">원금 총액</span>
+            <span className="text-xs font-medium text-content-secondary">원금 총액</span>
           </div>
-          <span className="text-sm font-bold tabular-nums text-content-primary">
+          <span className="text-xs font-bold tabular-nums text-content-primary">
             {formatWonWithWonSymbol(hideAmounts, row.원금총액)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: 'var(--color-chart-2)' }} />
-            <span className="text-sm font-medium text-content-secondary">평가금 총액</span>
+            <span className="text-xs font-medium text-content-secondary">평가금 총액</span>
           </div>
-          <span className="text-sm font-bold tabular-nums text-content-primary">
+          <span className="text-xs font-bold tabular-nums text-content-primary">
             {formatWonWithWonSymbol(hideAmounts, row.평가금총액)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-4 border-t border-stroke/60 pt-2">
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-amber-500" />
+            <span className="text-xs font-medium text-content-secondary">수익률</span>
+          </div>
+          <span className={`text-xs font-extrabold tabular-nums ${isProfit ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+            {isProfit ? '+' : ''}{rate.toFixed(2)}%
           </span>
         </div>
       </div>
@@ -100,16 +111,39 @@ function TrendTooltip({ active, payload, label, hideAmounts }: {
   )
 }
 
-function MomDeltaPill({ title, delta, hideAmounts }: { title: string; delta: number | null; hideAmounts: boolean }) {
-  if (delta == null) return null
-  const up = delta >= 0
+function MomDeltaPill({
+  title,
+  delta,
+  hideAmounts,
+  isPercent = false,
+  rateValue,
+}: {
+  title: string
+  delta: number | null
+  hideAmounts?: boolean
+  isPercent?: boolean
+  rateValue?: number | null
+}) {
+  if (delta == null && rateValue == null) return null
+  const up = (delta ?? 0) >= 0
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-xl border border-stroke bg-surface-secondary/40 px-3.5 py-2.5">
-      <span className="text-[11px] font-medium text-content-tertiary">전월 대비 · {title}</span>
-      <span className={`text-sm font-extrabold tabular-nums flex items-center gap-1 ${up ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-        {up ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-        {formatWonWithWonSymbol(hideAmounts, Math.abs(delta))}
+    <div className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-xl border border-stroke bg-surface-secondary/40 px-3.5 py-2">
+      <span className="text-[11px] font-medium text-content-tertiary">
+        {isPercent ? '수익률 (전월 대비)' : `전월 대비 · ${title}`}
       </span>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {isPercent && rateValue != null && (
+          <span className="text-sm font-extrabold tabular-nums text-content-primary">
+            {rateValue >= 0 ? '+' : ''}{rateValue.toFixed(2)}%
+          </span>
+        )}
+        {delta != null && (
+          <span className={`text-xs font-bold tabular-nums flex items-center gap-0.5 ${up ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+            {up ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+            {isPercent ? `${Math.abs(delta).toFixed(2)}%p` : formatWonWithWonSymbol(Boolean(hideAmounts), Math.abs(delta))}
+          </span>
+        )}
+      </div>
     </div>
   )
 }
@@ -198,7 +232,7 @@ export function GlobalOverview({
                 <h3 className="text-base font-bold text-content-primary">자산 변동 추이</h3>
                 {showTrend && principalValuationTrend != null && (
                   <p className="text-xs text-content-tertiary">
-                    최근 기준 <span className="font-semibold text-content-secondary">{principalValuationTrend.latestLabel}</span> · 원금 vs 평가금 시계열 분석
+                    최근 기준 <span className="font-semibold text-content-secondary">{principalValuationTrend.latestLabel}</span> · 원금 vs 평가금 vs 수익률(%) 복합 시계열
                   </p>
                 )}
               </div>
@@ -206,35 +240,95 @@ export function GlobalOverview({
             </div>
 
             {showTrend && principalValuationTrend != null && (
-              <div className="flex gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <MomDeltaPill title="원금 총액" delta={principalValuationTrend.momPrincipal} hideAmounts={hideAmounts} />
                 <MomDeltaPill title="평가금 총액" delta={principalValuationTrend.momValuation} hideAmounts={hideAmounts} />
+                <MomDeltaPill
+                  title="수익률"
+                  delta={principalValuationTrend.momRate}
+                  isPercent
+                  rateValue={principalValuationTrend.latestRate}
+                />
               </div>
             )}
           </div>
 
           {showTrend && principalValuationTrend != null ? (
-            <div className="h-[280px] w-full">
+            <div className="h-[290px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trendStackData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                <ComposedChart data={trendStackData} margin={{ top: 10, right: 12, left: -8, bottom: 0 }}>
                   <defs>
                     <linearGradient id="trendFillPrincipal" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.5} />
-                      <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.05} />
+                      <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.45} />
+                      <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.03} />
                     </linearGradient>
                     <linearGradient id="trendFillValuation" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-chart-2)" stopOpacity={0.5} />
-                      <stop offset="95%" stopColor="var(--color-chart-2)" stopOpacity={0.05} />
+                      <stop offset="5%" stopColor="var(--color-chart-2)" stopOpacity={0.45} />
+                      <stop offset="95%" stopColor="var(--color-chart-2)" stopOpacity={0.03} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--color-text-tertiary)' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-tertiary)' }} tickFormatter={(v) => formatAxisAmountShort(hideAmounts, v, formatYAxis(v))} width={50} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--color-text-tertiary)' }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    yAxisId="left"
+                    tick={{ fontSize: 11, fill: 'var(--color-text-tertiary)' }}
+                    tickFormatter={(v) => formatAxisAmountShort(hideAmounts, v, formatYAxis(v))}
+                    width={48}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fontSize: 11, fill: '#f59e0b' }}
+                    tickFormatter={(v) => `${Math.round(v)}%`}
+                    width={38}
+                    axisLine={false}
+                    tickLine={false}
+                    domain={['auto', 'auto']}
+                  />
                   <Tooltip content={(props) => <TrendTooltip {...props} hideAmounts={hideAmounts} />} />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', color: 'var(--color-text-secondary)' }} />
-                  <Area type="monotone" dataKey="원금총액" name="원금 총액" stackId="1" stroke="var(--color-chart-1)" strokeWidth={3} fill="url(#trendFillPrincipal)" fillOpacity={1} dot={false} activeDot={{ r: 6, strokeWidth: 2, fill: '#fff' }} />
-                  <Area type="monotone" dataKey="평가증분" name="평가금 총액" stackId="1" stroke="var(--color-chart-2)" strokeWidth={3} fill="url(#trendFillValuation)" fillOpacity={1} dot={false} activeDot={{ r: 6, strokeWidth: 2, fill: '#fff' }} />
-                </AreaChart>
+                  <Legend
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: '12px', color: 'var(--color-text-secondary)', paddingTop: '6px' }}
+                  />
+                  <Area
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="원금총액"
+                    name="원금 총액"
+                    stackId="1"
+                    stroke="var(--color-chart-1)"
+                    strokeWidth={2.5}
+                    fill="url(#trendFillPrincipal)"
+                    fillOpacity={1}
+                    dot={false}
+                    activeDot={{ r: 5, strokeWidth: 2, fill: '#fff' }}
+                  />
+                  <Area
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="평가증분"
+                    name="평가금 총액"
+                    stackId="1"
+                    stroke="var(--color-chart-2)"
+                    strokeWidth={2.5}
+                    fill="url(#trendFillValuation)"
+                    fillOpacity={1}
+                    dot={false}
+                    activeDot={{ r: 5, strokeWidth: 2, fill: '#fff' }}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="수익률"
+                    name="수익률 (%)"
+                    stroke="#f59e0b"
+                    strokeWidth={2.5}
+                    dot={{ r: 2.5, fill: '#f59e0b', strokeWidth: 1, stroke: '#fff' }}
+                    activeDot={{ r: 5, strokeWidth: 2, fill: '#f59e0b', stroke: '#fff' }}
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           ) : (

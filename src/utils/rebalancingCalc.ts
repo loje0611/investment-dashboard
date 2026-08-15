@@ -214,7 +214,7 @@ export function computeAdditionalBuyRebalancing(
 
   let remainingCash = addCash - itemBuys.reduce((sum, ib) => sum + ib.buyAmount, 0);
   remainingCash = greedySpendRemainingCash(itemBuys, remainingCash);
-  remainingCash = distributeRemainderToAccountLevel(itemBuys, holdings, remainingCash);
+  distributeRemainderToAccountLevel(itemBuys, holdings, remainingCash);
 
   const totalSpent = itemBuys.reduce((sum, ib) => sum + ib.buyAmount, 0);
   const newTotal = totalValuation + totalSpent;
