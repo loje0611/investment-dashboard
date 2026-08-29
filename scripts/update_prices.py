@@ -201,6 +201,22 @@ def main() -> None:
                 weight = (val / total_val) * 100
                 data_rows[idx][COL_WEIGHT] = format_weight(weight)
 
+            # 상단 계좌 요약 행(ETF/자문사, 연금 등)의 평가금액 및 수익률 자동 동기화
+            for row in data_rows:
+                cat = row[COL_CATEGORY].strip()
+                name = row[COL_NAME].strip()
+                if not cat.startswith(HOLDING_PREFIX) and name == account:
+                    row[COL_VALUATION] = str(int(round(total_val)))
+                    prin_str = row[COL_PRINCIPAL].replace(',', '').strip()
+                    try:
+                        prin = float(prin_str) if prin_str else 0.0
+                    except ValueError:
+                        prin = 0.0
+                    if prin > 0:
+                        ret_rate = ((total_val - prin) / prin) * 100
+                        row[COL_WEIGHT] = f'{ret_rate:.2f}%'
+                    break
+
     with open(portfolio_path, 'w', encoding='utf-8', newline='') as f:
         writer = csv.writer(f, lineterminator='\n')
         writer.writerow(header)
