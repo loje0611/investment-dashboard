@@ -17,6 +17,7 @@ import { useHashTab } from '../../hooks/useHashTab'
 
 const GlobalOverview = lazy(() => import('./GlobalOverview').then(m => ({ default: m.GlobalOverview })))
 const AssetDetailsTabs = lazy(() => import('./AssetDetailsTabs').then(m => ({ default: m.AssetDetailsTabs })))
+const TrendAnalytics = lazy(() => import('./TrendAnalytics').then(m => ({ default: m.TrendAnalytics })))
 
 const VALID_TABS = ['home', 'assets', 'analytics'] as const
 type MainTabId = (typeof VALID_TABS)[number]
@@ -240,9 +241,9 @@ export function DashboardLayout() {
         )}
 
         {mainTab === 'analytics' && (
-          <div className="flex min-h-[400px] items-center justify-center rounded-2xl border border-stroke bg-surface-card text-content-secondary">
-            추이 분석 준비 중...
-          </div>
+          <Suspense fallback={<LazyChunkFallback label="추이 분석을 불러오는 중…" />}>
+            <TrendAnalytics />
+          </Suspense>
         )}
       </main>
     </div>
