@@ -75,4 +75,20 @@ describe('getAssetClassTrend', () => {
     const etf = getAssetClassTrend(rows, 'ALL_ETF')
     expect(etf.some((p) => p.date === '2026-03-15')).toBe(false)
   })
+
+  it('AC-2: strips ISO time from 평가일 to YYYY-MM-DD', () => {
+    const etf = getAssetClassTrend(
+      [
+        {
+          평가일: '2026-08-15T15:00:00.000Z',
+          'ETF 원금': 153_000_000,
+          'ETF 평가금': 184_642_916,
+        },
+      ],
+      'ALL_ETF',
+    )
+    expect(etf).toHaveLength(1)
+    expect(etf[0].date).toBe('2026-08-15')
+    expect(etf[0].date).not.toMatch(/T/)
+  })
 })

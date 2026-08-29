@@ -9,7 +9,7 @@ vi.mock('../src/store/useStore', async () => {
   const useStore = create(() => ({
     totalAssets: [
       {
-        평가일: '2026-01-15',
+        평가일: '2026-01-15T15:00:00.000Z',
         'ETF 원금': 100_000_000,
         'ETF 평가금': 110_000_000,
         '연금 원금': 50_000_000,
@@ -18,7 +18,7 @@ vi.mock('../src/store/useStore', async () => {
         '현금 평가금': 20_000_000,
       },
       {
-        평가일: '2026-02-15',
+        평가일: '2026-02-15T10:16:30.000Z',
         'ETF 원금': 100_000_000,
         'ETF 평가금': 125_000_000,
         '연금 원금': 50_000_000,
@@ -27,8 +27,14 @@ vi.mock('../src/store/useStore', async () => {
         '현금 평가금': 25_000_000,
       },
     ],
-    etfList: [{ 상품명: '풍차1' }, { 상품명: '풍차12' }],
-    pensionList: [{ 상품명: '퇴직연금' }, { 상품명: '개인연금(자문)' }],
+    etfList: [
+      { 상품명: '풍차1', 투자원금: 4_000_000 },
+      { 상품명: '풍차12', 투자원금: 5_000_000 },
+    ],
+    pensionList: [
+      { 상품명: '퇴직연금', 투자원금: 10_000_000 },
+      { 상품명: '개인연금(자문)', 투자원금: 20_000_000 },
+    ],
     isLoading: false,
   }))
   return { useStore }
@@ -43,7 +49,13 @@ vi.mock('../src/api/localCsvApi', () => ({
         ['2025-11-01', 9],
         ['2025-12-01', 11],
         ['2026-01-01', 12],
-        ['2026-02-01', 14],
+        ['2026-02-01T09:00:00.000Z', 14],
+      ]
+    }
+    if (type === 'ETF' && name === '풍차12') {
+      return [
+        ['2026-01-01', 5],
+        ['2026-03-01T12:00:00.000Z', 20],
       ]
     }
     if (type === 'PENSION' && name === '퇴직연금') {
@@ -178,5 +190,55 @@ describe('TASK-005 TrendAnalytics', () => {
         document.querySelector('.recharts-reference-line-line')
       expect(hit).toBeTruthy()
     })
+  })
+
+  it('AC-2 (rev 1.1): asset-class table dates are YYYY-MM-DD without time', () => {
+    render(<TrendAnalytics />)
+    const table = screen.getByRole('table')
+    const dateCells = within(table).getAllByText(/^\d{4}-\d{2}-\d{2}$/)
+    expect(dateCells.length).toBeGreaterThan(0)
+    expect(within(table).queryByText(/T\d/)).toBeNull()
+    expect(within(table).getByText('2026-02-15')).toBeTruthy()
+    expect(within(table).queryByText(/2026-02-15T/)).toBeNull()
+  })
+
+  it('AC-3 (rev 1.1): product view renders a performance table with required columns', async () => {
+    const user = userEvent.setup()
+    render(<TrendAnalytics />)
+    await user.click(screen.getByRole('button', { name: /개별 상품\/계좌 분석/ }))
+    await screen.findByRole('heading', { name: /풍차1 시계열 수익률/ })
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /전체 ETF 시계열 추이/ })).toBeNull()
+    })
+    const table = screen.getByRole('table')
+    expect(within(table).getByText('평가일')).toBeTruthy()
+    expect(within(table).getByText('투자원금')).toBeTruthy()
+    expect(within(table).getByText('평가금액')).toBeTruthy()
+    expect(within(table).getByText('수익률(%)')).toBeTruthy()
+    expect(within(table).getByText(/MoM/)).toBeTruthy()
+    expect(within(table).getAllByText((_, el) => el?.tagName === 'TD' && (el.textContent || '').replace(/\s/g, '') === '4,000,000원').length).toBeGreaterThan(0)
+    expect(within(table).getByText('2026-02-01')).toBeTruthy()
+    expect(within(table).queryByText(/T\d/)).toBeNull()
+  })
+
+  it('AC-4 (rev 1.1): changing product dropdown updates table principal and history', async () => {
+    const user = userEvent.setup()
+    render(<TrendAnalytics />)
+    await user.click(screen.getByRole('button', { name: /개별 상품\/계좌 분석/ }))
+    await screen.findByRole('heading', { name: /풍차1 시계열 수익률/ })
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /전체 ETF 시계열 추이/ })).toBeNull()
+    })
+    expect(screen.getAllByText((_, el) => el?.tagName === 'TD' && (el.textContent || '').replace(/\s/g, '') === '4,000,000원').length).toBeGreaterThan(0)
+
+    await user.selectOptions(screen.getByRole('combobox'), '풍차12')
+    await screen.findByRole('heading', { name: /풍차12 시계열 수익률/ })
+    expect(
+      await screen.findAllByText((_, el) => el?.tagName === 'TD' && (el.textContent || '').replace(/\s/g, '') === '5,000,000원'),
+    ).not.toHaveLength(0)
+    expect(
+      screen.queryAllByText((_, el) => el?.tagName === 'TD' && (el.textContent || '').replace(/\s/g, '') === '4,000,000원'),
+    ).toHaveLength(0)
+    expect(screen.getByText((_, el) => el?.tagName === 'TD' && el.textContent === '2026-03-01')).toBeTruthy()
   })
 })
