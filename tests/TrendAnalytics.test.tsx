@@ -30,6 +30,8 @@ vi.mock('../src/store/useStore', async () => {
     etfList: [
       { 상품명: '풍차1', 투자원금: 4_000_000 },
       { 상품명: '풍차12', 투자원금: 5_000_000 },
+      { 상품명: '해외투자', 투자원금: 26_000_000 },
+      { 상품명: '해외투자_정은', 투자원금: 34_000_000 },
     ],
     pensionList: [
       { 상품명: '퇴직연금', 투자원금: 10_000_000 },
@@ -56,6 +58,25 @@ vi.mock('../src/api/localCsvApi', () => ({
       return [
         ['2026-01-01', 5],
         ['2026-03-01T12:00:00.000Z', 20],
+      ]
+    }
+    if (type === 'ETF' && name === '해외투자') {
+      return [
+        ['2026-02-15', 1.11],
+        ['2026-03-15', 2.22],
+        ['2026-04-15', 3.33],
+        ['2026-05-15', 4.44],
+        ['2026-06-15', 5.55],
+        ['2026-07-15', 6.66],
+        ['2026-08-15T10:16:30.000Z', 7.15],
+      ]
+    }
+    if (type === 'ETF' && name === '해외투자_정은') {
+      return [
+        ['2026-05-15', 1.5],
+        ['2026-06-15', 2.5],
+        ['2026-07-15', 3.5],
+        ['2026-08-15', 4.5],
       ]
     }
     if (type === 'PENSION' && name === '퇴직연금') {
@@ -240,5 +261,72 @@ describe('TASK-005 TrendAnalytics', () => {
       screen.queryAllByText((_, el) => el?.tagName === 'TD' && (el.textContent || '').replace(/\s/g, '') === '4,000,000원'),
     ).toHaveLength(0)
     expect(screen.getByText((_, el) => el?.tagName === 'TD' && el.textContent === '2026-03-01')).toBeTruthy()
+  })
+
+  it('AC-2 (rev 1.2): 해외투자 principal is 22M before Aug 2026 and 26M in Aug', async () => {
+    const user = userEvent.setup()
+    render(<TrendAnalytics />)
+    await user.click(screen.getByRole('button', { name: /개별 상품\/계좌 분석/ }))
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /전체 ETF 시계열 추이/ })).toBeNull()
+    })
+    await user.selectOptions(screen.getByRole('combobox'), '해외투자')
+    await screen.findByRole('heading', { name: /해외투자 시계열 수익률/ })
+    const table = screen.getByRole('table')
+
+    const rowFor = (date: string) => {
+      const cell = within(table).getByText((_, el) => el?.tagName === 'TD' && el.textContent === date)
+      return cell.closest('tr') as HTMLTableRowElement
+    }
+
+    for (const date of ['2026-02-15', '2026-03-15', '2026-04-15', '2026-05-15', '2026-06-15', '2026-07-15']) {
+      expect(within(rowFor(date)).getByText((_, el) => el?.tagName === 'TD' && (el.textContent || '').replace(/\s/g, '') === '22,000,000원')).toBeTruthy()
+    }
+    expect(within(rowFor('2026-08-15')).getByText((_, el) => el?.tagName === 'TD' && (el.textContent || '').replace(/\s/g, '') === '26,000,000원')).toBeTruthy()
+  })
+
+  it('AC-3 (rev 1.2): 해외투자_정은 principal is 32M before Aug 2026 and 34M in Aug', async () => {
+    const user = userEvent.setup()
+    render(<TrendAnalytics />)
+    await user.click(screen.getByRole('button', { name: /개별 상품\/계좌 분석/ }))
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /전체 ETF 시계열 추이/ })).toBeNull()
+    })
+    await user.selectOptions(screen.getByRole('combobox'), '해외투자_정은')
+    await screen.findByRole('heading', { name: /해외투자_정은 시계열 수익률/ })
+    const table = screen.getByRole('table')
+
+    const rowFor = (date: string) => {
+      const cell = within(table).getByText((_, el) => el?.tagName === 'TD' && el.textContent === date)
+      return cell.closest('tr') as HTMLTableRowElement
+    }
+
+    for (const date of ['2026-05-15', '2026-06-15', '2026-07-15']) {
+      expect(within(rowFor(date)).getByText((_, el) => el?.tagName === 'TD' && (el.textContent || '').replace(/\s/g, '') === '32,000,000원')).toBeTruthy()
+    }
+    expect(within(rowFor('2026-08-15')).getByText((_, el) => el?.tagName === 'TD' && (el.textContent || '').replace(/\s/g, '') === '34,000,000원')).toBeTruthy()
+  })
+
+  it('AC-4 (rev 1.2): product table valuations are rounded integers with no decimal', async () => {
+    const user = userEvent.setup()
+    render(<TrendAnalytics />)
+    await user.click(screen.getByRole('button', { name: /개별 상품\/계좌 분석/ }))
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /전체 ETF 시계열 추이/ })).toBeNull()
+    })
+    await user.selectOptions(screen.getByRole('combobox'), '해외투자')
+    await screen.findByRole('heading', { name: /해외투자 시계열 수익률/ })
+    const table = screen.getByRole('table')
+    const amountCells = within(table).getAllByText((_, el) => el?.tagName === 'TD' && /원$/.test((el.textContent || '').replace(/\s/g, '')))
+    expect(amountCells.length).toBeGreaterThan(0)
+    for (const cell of amountCells) {
+      const text = (cell.textContent || '').replace(/\s/g, '')
+      expect(text).not.toMatch(/\.\d/)
+      expect(text).toMatch(/^-?\d{1,3}(,\d{3})*원$/)
+    }
+    const augRow = within(table).getByText((_, el) => el?.tagName === 'TD' && el.textContent === '2026-08-15').closest('tr') as HTMLTableRowElement
+    const expected = Math.round(26_000_000 * (1 + 7.15 / 100))
+    const expectedLabel = `${expected.toLocaleString('ko-KR')}원`
+    expect(within(augRow).getByText((_, el) => el?.tagName === 'TD' && (el.textContent || '').replace(/\s/g, '') === expectedLabel)).toBeTruthy()
   })
 })
