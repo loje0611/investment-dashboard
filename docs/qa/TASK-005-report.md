@@ -3,19 +3,18 @@
 | Field | Value |
 |---|---|
 | Task | TASK-005 (`asset-account-trend-analytics`) |
+| Spec | Rev 1.1 (YYYY-MM-DD 날짜, 상품 뷰 성과 테이블) |
 | Tester | Lead QA Agent |
 | Date | 2026-08-29 |
 | Verdict | **QA_PASSED** |
-| retry_count | 1 |
-| Cycle | Retry after QA_FAILED (D-1 infinite re-render, D-2 0% baseline) |
+| retry_count | 0 |
 
 ## 0. Boundary Check
-Developer 변경 (retry):
+Developer 변경:
 
-- `src/components/dashboard/TrendAnalytics.tsx` — `useShallow`, `ReferenceLine y={0}`, 토큰 `text-emerald-400` / `text-rose-400`
-- `src/utils/trendAnalytics.ts` (신규, 유지)
-- `src/components/dashboard/DashboardLayout.tsx` — analytics 탭 연동
-- `package.json` / `package-lock.json` — `jsdom` 추가 (설정, Developer 권한)
+- `src/utils/trendAnalytics.ts` — `formatDate` (`split('T')[0]`), `ProductTrendPoint` 확장
+- `src/components/dashboard/TrendAnalytics.tsx` — 상품 이력 원금/평가금/MoM 계산, 상품 뷰 하단 성과 테이블
+- `docs/task-board.json`, `docs/turn.json`
 
 테스트 소스 무단 수정 없음. 경계 위반 없음.
 
@@ -26,46 +25,39 @@ npm run build
 # PASS — tsc -b && vite build, 0 errors
 
 npx vitest run tests --environment jsdom
-# PASS — 8 files, 28 tests
+# PASS — 8 files, 32 tests
 ```
 
-차트 SVG는 jsdom에서 `ResponsiveContainer`가 width/height를 자식에 주입하도록 테스트 목으로 고정해 렌더를 **실행**함. USB ADB 없음 (웹 태스크).
+USB ADB 없음 (웹 태스크).
 
-## 2. Acceptance Criteria
+## 2. Acceptance Criteria (Rev 1.1)
 
 | ID | Criterion | Executed? | Result |
 |---|---|---|---|
-| AC-1 | `npm run build` 타입 에러 없이 성공 | Yes — `npm run build` | **PASS** |
-| AC-2 | 추이 분석에서 `TrendAnalytics` + 기본 ETF 시계열 차트 | Yes — 제목/테이블/`.recharts-surface` | **PASS** |
-| AC-3 | ETF/연금/현금 클릭 시 차트·테이블 즉시 변경 | Yes — 제목·금액 스위칭 | **PASS** |
-| AC-4 | 상품별 모드에서 풍차·연금 선택 및 수익률 차트 | Yes — 풍차1/12, 퇴직연금, 요약 카드 | **PASS** |
-| AC-Visual | 다크모드 차트 + MoM 증감 배지 | Yes — 토큰/tnum/가로 스크롤 | **PASS** |
-| FR-3 0% 기준선 | 상품 차트 `ReferenceLine y={0}` | Yes — `.recharts-reference-line` | **PASS** |
+| AC-1 | `npm run build` 타입 에러 없이 성공 | Yes | **PASS** |
+| AC-2 | 자산군 월별 테이블 평가일 `YYYY-MM-DD`, 시간 없음 | Yes — ISO `T15:00:00.000Z` → `2026-02-15` | **PASS** |
+| AC-3 | Product View 하단 성과 테이블 (평가일, 투자원금, 평가금액, 수익률, MoM) | Yes — `증감(MoM)` 컬럼·원금 행 | **PASS** |
+| AC-4 | 상품 드롭다운 변경 시 테이블 원금/평가/이력 즉시 갱신 | Yes — 풍차1 `4,000,000원` → 풍차12 `5,000,000원`, `2026-03-01` | **PASS** |
 
-이전 D-1(무한 리렌더): `useShallow` 적용 후 `TrendAnalytics` 마운트 성공.  
-이전 D-2(0% 기준선): `ReferenceLine` DOM 확인.
-
-유틸 `tests/trendAnalytics.test.ts` PASS. 레이아웃 탭 연동 `tests/DashboardLayout.test.tsx` PASS.
+회귀 (이전 FR): ETF/연금/현금 전환, 풍차·연금 선택, 0% `ReferenceLine`, `useShallow` 마운트 — 모두 PASS.
 
 ## 3. Visual Fidelity Check
 
 | Check | Expected | Observed | Result |
 |---|---|---|---|
-| View segments | 자산군별 분석 / 개별 상품·계좌 분석 | 버튼 2개, 기본 자산군 | PASS |
-| Asset class tabs | 전체 ETF / 연금 / 현금, 활성 accent | `bg-accent text-white shadow-md` | PASS |
-| Chart | 다크 카드 위 복합 차트 | `bg-surface-card border-stroke`, recharts surface | PASS |
-| MoM badges | `bg-emerald-500/10` + `text-emerald-400` / rose | 15,000,000 배지 토큰 일치 | PASS |
+| Date format | 테이블·차트 `YYYY-MM-DD` | 테이블 `2026-02-15`, 차트 tick `2026-03-01` (시간 없음) | PASS |
 | tnum | `tabular-nums` | 평가일·금액 셀 | PASS |
-| Mobile table | 가로 스크롤 | `overflow-x-auto` | PASS |
-| Product 0% guide | ReferenceLine | `.recharts-reference-line` | PASS |
-| Pixel layout bounds | 목업과 픽셀 일치 | 브라우저 MCP 없음, jsdom 박스 모델 없음 | 미실행 (AC 픽셀 항목 아님) |
+| MoM badges | `bg-emerald-500/10` + `text-emerald-400` | 자산군·상품 증감 배지 | PASS |
+| Product table chrome | 자산군과 동일 다크 카드/`overflow-x-auto` | `bg-surface-card border-stroke overflow-x-auto` | PASS |
+| 수익률 셀 토큰 | `text-emerald-400` | 상품 테이블 수익률은 `text-emerald-500` | Observation |
+| Pixel bounds | 목업 픽셀 | 브라우저 MCP 없음 | 미실행 (AC 아님) |
 
 ## 4. Observations (non-blocking)
 
-1. 상품 차트 Area fill이 수익률 부호와 무관하게 `colorRateUp`(녹색)만 사용. 하락 구간 그라데이션(`colorRateDown`)은 정의만 되고 미적용.
-2. 실데이터 `history.csv` 평가일은 ISO datetime 문자열이 X축에 그대로 나갈 수 있음 (스펙은 YYYY-MM-DD 또는 YYYY.MM).
-3. 테스트 러너(`vitest`)는 `package.json` 스크립트에 없음. 실행은 `npx vitest run tests --environment jsdom`.
+1. 상품 성과 테이블 수익률 컬럼이 `text-emerald-500` / `text-rose-500` (스펙 토큰은 `*-400`). MoM 배지는 400.
+2. `colorRateDown` 그라데이션은 정의만 되고 Area fill은 항상 `colorRateUp`.
+3. `row.principal` / `row.valuation`이 0이면 `-` 표시 (`0`이 falsy). 원금 0 fallback 스펙과 대체로 맞음.
 
 ## 5. Verdict
 
-재시도에서 모든 선언 AC를 실행했고 통과했다. Developer로 핸드오프한다 (`status: QA_PASSED`).
+Rev 1.1 AC를 실제 명령·테스트로 실행했고 통과했다. Developer로 핸드오프 (`status: QA_PASSED`).

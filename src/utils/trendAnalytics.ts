@@ -12,9 +12,18 @@ export interface AssetClassTrendPoint {
 export interface ProductTrendPoint {
   date: string
   ratePercent: number
+  principal?: number
+  valuation?: number
+  momValuationChange?: number
+  momReturnRateChange?: number
 }
 
 export type AssetClassType = 'ALL_ETF' | 'PENSION' | 'CASH'
+
+function formatDate(dateStr: string): string {
+  if (!dateStr) return ''
+  return String(dateStr).trim().split('T')[0]
+}
 
 export function getAssetClassTrend(
   totalAssets: TotalAssetRow[],
@@ -34,8 +43,9 @@ export function getAssetClassTrend(
   let prevRate = 0
 
   for (const row of sorted) {
-    const dateStr = String(row.평가일 || row.일자 || '').trim()
-    if (!dateStr) continue
+    const rawDateStr = String(row.평가일 || row.일자 || '').trim()
+    if (!rawDateStr) continue
+    const dateStr = formatDate(rawDateStr)
 
     let principal = 0
     let valuation = 0

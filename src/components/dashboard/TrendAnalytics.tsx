@@ -51,8 +51,43 @@ export function TrendAnalytics() {
       return
     }
     const data = fetchLocalProductHistory(productName, productType)
-    setProductHistory(data.map(([date, rate]) => ({ date, ratePercent: rate })))
-  }, [productName, productType])
+    
+    // Find current principal
+    let principal = 0
+    if (productType === 'ETF') {
+      const p = etfList.find(r => r.상품명 === productName)
+      if (p) principal = Number(p.투자원금) || 0
+    } else {
+      const p = pensionList.find(r => r.상품명 === productName)
+      if (p) principal = Number(p.투자원금) || 0
+    }
+
+    const processed: ProductTrendPoint[] = []
+    let prevValuation = 0
+    let prevRate = 0
+
+    data.forEach(([rawDate, rate]) => {
+      const dateStr = rawDate.split('T')[0]
+      const valuation = principal > 0 ? principal * (1 + rate / 100) : 0
+      
+      const momValuationChange = processed.length > 0 && principal > 0 ? valuation - prevValuation : undefined
+      const momReturnRateChange = processed.length > 0 ? rate - prevRate : undefined
+      
+      processed.push({
+        date: dateStr,
+        ratePercent: rate,
+        principal,
+        valuation,
+        momValuationChange,
+        momReturnRateChange
+      })
+
+      prevValuation = valuation
+      prevRate = rate
+    })
+
+    setProductHistory(processed)
+  }, [productName, productType, etfList, pensionList])
 
   // Process Asset Class Data
   const assetClassData = useMemo(() => {
@@ -450,6 +485,60 @@ export function TrendAnalytics() {
               </div>
             ) : (
               <EmptyState title="데이터 없음" description="선택한 상품의 이력 데이터가 없습니다." />
+            )}
+
+            {/* Product History Monthly Table */}
+            {productHistory.length > 0 && (
+              <div className="overflow-x-auto rounded-2xl border border-stroke bg-surface-card shadow-glass-sm">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-surface-secondary/50 text-xs text-content-secondary">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">평가일</th>
+                      <th className="px-4 py-3 font-semibold text-right">투자원금</th>
+                      <th className="px-4 py-3 font-semibold text-right">평가금액</th>
+                      <th className="px-4 py-3 font-semibold text-right">증감(MoM)</th>
+                      <th className="px-4 py-3 font-semibold text-right">수익률(%)</th>
+                      <th className="px-4 py-3 font-semibold text-right">수익률 변동(p)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stroke">
+                    {[...productHistory].reverse().map((row, idx) => (
+                      <tr key={idx} className="hover:bg-surface-hover/50 transition-colors">
+                        <td className="px-4 py-3 text-content-primary tabular-nums">{row.date}</td>
+                        <td className="px-4 py-3 text-right text-content-secondary tabular-nums">
+                          {row.principal ? `${formatWonDigits(row.principal)}원` : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-content-primary tabular-nums">
+                          {row.valuation ? `${formatWonDigits(row.valuation)}원` : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {row.momValuationChange != null ? (
+                            <span className={`inline-flex items-center gap-0.5 rounded px-2 py-0.5 text-xs font-bold tabular-nums ${
+                              row.momValuationChange >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
+                            }`}>
+                              {row.momValuationChange >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                              {formatWonDigits(Math.abs(row.momValuationChange))}
+                            </span>
+                          ) : '-'}
+                        </td>
+                        <td className={`px-4 py-3 text-right font-bold tabular-nums ${row.ratePercent >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                          {row.ratePercent >= 0 ? '+' : ''}{row.ratePercent.toFixed(2)}%
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {row.momReturnRateChange != null ? (
+                            <span className={`inline-flex items-center gap-0.5 rounded px-2 py-0.5 text-xs font-bold tabular-nums ${
+                              row.momReturnRateChange >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
+                            }`}>
+                              {row.momReturnRateChange >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                              {Math.abs(row.momReturnRateChange).toFixed(2)}%p
+                            </span>
+                          ) : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </motion.div>
         )}

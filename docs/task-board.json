@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-08-29T19:32:20+09:00",
+  "last_updated": "2026-08-29T19:45:20+09:00",
   "batch_mode": true,
   "tasks": [
     {
@@ -38,7 +38,7 @@
       "id": "TASK-005",
       "slug": "asset-account-trend-analytics",
       "title": "자산군 및 계좌별 시계열 추이 분석 탭 구현 (신규 UI)",
-      "status": "SPEC_READY",
+      "status": "DONE",
       "spec_path": "docs/specs/TASK-005-asset-account-trend-analytics.md",
       "retry_count": 0
     },
