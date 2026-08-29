@@ -38,9 +38,9 @@
       "id": "TASK-005",
       "slug": "asset-account-trend-analytics",
       "title": "자산군 및 계좌별 시계열 추이 분석 탭 구현 (신규 UI)",
-      "status": "DONE",
+      "status": "SPEC_READY",
       "spec_path": "docs/specs/TASK-005-asset-account-trend-analytics.md",
-      "retry_count": 1
+      "retry_count": 0
     },
     {
       "id": "TASK-006",
