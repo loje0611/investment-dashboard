@@ -1,0 +1,78 @@
+{
+  "last_updated": "2026-08-29T19:07:30+09:00",
+  "batch_mode": true,
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "slug": "layout-and-tab-cleanup",
+      "title": "UI 레이아웃 정리 및 리밸런싱/금액숨김 제거 (3개 탭 구성)",
+      "status": "SPEC_READY",
+      "spec_path": "docs/specs/TASK-001-layout-and-tab-cleanup.md",
+      "retry_count": 0
+    },
+    {
+      "id": "TASK-002",
+      "slug": "csv-data-model-integration",
+      "title": "로컬 CSV 파싱 및 통합 데이터 모델 구축",
+      "status": "DONE",
+      "spec_path": "docs/specs/TASK-002-csv-data-model-integration.md",
+      "retry_count": 0
+    },
+    {
+      "id": "TASK-003",
+      "slug": "home-overview-dashboard",
+      "title": "총자산 대시보드 홈 화면 구현",
+      "status": "DONE",
+      "spec_path": "docs/specs/TASK-003-home-overview-dashboard.md",
+      "retry_count": 0
+    },
+    {
+      "id": "TASK-004",
+      "slug": "asset-details-tab",
+      "title": "자산 상세 탭 (ETF, 연금, 현금) 구현",
+      "status": "DONE",
+      "spec_path": "docs/specs/TASK-004-asset-details-tab.md",
+      "retry_count": 0
+    },
+    {
+      "id": "TASK-005",
+      "slug": "asset-account-trend-analytics",
+      "title": "자산군 및 계좌별 시계열 추이 분석 탭 구현 (신규 UI)",
+      "status": "TODO",
+      "spec_path": "docs/specs/TASK-005-asset-account-trend-analytics.md",
+      "retry_count": 0
+    },
+    {
+      "id": "TASK-006",
+      "slug": "script-update-prices",
+      "title": "실시간 시세 및 환율 자동 업데이트 스크립트 (update_prices.py)",
+      "status": "DONE",
+      "spec_path": "docs/specs/TASK-006-script-update-prices.md",
+      "retry_count": 0
+    },
+    {
+      "id": "TASK-007",
+      "slug": "script-update-principal",
+      "title": "투자 원금 및 현금 자산 대화형 갱신 스크립트 (update_principal.py)",
+      "status": "DONE",
+      "spec_path": "docs/specs/TASK-007-script-update-principal.md",
+      "retry_count": 0
+    },
+    {
+      "id": "TASK-008",
+      "slug": "script-monthly-settlement",
+      "title": "월 스냅샷 정산 자동화 스크립트 (monthly_settlement.py)",
+      "status": "DONE",
+      "spec_path": "docs/specs/TASK-008-script-monthly-settlement.md",
+      "retry_count": 0
+    },
+    {
+      "id": "TASK-009",
+      "slug": "script-windmill-and-shares",
+      "title": "풍차 평가금 및 보유 주수 수동 갱신 스크립트 (update_windmill.py, update_shares.py)",
+      "status": "DONE",
+      "spec_path": "docs/specs/TASK-009-script-windmill-and-shares.md",
+      "retry_count": 0
+    }
+  ]
+}
