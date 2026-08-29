@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Task | TASK-005 (`asset-account-trend-analytics`) |
-| Spec | Rev 1.1 (YYYY-MM-DD 날짜, 상품 뷰 성과 테이블) |
+| Spec | Rev 1.2 (해외투자 원금 이력, 평가금 Math.round) |
 | Tester | Lead QA Agent |
 | Date | 2026-08-29 |
 | Verdict | **QA_PASSED** |
@@ -12,8 +12,7 @@
 ## 0. Boundary Check
 Developer 변경:
 
-- `src/utils/trendAnalytics.ts` — `formatDate` (`split('T')[0]`), `ProductTrendPoint` 확장
-- `src/components/dashboard/TrendAnalytics.tsx` — 상품 이력 원금/평가금/MoM 계산, 상품 뷰 하단 성과 테이블
+- `src/components/dashboard/TrendAnalytics.tsx` — 해외투자/해외투자_정은 일자별 원금 규칙, `Math.round` 평가금
 - `docs/task-board.json`, `docs/turn.json`
 
 테스트 소스 무단 수정 없음. 경계 위반 없음.
@@ -25,39 +24,38 @@ npm run build
 # PASS — tsc -b && vite build, 0 errors
 
 npx vitest run tests --environment jsdom
-# PASS — 8 files, 32 tests
+# PASS — 8 files, 35 tests
 ```
 
 USB ADB 없음 (웹 태스크).
 
-## 2. Acceptance Criteria (Rev 1.1)
+## 2. Acceptance Criteria (Rev 1.2)
 
 | ID | Criterion | Executed? | Result |
 |---|---|---|---|
-| AC-1 | `npm run build` 타입 에러 없이 성공 | Yes | **PASS** |
-| AC-2 | 자산군 월별 테이블 평가일 `YYYY-MM-DD`, 시간 없음 | Yes — ISO `T15:00:00.000Z` → `2026-02-15` | **PASS** |
-| AC-3 | Product View 하단 성과 테이블 (평가일, 투자원금, 평가금액, 수익률, MoM) | Yes — `증감(MoM)` 컬럼·원금 행 | **PASS** |
-| AC-4 | 상품 드롭다운 변경 시 테이블 원금/평가/이력 즉시 갱신 | Yes — 풍차1 `4,000,000원` → 풍차12 `5,000,000원`, `2026-03-01` | **PASS** |
+| AC-1 | `npm run build` 성공 | Yes | **PASS** |
+| AC-2 | `해외투자`: 2026-02~07 원금 `22,000,000원`, 2026-08 `26,000,000원` | Yes — 행별 원금 셀 | **PASS** |
+| AC-3 | `해외투자_정은`: 2026-05~07 `32,000,000원`, 2026-08 `34,000,000원` | Yes — 행별 원금 셀 | **PASS** |
+| AC-4 | 상품 테이블 평가금액 정수 반올림 (`Math.round`) | Yes — 소수점 없음, 8월 `Math.round(26e6*(1+7.15/100))` 일치 | **PASS** |
 
-회귀 (이전 FR): ETF/연금/현금 전환, 풍차·연금 선택, 0% `ReferenceLine`, `useShallow` 마운트 — 모두 PASS.
+Rev 1.1 회귀(YYYY-MM-DD, 상품 테이블, 드롭다운 갱신) 및 차트/0% 기준선도 PASS.
 
 ## 3. Visual Fidelity Check
 
 | Check | Expected | Observed | Result |
 |---|---|---|---|
-| Date format | 테이블·차트 `YYYY-MM-DD` | 테이블 `2026-02-15`, 차트 tick `2026-03-01` (시간 없음) | PASS |
-| tnum | `tabular-nums` | 평가일·금액 셀 | PASS |
-| MoM badges | `bg-emerald-500/10` + `text-emerald-400` | 자산군·상품 증감 배지 | PASS |
-| Product table chrome | 자산군과 동일 다크 카드/`overflow-x-auto` | `bg-surface-card border-stroke overflow-x-auto` | PASS |
-| 수익률 셀 토큰 | `text-emerald-400` | 상품 테이블 수익률은 `text-emerald-500` | Observation |
+| Date | `YYYY-MM-DD` | `2026-08-15` (ISO T 제거) | PASS |
+| 원 단위 정수 | 소수점 없는 원화 | `22,000,000원` / `26,000,000원` 등 | PASS |
+| tnum | `tabular-nums` | 원금·평가 셀 | PASS |
+| MoM tokens | emerald-400 / rose-400 + `/10` bg | 유지 | PASS |
 | Pixel bounds | 목업 픽셀 | 브라우저 MCP 없음 | 미실행 (AC 아님) |
 
 ## 4. Observations (non-blocking)
 
-1. 상품 성과 테이블 수익률 컬럼이 `text-emerald-500` / `text-rose-500` (스펙 토큰은 `*-400`). MoM 배지는 400.
-2. `colorRateDown` 그라데이션은 정의만 되고 Area fill은 항상 `colorRateUp`.
-3. `row.principal` / `row.valuation`이 0이면 `-` 표시 (`0`이 falsy). 원금 0 fallback 스펙과 대체로 맞음.
+1. 과거 원금 규칙은 `TrendAnalytics.tsx`에 인라인. 유틸(`trendAnalytics.ts`)로 빼지 않음. 동작은 AC와 일치.
+2. 상품 테이블 수익률 컬럼은 여전히 `text-emerald-500` (스펙 토큰은 `*-400`).
+3. Area fill `colorRateDown` 미사용.
 
 ## 5. Verdict
 
-Rev 1.1 AC를 실제 명령·테스트로 실행했고 통과했다. Developer로 핸드오프 (`status: QA_PASSED`).
+Rev 1.2 AC를 실행했고 통과했다. Developer로 핸드오프 (`status: QA_PASSED`).

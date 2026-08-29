@@ -52,14 +52,14 @@ export function TrendAnalytics() {
     }
     const data = fetchLocalProductHistory(productName, productType)
     
-    // Find current principal
-    let principal = 0
+    // Find base principal from portfolio
+    let basePrincipal = 0
     if (productType === 'ETF') {
       const p = etfList.find(r => r.상품명 === productName)
-      if (p) principal = Number(p.투자원금) || 0
+      if (p) basePrincipal = Number(p.투자원금) || 0
     } else {
       const p = pensionList.find(r => r.상품명 === productName)
-      if (p) principal = Number(p.투자원금) || 0
+      if (p) basePrincipal = Number(p.투자원금) || 0
     }
 
     const processed: ProductTrendPoint[] = []
@@ -68,7 +68,16 @@ export function TrendAnalytics() {
 
     data.forEach(([rawDate, rate]) => {
       const dateStr = rawDate.split('T')[0]
-      const valuation = principal > 0 ? principal * (1 + rate / 100) : 0
+      
+      // Apply Historical Principal Rules
+      let principal = basePrincipal
+      if (productName === '해외투자') {
+        principal = dateStr < '2026-08-01' ? 22000000 : 26000000
+      } else if (productName === '해외투자_정은') {
+        principal = dateStr < '2026-08-01' ? 32000000 : 34000000
+      }
+
+      const valuation = principal > 0 ? Math.round(principal * (1 + rate / 100)) : 0
       
       const momValuationChange = processed.length > 0 && principal > 0 ? valuation - prevValuation : undefined
       const momReturnRateChange = processed.length > 0 ? rate - prevRate : undefined
