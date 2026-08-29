@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { LayoutDashboard, PieChart, Scale, ShieldCheck } from 'lucide-react'
+import { LayoutDashboard, PieChart, TrendingUp, ShieldCheck } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import { rebalancingTablesToAccounts } from '../../utils/rebalancingTablesToAccounts'
 import { portfolioToEtfRows } from '../../utils/portfolioToEtf'
@@ -17,9 +17,8 @@ import { useHashTab } from '../../hooks/useHashTab'
 
 const GlobalOverview = lazy(() => import('./GlobalOverview').then(m => ({ default: m.GlobalOverview })))
 const AssetDetailsTabs = lazy(() => import('./AssetDetailsTabs').then(m => ({ default: m.AssetDetailsTabs })))
-const RebalancingActionCenter = lazy(() => import('./RebalancingActionCenter').then(m => ({ default: m.RebalancingActionCenter })))
 
-const VALID_TABS = ['home', 'assets', 'rebalancing'] as const
+const VALID_TABS = ['home', 'assets', 'analytics'] as const
 type MainTabId = (typeof VALID_TABS)[number]
 
 function LazyChunkFallback({ label = '로딩 중…' }: { label?: string }) {
@@ -34,13 +33,12 @@ function LazyChunkFallback({ label = '로딩 중…' }: { label?: string }) {
 export function DashboardLayout() {
   const {
     etfList, pensionList, cashList, totalAssets, rebalancing,
-    isLoading, isLoadingAssets, hideAmounts,
+    isLoading, isLoadingAssets,
   } = useStore(
     useShallow((s) => ({
       etfList: s.etfList, pensionList: s.pensionList, cashList: s.cashList,
       totalAssets: s.totalAssets, rebalancing: s.rebalancing,
       isLoading: s.isLoading, isLoadingAssets: s.isLoadingAssets,
-      hideAmounts: s.hideAmounts,
     }))
   )
   const fetchData = useStore((s) => s.fetchData)
@@ -173,7 +171,7 @@ export function DashboardLayout() {
   const navItems = [
     { id: 'home' as const, label: '홈', icon: LayoutDashboard },
     { id: 'assets' as const, label: '자산 상세', icon: PieChart },
-    { id: 'rebalancing' as const, label: '리밸런싱', icon: Scale },
+    { id: 'analytics' as const, label: '추이 분석', icon: TrendingUp },
   ]
 
   return (
@@ -226,7 +224,6 @@ export function DashboardLayout() {
               principalValuationTrend={principalValuationTrend}
               insightText={insightText || undefined}
               isLoading={isLoading}
-              hideAmounts={hideAmounts}
             />
           </Suspense>
         )}
@@ -238,15 +235,14 @@ export function DashboardLayout() {
               pensionTable={pensionTableForTab}
               cashTable={cashTableForTab}
               isLoading={isLoading || isLoadingAssets}
-              hideAmounts={hideAmounts}
             />
           </Suspense>
         )}
 
-        {mainTab === 'rebalancing' && (
-          <Suspense fallback={<LazyChunkFallback label="리밸런싱을 불러오는 중…" />}>
-            <RebalancingActionCenter hideAmounts={hideAmounts} />
-          </Suspense>
+        {mainTab === 'analytics' && (
+          <div className="flex min-h-[400px] items-center justify-center rounded-2xl border border-stroke bg-surface-card text-content-secondary">
+            추이 분석 준비 중...
+          </div>
         )}
       </main>
     </div>

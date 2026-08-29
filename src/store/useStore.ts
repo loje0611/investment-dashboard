@@ -18,13 +18,11 @@ export interface DashboardState {
   isLoadingAssets: boolean;
   isLoadingRebalancing: boolean;
   error: string | null;
-  hideAmounts: boolean;
 }
 
 export interface DashboardActions {
   fetchData: (endpoint?: string) => Promise<void>;
   clearError: () => void;
-  setHideAmounts: (hide: boolean) => void;
 }
 
 const initialState: DashboardState = {
@@ -37,7 +35,6 @@ const initialState: DashboardState = {
   isLoadingAssets: false,
   isLoadingRebalancing: false,
   error: null,
-  hideAmounts: false,
 };
 
 export const useStore = create<DashboardState & DashboardActions>((set) => ({
@@ -67,6 +64,4 @@ export const useStore = create<DashboardState & DashboardActions>((set) => ({
   },
 
   clearError: () => set({ error: null }),
-
-  setHideAmounts: (hide) => set({ hideAmounts: hide }),
 }));

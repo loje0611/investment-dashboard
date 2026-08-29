@@ -20,7 +20,6 @@ interface GlobalOverviewProps {
   insightText?: string | null
   totalAssetsRowCount?: number
   isLoading?: boolean
-  hideAmounts: boolean
 }
 
 function formatYAxis(value: number): string {
@@ -67,8 +66,8 @@ function PeriodPills({ selected, onSelect }: { selected: PeriodId; onSelect: (id
   )
 }
 
-function TrendTooltip({ active, payload, label, hideAmounts }: {
-  active?: boolean; payload?: Array<{ payload?: TrendStackPoint }>; label?: string; hideAmounts: boolean
+function TrendTooltip({ active, payload, label }: {
+  active?: boolean; payload?: Array<{ payload?: TrendStackPoint }>; label?: string;
 }) {
   if (!active || !payload?.length) return null
   const row = payload[0]?.payload as TrendStackPoint | undefined
@@ -85,7 +84,7 @@ function TrendTooltip({ active, payload, label, hideAmounts }: {
             <span className="text-xs font-medium text-content-secondary">원금 총액</span>
           </div>
           <span className="text-xs font-bold tabular-nums text-content-primary">
-            {formatWonWithWonSymbol(hideAmounts, row.원금총액)}
+            {formatWonWithWonSymbol(row.원금총액)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4">
@@ -94,7 +93,7 @@ function TrendTooltip({ active, payload, label, hideAmounts }: {
             <span className="text-xs font-medium text-content-secondary">평가금 총액</span>
           </div>
           <span className="text-xs font-bold tabular-nums text-content-primary">
-            {formatWonWithWonSymbol(hideAmounts, row.평가금총액)}
+            {formatWonWithWonSymbol(row.평가금총액)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4 border-t border-stroke/60 pt-2">
@@ -114,13 +113,11 @@ function TrendTooltip({ active, payload, label, hideAmounts }: {
 function MomDeltaPill({
   title,
   delta,
-  hideAmounts,
   isPercent = false,
   rateValue,
 }: {
   title: string
   delta: number | null
-  hideAmounts?: boolean
   isPercent?: boolean
   rateValue?: number | null
 }) {
@@ -140,7 +137,7 @@ function MomDeltaPill({
         {delta != null && (
           <span className={`text-xs font-bold tabular-nums flex items-center gap-0.5 ${up ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
             {up ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-            {isPercent ? `${Math.abs(delta).toFixed(2)}%p` : formatWonWithWonSymbol(Boolean(hideAmounts), Math.abs(delta))}
+            {isPercent ? `${Math.abs(delta).toFixed(2)}%p` : formatWonWithWonSymbol(Math.abs(delta))}
           </span>
         )}
       </div>
@@ -165,7 +162,6 @@ export function GlobalOverview({
   pieData,
   principalValuationTrend,
   insightText,
-  hideAmounts,
 }: GlobalOverviewProps) {
   const [period, setPeriod] = useState<PeriodId>('all')
   const showTrend = principalValuationTrend != null && principalValuationTrend.points.length > 0
@@ -202,7 +198,7 @@ export function GlobalOverview({
                 </div>
                 <div className="mt-4 flex items-end justify-between">
                   <p className="text-xl font-black text-content-primary">
-                    {formatWonDigits(hideAmounts, card.amount ?? 0)}
+                    {formatWonDigits(card.amount ?? 0)}
                   </p>
                   {hasRate && (
                     <span
@@ -241,8 +237,8 @@ export function GlobalOverview({
 
             {showTrend && principalValuationTrend != null && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <MomDeltaPill title="원금 총액" delta={principalValuationTrend.momPrincipal} hideAmounts={hideAmounts} />
-                <MomDeltaPill title="평가금 총액" delta={principalValuationTrend.momValuation} hideAmounts={hideAmounts} />
+                <MomDeltaPill title="원금 총액" delta={principalValuationTrend.momPrincipal} />
+                <MomDeltaPill title="평가금 총액" delta={principalValuationTrend.momValuation} />
                 <MomDeltaPill
                   title="수익률"
                   delta={principalValuationTrend.momRate}
@@ -272,7 +268,7 @@ export function GlobalOverview({
                   <YAxis
                     yAxisId="left"
                     tick={{ fontSize: 11, fill: 'var(--color-text-tertiary)' }}
-                    tickFormatter={(v) => formatAxisAmountShort(hideAmounts, v, formatYAxis(v))}
+                    tickFormatter={(v) => formatAxisAmountShort(v, formatYAxis(v))}
                     width={48}
                     axisLine={false}
                     tickLine={false}
@@ -287,7 +283,7 @@ export function GlobalOverview({
                     tickLine={false}
                     domain={['auto', 'auto']}
                   />
-                  <Tooltip content={(props) => <TrendTooltip {...props} hideAmounts={hideAmounts} />} />
+                  <Tooltip content={(props) => <TrendTooltip {...props} />} />
                   <Legend
                     iconType="circle"
                     wrapperStyle={{ fontSize: '12px', color: 'var(--color-text-secondary)', paddingTop: '6px' }}

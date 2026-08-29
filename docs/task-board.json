@@ -1,12 +1,12 @@
 {
-  "last_updated": "2026-08-29T19:07:30+09:00",
+  "last_updated": "2026-08-29T19:17:14+09:00",
   "batch_mode": true,
   "tasks": [
     {
       "id": "TASK-001",
       "slug": "layout-and-tab-cleanup",
       "title": "UI 레이아웃 정리 및 리밸런싱/금액숨김 제거 (3개 탭 구성)",
-      "status": "SPEC_READY",
+      "status": "DONE",
       "spec_path": "docs/specs/TASK-001-layout-and-tab-cleanup.md",
       "retry_count": 0
     },
@@ -38,7 +38,7 @@
       "id": "TASK-005",
       "slug": "asset-account-trend-analytics",
       "title": "자산군 및 계좌별 시계열 추이 분석 탭 구현 (신규 UI)",
-      "status": "TODO",
+      "status": "SPEC_READY",
       "spec_path": "docs/specs/TASK-005-asset-account-trend-analytics.md",
       "retry_count": 0
     },

@@ -15,12 +15,11 @@ interface AssetDetailsTabsProps {
   pensionTable: PensionRow[]
   cashTable: CashRow[]
   isLoading?: boolean
-  hideAmounts: boolean
 }
 
-function AssetCard({ name, valuation, returnRate, sparklineData, hideAmounts, onTap, index }: {
+function AssetCard({ name, valuation, returnRate, sparklineData, onTap, index }: {
   name: string; valuation: number; returnRate: number; sparklineData: number[]
-  hideAmounts: boolean; onTap?: () => void; index: number
+  onTap?: () => void; index: number
 }) {
   const isProfit = returnRate >= 0
   const isCash = sparklineData.length === 0 && returnRate === 0
@@ -42,7 +41,7 @@ function AssetCard({ name, valuation, returnRate, sparklineData, hideAmounts, on
 
       <div className="mt-2 flex items-end justify-between gap-3">
         <p className="text-xl font-bold tabular-nums leading-snug text-content-primary">
-          ₩{formatWonDigits(hideAmounts, valuation)}
+          ₩{formatWonDigits(valuation)}
         </p>
         {!isCash && (
           <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -63,7 +62,7 @@ function AssetCard({ name, valuation, returnRate, sparklineData, hideAmounts, on
 
 export function AssetDetailsTabs({
   etfTable, pensionTable, cashTable,
-  isLoading = false, hideAmounts,
+  isLoading = false,
 }: AssetDetailsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('etf')
   const [historyModal, setHistoryModal] = useState<{
@@ -144,7 +143,6 @@ export function AssetDetailsTabs({
                         key={row.id} name={row.name} index={i}
                         valuation={row.valuation} returnRate={row.returnRate}
                         sparklineData={row.sparklineData}
-                        hideAmounts={hideAmounts}
                         onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'ETF' })}
                       />
                     ))}
@@ -164,7 +162,6 @@ export function AssetDetailsTabs({
                         key={row.id} name={row.name} index={i}
                         valuation={row.valuation} returnRate={row.returnRate}
                         sparklineData={row.sparklineData}
-                        hideAmounts={hideAmounts}
                         onTap={() => setHistoryModal({ open: true, name: row.name, kind: 'PENSION' })}
                       />
                     ))}
@@ -184,7 +181,6 @@ export function AssetDetailsTabs({
                         key={row.id} name={row.name} index={i}
                         valuation={row.valuation} returnRate={row.returnRate}
                         sparklineData={row.sparklineData}
-                        hideAmounts={hideAmounts}
                       />
                     ))}
                   </div>
