@@ -69,6 +69,13 @@ function toRatePercent(raw: string | undefined): number {
 function buildHistoryMap(csvText: string): Map<string, ProductHistoryPoint[]> {
   const rows = parseCsv(csvText);
   const map = new Map<string, ProductHistoryPoint[]>();
+  if (rows.length <= 1) return map;
+
+  const header = rows[0].map((h) => h.trim());
+  let rateColIndex = header.indexOf('수익률');
+  if (rateColIndex === -1) {
+    rateColIndex = header.length - 1;
+  }
 
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
@@ -76,7 +83,7 @@ function buildHistoryMap(csvText: string): Map<string, ProductHistoryPoint[]> {
     const name = r[0].trim();
     const date = parseDateValue(r[1]);
     if (!name || !date) continue;
-    const ratePercent = toRatePercent(r[2]);
+    const ratePercent = toRatePercent(r[rateColIndex >= 0 && rateColIndex < r.length ? rateColIndex : r.length - 1]);
     const list = map.get(name) ?? [];
     list.push({ date, ratePercent });
     map.set(name, list);
@@ -88,6 +95,7 @@ function buildHistoryMap(csvText: string): Map<string, ProductHistoryPoint[]> {
 
   return map;
 }
+
 
 let etfHistoryMap: Map<string, ProductHistoryPoint[]> | null = null;
 let pensionHistoryMap: Map<string, ProductHistoryPoint[]> | null = null;
