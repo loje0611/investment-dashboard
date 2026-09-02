@@ -1,44 +1,90 @@
 {
-  "account": "해외투자",
-  "mode": "additional",
-  "step": "WAITING_BUY_FILL",
-  "createdAt": "2026-09-02T19:02:10+09:00",
-  "additionalAmount": 2000000,
-  "exchangeRate": 1365.88,
-  "sellOrders": [],
-  "buyOrders": [
-    {
-      "ticker": "QQQM",
-      "name": "QQQM",
-      "currentQuantity": 19,
-      "orderQuantity": 2,
-      "targetQuantity": 21,
-      "priceUSD": 291.4,
-      "priceKRW": 398017.432,
-      "orderAmountUSD": 582.8,
-      "orderAmountKRW": 796034.86
-    },
-    {
-      "ticker": "SCHX",
-      "name": "SCHX",
-      "currentQuantity": 256,
-      "orderQuantity": 11,
-      "targetQuantity": 267,
-      "priceUSD": 30.03,
-      "priceKRW": 41017.3764,
-      "orderAmountUSD": 330.33,
-      "orderAmountKRW": 451191.14
-    },
-    {
-      "ticker": "SMH",
-      "name": "SMH",
-      "currentQuantity": 10,
-      "orderQuantity": 1,
-      "targetQuantity": 11,
-      "priceUSD": 545.22,
-      "priceKRW": 744705.0936,
-      "orderAmountUSD": 545.22,
-      "orderAmountKRW": 744705.09
-    }
-  ]
+  "해외투자": {
+    "account": "해외투자",
+    "mode": "additional",
+    "step": "WAITING_BUY_FILL",
+    "createdAt": "2026-09-02T19:02:10+09:00",
+    "additionalAmount": 2000000,
+    "exchangeRate": 1365.88,
+    "sellOrders": [],
+    "buyOrders": [
+      {
+        "ticker": "QQQM",
+        "name": "QQQM",
+        "currentQuantity": 19,
+        "orderQuantity": 2,
+        "targetQuantity": 21,
+        "priceUSD": 291.4,
+        "priceKRW": 398017.432,
+        "orderAmountUSD": 582.8,
+        "orderAmountKRW": 796034.86
+      },
+      {
+        "ticker": "SCHX",
+        "name": "SCHX",
+        "currentQuantity": 256,
+        "orderQuantity": 11,
+        "targetQuantity": 267,
+        "priceUSD": 30.03,
+        "priceKRW": 41017.3764,
+        "orderAmountUSD": 330.33,
+        "orderAmountKRW": 451191.14
+      },
+      {
+        "ticker": "SMH",
+        "name": "SMH",
+        "currentQuantity": 10,
+        "orderQuantity": 1,
+        "targetQuantity": 11,
+        "priceUSD": 545.22,
+        "priceKRW": 744705.0936,
+        "orderAmountUSD": 545.22,
+        "orderAmountKRW": 744705.09
+      }
+    ]
+  },
+  "해외투자_정은": {
+    "account": "해외투자_정은",
+    "mode": "additional",
+    "step": "WAITING_BUY_FILL",
+    "createdAt": "2026-09-02T19:05:30+09:00",
+    "additionalAmount": 2000000,
+    "exchangeRate": 1366.48,
+    "sellOrders": [],
+    "buyOrders": [
+      {
+        "ticker": "FHLC",
+        "name": "FHLC",
+        "currentQuantity": 64,
+        "orderQuantity": 2,
+        "targetQuantity": 66,
+        "priceUSD": 83.11,
+        "priceKRW": 113568.0,
+        "orderAmountUSD": 166.22,
+        "orderAmountKRW": 227136.0
+      },
+      {
+        "ticker": "SCHX",
+        "name": "SCHX",
+        "currentQuantity": 250,
+        "orderQuantity": 24,
+        "targetQuantity": 274,
+        "priceUSD": 30.03,
+        "priceKRW": 41035.0,
+        "orderAmountUSD": 720.72,
+        "orderAmountKRW": 984850.0
+      },
+      {
+        "ticker": "SCHD",
+        "name": "SCHD",
+        "currentQuantity": 379,
+        "orderQuantity": 15,
+        "targetQuantity": 394,
+        "priceUSD": 34.81,
+        "priceKRW": 47567.0,
+        "orderAmountUSD": 522.15,
+        "orderAmountKRW": 713506.0
+      }
+    ]
+  }
 }

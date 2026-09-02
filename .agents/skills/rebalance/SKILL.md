@@ -33,23 +33,26 @@ description: >-
 
 ### [Branch A] 대기 주문 체결 처리
 
-`src/data/pending_rebalance.json`을 읽고 현재 대기 상태(`step`, `account`, 주문 목록)를 사용자에게 브리핑합니다.
+`src/data/pending_rebalance.json`을 읽고 현재 대기 중인 계좌 목록과 상태(`step`, `account`, 주문 목록)를 사용자에게 브리핑합니다.
+*(단일 계좌 포맷 및 다중 계좌 포맷 `{ "계좌명": {...} }`을 모두 지원합니다.)*
 
 #### 1. 대기 상태 확인 및 질문
+대기 중인 계좌가 여러 개인 경우, 처리할 대상(예: "전체 일괄 체결", "특정 계좌만 체결", "다른 계좌 추가 리밸런싱 진행")을 먼저 선택하거나 지정할 수 있습니다.
 `ask_question` 도구를 사용하여 다음 선택지를 제시합니다:
 - **(Recommended) 가이드대로 전량 체결 완료** (모든 주문이 추천 수량대로 체결됨)
 - **일부만 체결됨 (부분 체결)** (특정 종목만 체결되었거나 수량이 다름)
-- **대기 주문 취소** (주문을 취소하고 대기 파일 삭제)
+- **다른 계좌 추가 리밸런싱 진행** (기존 대기 주문을 유지한 채 새로운 계좌 가이드 생성)
+- **대기 주문 취소** (특정 계좌 또는 전체 대기 주문 취소)
 
 #### 2. 사용자 선택에 따른 분기 처리
 - **Case 1: 전량 체결 완료**
   - **해외투자 계좌이고 `step === "WAITING_SELL_FILL"`인 경우 (2단계 매수 전환):**
     1. `src/data/portfolio.csv`에 매도된 주수를 먼저 차감 반영합니다.
     2. 확보된 매도 대금을 바탕으로 오늘 밤 실행할 **2단계 LOC 매수 가이드**를 출력합니다.
-    3. `pending_rebalance.json`의 `step`을 `"WAITING_BUY_FILL"`로 변경하고 매수 주문 목록을 저장한 뒤 `git add` ➔ `git commit` ➔ `git push`를 수행합니다.
+    3. `pending_rebalance.json`의 해당 계좌 `step`을 `"WAITING_BUY_FILL"`로 변경하고 매수 주문 목록을 저장한 뒤 `git add` ➔ `git commit` ➔ `git push`를 수행합니다.
   - **그 외 일반 체결 또는 최종 매수 체결인 경우:**
     1. `src/data/portfolio.csv`의 해당 종목 `수량`을 추천 가감 수량에 맞춰 자동 갱신합니다. (매도: 기존 수량 - 매도주수, 매수: 기존 수량 + 매수주수)
-    2. `pending_rebalance.json` 파일을 삭제합니다.
+    2. 체결된 계좌를 `pending_rebalance.json`에서 제거합니다. (모든 계좌 처리가 완료되면 파일 삭제)
     3. ➔ **[Step 4: 데이터 영구화 & 완료]**로 이동합니다.
 
 - **Case 2: 부분 체결**
@@ -57,9 +60,13 @@ description: >-
   - 사용자가 입력한 수량만 `portfolio.csv`에 반영하고, 미체결 잔여분은 대기 파일에 유지하거나 정리합니다.
   - ➔ **[Step 4: 데이터 영구화 & 완료]**로 이동합니다.
 
-- **Case 3: 대기 주문 취소**
-  - `pending_rebalance.json` 파일을 삭제합니다.
-  - `git add -A` ➔ `git commit -m "chore(rebalance): cancel pending rebalance order"` ➔ `git push`
+- **Case 3: 다른 계좌 추가 리밸런싱 진행**
+  - 기존 대기 상태를 그대로 유지한 채 ➔ **[Branch B: 신규 리밸런싱 가이드 생성]**으로 이동합니다.
+  - 신규 가이드 생성 후 기존 대기 주문과 함께 `pending_rebalance.json`에 병합 저장합니다.
+
+- **Case 4: 대기 주문 취소**
+  - 선택한 계좌를 `pending_rebalance.json`에서 삭제합니다 (남은 대기 주문이 없으면 파일 삭제).
+  - `git add -A` ➔ `git commit -m "chore(rebalance): cancel pending rebalance order for {계좌명}"` ➔ `git push`
   - 사용자에게 "대기 중인 리밸런싱 주문이 취소되었습니다."라고 안내하고 종료합니다.
 
 ---
@@ -138,16 +145,18 @@ description: >-
   - 매도가 없으므로 즉시 **LOC 매수 가이드**를 출력합니다.
 
 #### 5. 대기 주문 파일 저장 및 Git Push
-가이드 출력이 완료되면 즉시 `src/data/pending_rebalance.json`을 작성하고 Git에 Push합니다:
-1. `src/data/pending_rebalance.json` 파일 생성:
+가이드 출력이 완료되면 즉시 `src/data/pending_rebalance.json`을 작성(기존 파일이 있으면 병합)하고 Git에 Push합니다:
+1. `src/data/pending_rebalance.json` 파일 생성 / 병합:
    ```json
    {
-     "account": "계좌명",
-     "mode": "pure | additional",
-     "step": "WAITING_FILL | WAITING_SELL_FILL | WAITING_BUY_FILL",
-     "createdAt": "YYYY-MM-DDTHH:mm:ss",
-     "sellOrders": [...],
-     "buyOrders": [...]
+     "계좌명": {
+       "account": "계좌명",
+       "mode": "pure | additional",
+       "step": "WAITING_FILL | WAITING_SELL_FILL | WAITING_BUY_FILL",
+       "createdAt": "YYYY-MM-DDTHH:mm:ss",
+       "sellOrders": [...],
+       "buyOrders": [...]
+     }
    }
    ```
 2. Git 커밋 및 푸시 실행:
@@ -164,11 +173,11 @@ description: >-
 1. **CSV 수량 갱신:**
    - `src/data/portfolio.csv` 파일에서 해당 계좌의 종목 행을 찾아 `수량` 컬럼 값을 새로운 보유 수량으로 수정합니다.
 2. **대기 파일 정리:**
-   - `src/data/pending_rebalance.json` 파일이 존재하면 삭제합니다.
+   - `src/data/pending_rebalance.json` 파일에서 체결된 계좌 항목을 제거합니다. (모든 대기 계좌가 완료되면 파일 삭제)
 3. **시세 및 평가금액 자동 재계산:**
    - `run_command`로 `python scripts/update_prices.py`를 실행합니다.
 4. **Git 자동 커밋 & 푸시:**
-   - `git add src/data/portfolio.csv src/data/pending_rebalance.json`
+   - `git add src/data/portfolio.csv src/data/pending_rebalance.json .agents/skills/rebalance/SKILL.md`
    - `git commit -m "feat(rebalance): complete rebalancing for {계좌명}"`
    - `git push`
 5. **최종 보고:**
