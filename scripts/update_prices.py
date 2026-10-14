@@ -217,6 +217,29 @@ def main() -> None:
                         row[COL_WEIGHT] = f'{ret_rate:.2f}%'
                     break
 
+    # 퇴직연금 상단 행 자동 동기화 (IRP_회사 + IRP_개인 합산)
+    irp_sum = 0.0
+    for acc in ['IRP_회사', 'IRP_개인']:
+        if acc in account_indices:
+            for idx in account_indices[acc]:
+                irp_sum += float(data_rows[idx][COL_VALUATION].replace(',', '') or '0')
+    if irp_sum > 0:
+        for row in data_rows:
+            cat = row[COL_CATEGORY].strip()
+            name = row[COL_NAME].strip()
+            if not cat.startswith(HOLDING_PREFIX) and name == '퇴직연금':
+                row[COL_VALUATION] = str(int(round(irp_sum)))
+                prin_str = row[COL_PRINCIPAL].replace(',', '').strip()
+                try:
+                    prin = float(prin_str) if prin_str else 0.0
+                except ValueError:
+                    prin = 0.0
+                if prin > 0:
+                    ret_rate = ((irp_sum - prin) / prin) * 100
+                    row[COL_WEIGHT] = f'{ret_rate:.2f}%'
+                print(f'  Synced [퇴직연금 (IRP 합산)]: {int(round(irp_sum)):,} KRW ({row[COL_WEIGHT]})')
+                break
+
     with open(portfolio_path, 'w', encoding='utf-8', newline='') as f:
         writer = csv.writer(f, lineterminator='\n')
         writer.writerow(header)
