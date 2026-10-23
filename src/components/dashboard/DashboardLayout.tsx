@@ -113,6 +113,8 @@ export function DashboardLayout() {
       const name = row.name.trim()
       let keys: string[] = []
       if (name.includes('연금저축_정은') || name.includes('연금저축 (정은)')) keys = ['연금저축_정은']
+      else if (name === '연금저축1') keys = ['연금저축1']
+      else if (name === '연금저축2') keys = ['연금저축2']
       else if (name.includes('연금저축')) keys = ['연금저축']
       else if (name.includes('퇴직연금')) keys = ['IRP_회사', 'IRP_개인']
       else if (name.includes('IRP_회사') || name.includes('IRP (회사)')) keys = ['IRP_회사']
