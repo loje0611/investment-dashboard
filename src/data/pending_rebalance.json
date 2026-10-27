@@ -1,0 +1,46 @@
+{
+  "해외투자": {
+    "account": "해외투자",
+    "mode": "additional",
+    "step": "WAITING_BUY_FILL",
+    "createdAt": "2026-10-27T22:55:00+09:00",
+    "additionalAmount": 3670000,
+    "exchangeRate": 1327.41,
+    "sellOrders": [],
+    "buyOrders": [
+      {
+        "ticker": "SMH",
+        "name": "SMH",
+        "currentQuantity": 15,
+        "orderQuantity": 3,
+        "targetQuantity": 18,
+        "priceUSD": 549.50,
+        "priceKRW": 729411.80,
+        "orderAmountUSD": 1648.50,
+        "orderAmountKRW": 2188235.39
+      },
+      {
+        "ticker": "QQQM",
+        "name": "QQQM",
+        "currentQuantity": 29,
+        "orderQuantity": 3,
+        "targetQuantity": 32,
+        "priceUSD": 294.38,
+        "priceKRW": 390766.94,
+        "orderAmountUSD": 883.14,
+        "orderAmountKRW": 1172300.81
+      },
+      {
+        "ticker": "SCHX",
+        "name": "SCHX",
+        "currentQuantity": 417,
+        "orderQuantity": 6,
+        "targetQuantity": 423,
+        "priceUSD": 30.14,
+        "priceKRW": 40014.77,
+        "orderAmountUSD": 180.84,
+        "orderAmountKRW": 240088.65
+      }
+    ]
+  }
+}
